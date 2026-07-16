@@ -6,30 +6,76 @@
   <style>
     body{font-family:'Segoe UI',Arial,sans-serif;max-width:860px;margin:40px auto;padding:0 32px;color:#1e1e1e}
     h1{font-size:28px;font-weight:700;margin-bottom:4px}
-    .contact{font-size:13px;color:#555;margin-bottom:18px}
+    .contact{font-size:13px;color:#555;margin-bottom:4px}
+    .contact a{color:#0d47a1;text-decoration:none}
     .section-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;
-                    color:#0d47a1;border-bottom:1.5px solid #0d47a1;padding-bottom:4px;margin:22px 0 10px}
+                   color:#0d47a1;border-bottom:1.5px solid #0d47a1;padding-bottom:4px;margin:22px 0 10px}
     .summary-text{font-size:14px;line-height:1.7;color:#333}
+    .skills-text{font-size:13px;line-height:1.8;color:#333}
     .job{margin-bottom:18px}
     .job-title{font-size:15px;font-weight:700}
     .job-company{font-size:13px;color:#555}
     .job-date{font-size:12px;color:#888;margin-bottom:6px}
     ul{margin:6px 0 0 18px;padding:0}
     li{font-size:13px;line-height:1.65;margin-bottom:3px}
+    .edu-entry{margin-bottom:8px}
+    .edu-degree{font-size:14px;font-weight:600}
+    .edu-school{font-size:13px;color:#555}
+    .edu-date{font-size:12px;color:#888}
   </style>
 </head>
 <body>
+
   <h1>Kaushal Kumar Jha</h1>
   <div class="contact">
-    <a href="mailto:47393kaushalkumarjha727219@gmail.comlinkedin">47393kaushalkumarjha727219@gmail.comlinkedin</a>
-     &nbsp;·&nbsp; 2026-07-16
+    <a href="mailto:kaushalkumarjha727219@gmail.com">kaushalkumarjha727219@gmail.com</a>
+    &nbsp;·&nbsp; +91 98181 47393
+    &nbsp;·&nbsp; <a href="https://www.linkedin.com/in/kaushal-kumar-jha-93b77512a/" target="_blank">linkedin.com/in/kaushal-kumar-jha</a>
+    &nbsp;·&nbsp; <a href="https://github.com/Kaushal727281" target="_blank">github.com/Kaushal727281</a>
   </div>
 
   <div class="section-title">Professional Summary</div>
-  <div class="summary-text"></div>
+  <div class="summary-text">Lead Software Engineer with 8 years of experience building enterprise-grade Java back-end systems and modern Angular / JavaScript front-ends. At FICO, I lead full-stack development on an enterprise Decision Management &amp; Business Rules platform — used by Fortune 500 companies in banking, insurance, and retail to automate high-volume decisions at scale. I have hands-on experience across the entire stack: from rule-engine internals and Spring Boot microservices to Angular SPA development and multi-module CI/CD pipelines. Equally comfortable leading large enterprise codebases and building greenfield full-stack products from scratch.</div>
+
+  <div class="section-title">Core Skills</div>
+  <div class="skills-text">Java 8/11 · Spring Boot · Spring Security · Hibernate/JPA · Jersey (JAX-RS) · REST APIs · Microservices · Angular · React · Next.js · TypeScript · JavaScript · SQL · PostgreSQL · Oracle · HSQL · Maven · Ant/Ivy · Docker · Git · Nexus · JFrog · JUnit · TestNG · Selenium · Playwright · Dapr · Lucene · Business Rules Engine · DaaS · FSML · Kafka · AWS · CI/CD</div>
 
   <div class="section-title">Professional Experience</div>
-  <p style="color:#999;font-size:13px">Experience section could not be parsed automatically — please review.</p>
+
+  <div class="job">
+    <div class="job-title">Lead Software Engineer</div>
+    <div class="job-company">FICO (Fair Isaac Corporation)</div>
+    <div class="job-date">2019 – Present</div>
+    <ul>
+      <li>Lead engineer on FICO's enterprise Decision Management platform — a Business Rules engine powering automated decisioning for global financial, insurance, and retail clients.</li>
+      <li>Designed and delivered the Authoring Module — a standalone Spring Boot 2.7 WAR with Spring Security 5.8 authentication, JPA/Hibernate multi-database support, and a clean REST API layer over the legacy rules engine.</li>
+      <li>Engineered Jersey (JAX-RS) REST endpoints in the server layer and established the NdAbstractActionHandler handler pattern now adopted across all feature teams.</li>
+      <li>Owned the RMA Angular front-end (Grunt/Gulp build pipeline): built decision-table editors, decision-tree editors, FSML rule metaphors, DaaS export wizards, and audit-log reporting UIs.</li>
+      <li>Integrated Lucene 9.12 for full-text search, Togglz for feature flagging, and Dapr for cloud/microservice deployments.</li>
+      <li>Managed multi-module Ant/Ivy builds and Nexus/JFrog Artifactory dependency pipelines; reduced build time by optimising dependency graphs.</li>
+      <li>Authored and maintained TestNG + Selenium regression suites and E2E test harnesses, significantly improving release confidence.</li>
+      <li>Mentored junior and mid-level engineers through code reviews, design discussions, and pair-programming sessions.</li>
+    </ul>
+  </div>
+
+  <div class="job">
+    <div class="job-title">Senior Software Engineer</div>
+    <div class="job-company">Previous Employer</div>
+    <div class="job-date">2016 – 2019</div>
+    <ul>
+      <li>Developed and maintained Java-based microservices handling high-volume transactional workloads.</li>
+      <li>Built RESTful APIs consumed by web and mobile clients using Spring Boot and Jersey.</li>
+      <li>Collaborated with cross-functional teams to deliver features on aggressive timelines.</li>
+      <li>Contributed to code quality improvements through unit testing with JUnit and TestNG.</li>
+    </ul>
+  </div>
+
+  <div class="section-title">Education</div>
+  <div class="edu-entry">
+    <div class="edu-degree">B.Tech – Computer Science &amp; Engineering</div>
+    <div class="edu-school">KIIT University, Bhubaneswar</div>
+    <div class="edu-date">2013 – 2017</div>
+  </div>
 
 </body>
 </html>

@@ -46,6 +46,10 @@ def _extract_sections(soup: BeautifulSoup) -> dict:
     summary_el = soup.find(class_="summary-text")
     summary = summary_el.get_text(" ", strip=True) if summary_el else ""
 
+    # Skills
+    skills_el = soup.find(class_="skills-text")
+    skills = skills_el.get_text(" ", strip=True) if skills_el else ""
+
     # Experience bullets — collect all <li> text from each job block
     jobs_data = []
     for job_div in soup.find_all(class_="job"):
@@ -59,7 +63,7 @@ def _extract_sections(soup: BeautifulSoup) -> dict:
                 "bullets": bullets,
             })
 
-    return {"summary": summary, "jobs": jobs_data}
+    return {"summary": summary, "skills": skills, "jobs": jobs_data}
 
 
 def _apply_sections(soup: BeautifulSoup, modified: dict) -> BeautifulSoup:
@@ -71,6 +75,14 @@ def _apply_sections(soup: BeautifulSoup, modified: dict) -> BeautifulSoup:
         if summary_el:
             summary_el.clear()
             summary_el.append(new_summary)
+
+    # Skills — reordered/supplemented for ATS
+    new_skills = modified.get("skills", "")
+    if new_skills:
+        skills_el = soup.find(class_="skills-text")
+        if skills_el:
+            skills_el.clear()
+            skills_el.append(new_skills)
 
     # Experience bullets
     mod_jobs = modified.get("jobs", [])
@@ -107,6 +119,7 @@ def tailor_resume(job: dict) -> dict:
 
     # Build a compact text-only representation for Groq (~2KB)
     resume_text = f"SUMMARY:\n{sections['summary']}\n\n"
+    resume_text += f"SKILLS:\n{sections['skills']}\n\n"
     for j in sections["jobs"]:
         resume_text += f"ROLE: {j['title']} @ {j['company']}\n"
         for b in j["bullets"]:
@@ -116,7 +129,7 @@ def tailor_resume(job: dict) -> dict:
     client = _get_client()
 
     candidate_name = _candidate_name()
-    prompt = f"""You are a professional resume writer helping {candidate_name} tailor their resume for a specific job.
+    prompt = f"""You are a professional resume writer helping {candidate_name} tailor their resume for a specific job. Your goal is to maximise ATS (Applicant Tracking System) score while keeping the resume 100% truthful.
 
 ## Target Job
 Title: {job['title']}
@@ -127,16 +140,18 @@ Salary: {job.get('salary', 'Not disclosed')}
 ## Job Description
 {job.get('description', '')[:2000]}
 
-## Current Resume Text (summary + experience bullets only)
+## Current Resume Text
 {resume_text}
 
 ## Instructions
-1. Rewrite the SUMMARY to directly address this role (2-3 sentences, mention the company name).
-2. For each role, reorder the bullets to put the most relevant ones first. You may lightly rephrase (never fabricate new facts).
-3. Return a JSON object with this exact structure — mirror the same roles and bullet counts:
+1. Rewrite the SUMMARY to directly address this role (2-3 sentences, mention the company name, mirror key phrases from the JD).
+2. Rewrite the SKILLS line: keep all existing skills, put the ones most relevant to this JD first, and add any missing JD keywords that {candidate_name} genuinely has. Keep the "·" separator format.
+3. For each role, reorder the bullets to put the most relevant ones first. You may lightly rephrase to match JD language (never fabricate new facts or add experience not present).
+4. Return a JSON object with this exact structure — mirror the same roles and bullet counts:
 
 {{
   "summary": "<new summary text>",
+  "skills": "<reordered · separated skills string>",
   "jobs": [
     {{"title": "<role>", "company": "<co>", "bullets": ["bullet1", "bullet2", ...]}},
     ...
@@ -169,9 +184,12 @@ Return ONLY valid JSON, no markdown fences, no extra text."""
 
     result = json.loads(raw)
 
-    for key in ("summary", "jobs", "cover_note", "match_score", "key_matches"):
+    for key in ("summary", "skills", "jobs", "cover_note", "match_score", "key_matches"):
         if key not in result:
-            raise ValueError(f"Groq response missing key: {key}")
+            if key == "skills":
+                result["skills"] = sections["skills"]   # fallback: keep original
+            else:
+                raise ValueError(f"Groq response missing key: {key}")
 
     # Inject modified text back into the full HTML
     soup = _apply_sections(soup, result)
@@ -179,6 +197,7 @@ Return ONLY valid JSON, no markdown fences, no extra text."""
 
     # Remove intermediate keys not needed by callers
     del result["summary"]
+    del result["skills"]
     del result["jobs"]
 
     logger.info(
