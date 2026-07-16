@@ -111,18 +111,18 @@ def _imap_since(applied_at: str) -> str:
 
 
 def _email_after_apply(date_str: str, applied_at: str) -> bool:
-    """Return True if the email's Date header is on or after the applied_at datetime."""
+    """Return True if the email's date is on or after the day the job was applied."""
     if not applied_at:
-        return True   # no apply date recorded — allow everything
+        return True
     try:
-        applied_dt = datetime.fromisoformat(applied_at).replace(tzinfo=timezone.utc)
-        email_dt   = parsedate_to_datetime(date_str)
-        # Make both offset-aware for comparison
-        if email_dt.tzinfo is None:
-            email_dt = email_dt.replace(tzinfo=timezone.utc)
-        return email_dt >= applied_dt
+        # Compare dates only — applied_at is in local time, email Date header
+        # may be in any timezone. Day-level comparison avoids TZ mismatch bugs.
+        applied_date = datetime.fromisoformat(applied_at).date()
+        email_dt = parsedate_to_datetime(date_str)
+        email_date = email_dt.date()
+        return email_date >= applied_date
     except Exception:
-        return True   # can't parse — allow through
+        return True
 
 
 def _company_key(company: str) -> str:
@@ -177,8 +177,17 @@ def check_responses(applied_jobs: list[dict]) -> dict:
             seen_ids: set = set()
             responses = []
 
+            # Also search by job title keyword as fallback (catches LinkedIn/platform replies)
+            title_key = _company_key(title)
+            criteria = [
+                f'{since_clause}FROM "{key}"',
+                f'{since_clause}SUBJECT "{key}"',
+            ]
+            if title_key and title_key.lower() != key.lower():
+                criteria.append(f'{since_clause}SUBJECT "{title_key}"')
+
             # Search by company name in FROM and SUBJECT, filtered by apply date
-            for criterion in [f'{since_clause}FROM "{key}"', f'{since_clause}SUBJECT "{key}"']:
+            for criterion in criteria:
                 try:
                     status, data = mail.search(None, criterion)
                     if status != "OK" or not data[0]:
