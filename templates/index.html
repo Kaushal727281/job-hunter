@@ -54,6 +54,8 @@
     .badge-naukri{background:#ffe0e0;color:#c62828;padding:2px 7px;border-radius:10px}
     .badge-linkedin{background:#e3f2fd;color:#1565c0;padding:2px 7px;border-radius:10px}
     .badge-remote{background:#e8f5e9;color:#2e7d32;padding:2px 7px;border-radius:10px}
+    .badge-applied{background:#e8f5e9;color:#1b5e20;padding:2px 7px;border-radius:10px;font-weight:700}
+    .badge-responded{background:#fff3e0;color:#e65100;padding:2px 7px;border-radius:10px;font-weight:700}
     .card-title{font-size:15px;font-weight:700;color:#0d47a1;line-height:1.3;margin-bottom:3px}
     .card-company{font-size:13px;font-weight:600;color:#333}
     .card-meta{font-size:12px;color:#777;margin-top:3px}
@@ -111,6 +113,7 @@
   <div class="header-right">
     <span id="status-msg">{{ status.message }}</span>
     <button class="btn btn-white" id="fetch-btn" onclick="startFetch()">Fetch New Jobs</button>
+    <button class="btn btn-outline" id="resp-btn" onclick="checkResponses()">📬 Check Responses</button>
     <button class="btn btn-outline" onclick="if(confirm('Clear all jobs?')) clearAll()">Clear All</button>
   </div>
 </header>
@@ -152,6 +155,8 @@
     <span class="filter-label">Status</span>
     <button class="filter-btn active" data-filter="status" data-val="all"      onclick="applyFilters(this,'status')">All ({{ jobs|length }})</button>
     <button class="filter-btn"        data-filter="status" data-val="tailored" onclick="applyFilters(this,'status')">Tailored ({{ jobs|selectattr('tailor_result')|list|length }})</button>
+    <button class="filter-btn"        data-filter="status" data-val="applied"  onclick="applyFilters(this,'status')">Applied ({{ jobs|selectattr('applied_at')|list|length }})</button>
+    <button class="filter-btn"        data-filter="status" data-val="responded" onclick="applyFilters(this,'status')">Responded ({{ jobs|selectattr('email_responses')|list|length }})</button>
   </div>
 
   <input class="search-box" id="search" type="text" placeholder="Search role, company…" oninput="applyFilters()"/>
@@ -165,6 +170,8 @@
   <div class="card" id="card-{{ job.id }}"
        data-source="{{ job.source }}"
        data-tailored="{{ 'yes' if tr else 'no' }}"
+       data-applied="{{ 'yes' if job.applied_at else 'no' }}"
+       data-responded="{{ 'yes' if job.email_responses else 'no' }}"
        data-loc="{{ job.location|lower }}"
        data-expmin="{{ job.experience.split('–')[0].strip() if job.experience and '–' in job.experience else '' }}"
        data-text="{{ (job.title + ' ' + job.company + ' ' + job.location)|lower }}">
@@ -173,6 +180,8 @@
       <div class="card-source">
         <span class="badge-{{ job.source|lower }}">{{ job.source }}</span>
         {% if job.is_remote %}<span class="badge-remote">Remote</span>{% endif %}
+        {% if job.applied_at %}<span class="badge-applied">✓ Applied</span>{% endif %}
+        {% if job.email_responses %}<span class="badge-responded">📬 Response!</span>{% endif %}
         <span style="margin-left:auto;font-size:11px;color:#aaa">{{ job.fetched_date }}</span>
       </div>
       <div class="card-title">{{ job.title }}</div>
@@ -219,8 +228,16 @@
       {% endif %}
       {% if job.apply_link %}
       <a href="{{ job.apply_link }}" target="_blank" rel="noopener">
-        <button class="btn-sm btn-apply">Apply →</button>
+        <button class="btn-sm btn-apply" onclick="markApplied('{{ job.id }}', this)">Apply →</button>
       </a>
+      {% endif %}
+      {% if job.applied_at %}
+      <button class="btn-sm" style="background:#e8f5e9;color:#1b5e20;border:1.5px solid #a5d6a7"
+              onclick="unmarkApplied('{{ job.id }}', this)">✓ Applied</button>
+      {% else %}
+      <button class="btn-sm" style="background:#f5f5f5;color:#777;border:1.5px solid #ddd"
+              id="apply-mark-{{ job.id }}"
+              onclick="markApplied('{{ job.id }}', this)">Mark Applied</button>
       {% endif %}
     </div>
   </div>
@@ -327,7 +344,9 @@ function applyFilters(btn, group){
       if(activeFilters.exp === '10+'  && expMin < 10) show=false;
     }
     // Status
-    if(show && activeFilters.status === 'tailored' && c.dataset.tailored !== 'yes') show=false;
+    if(show && activeFilters.status === 'tailored'   && c.dataset.tailored   !== 'yes') show=false;
+    if(show && activeFilters.status === 'applied'    && c.dataset.applied    !== 'yes') show=false;
+    if(show && activeFilters.status === 'responded'  && c.dataset.responded  !== 'yes') show=false;
     // Search text
     if(show && q && !c.dataset.text.includes(q)) show=false;
     c.style.display = show ? '' : 'none';
@@ -336,6 +355,49 @@ function applyFilters(btn, group){
 
 function clearAll(){
   fetch('/clear',{method:'POST'}).then(()=>location.reload());
+}
+
+function markApplied(jobId, btn){
+  fetch(`/apply/${jobId}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({applied:true})})
+    .then(r=>r.json()).then(()=>{
+      // Update the card badge
+      const card = document.getElementById('card-'+jobId);
+      if(card){
+        card.dataset.applied='yes';
+        const src = card.querySelector('.card-source');
+        if(src && !src.querySelector('.badge-applied')){
+          const b=document.createElement('span');
+          b.className='badge-applied'; b.textContent='✓ Applied';
+          src.insertBefore(b, src.querySelector('span[style]'));
+        }
+      }
+      // Swap button
+      if(btn){ btn.textContent='✓ Applied'; btn.style.cssText='background:#e8f5e9;color:#1b5e20;border:1.5px solid #a5d6a7'; }
+      toast('Marked as applied!');
+    });
+}
+
+function unmarkApplied(jobId, btn){
+  fetch(`/apply/${jobId}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({applied:false})})
+    .then(()=>{ toast('Unmarked'); setTimeout(()=>location.reload(),600); });
+}
+
+function checkResponses(){
+  const btn=document.getElementById('resp-btn');
+  btn.innerHTML='<span class="spinner"></span>Checking…'; btn.disabled=true;
+  fetch('/check-responses',{method:'POST'}).then(r=>r.json()).then(d=>{
+    toast(d.message);
+    const t=setInterval(()=>{
+      fetch('/check-responses-status').then(r=>r.json()).then(s=>{
+        if(!s.running){
+          clearInterval(t);
+          btn.innerHTML='📬 Check Responses'; btn.disabled=false;
+          toast('Done! Reloading…');
+          setTimeout(()=>location.reload(),1000);
+        }
+      });
+    },2000);
+  });
 }
 
 // Resume auto-poll if fetch was running before reload

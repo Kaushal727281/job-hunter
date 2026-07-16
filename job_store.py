@@ -57,6 +57,37 @@ def update_job(job_id: str, **fields):
         _write(jobs)
 
 
+def mark_applied(job_id: str, applied: bool = True):
+    """Toggle the applied state for a job."""
+    from datetime import datetime
+    with _lock:
+        jobs = _read()
+        for j in jobs:
+            if j["id"] == job_id:
+                if applied:
+                    j["applied_at"] = datetime.now().isoformat(timespec="seconds")
+                else:
+                    j.pop("applied_at", None)
+                    j.pop("email_responses", None)
+        _write(jobs)
+
+
+def set_responses(job_id: str, responses: list[dict]):
+    """Store Gmail response emails for an applied job."""
+    with _lock:
+        jobs = _read()
+        for j in jobs:
+            if j["id"] == job_id:
+                j["email_responses"] = responses
+        _write(jobs)
+
+
+def applied_jobs() -> list[dict]:
+    """Return all jobs that have been marked as applied."""
+    with _lock:
+        return [j for j in _read() if j.get("applied_at")]
+
+
 def clear_all():
     with _lock:
         _write([])

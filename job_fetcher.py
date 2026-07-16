@@ -24,6 +24,22 @@ logger = logging.getLogger(__name__)
 
 SEEN_JOBS_FILE = Path(__file__).parent / "output" / "seen_jobs.json"
 
+# Common words to strip when building a dedup key from title+company
+_STOP = {
+    "senior", "lead", "principal", "staff", "junior", "associate", "software",
+    "engineer", "developer", "manager", "architect", "consultant", "specialist",
+    "private", "limited", "pvt", "ltd", "inc", "corp", "technologies",
+    "solutions", "services", "india", "the", "and", "for", "of",
+}
+
+
+def _norm_key(title: str, company: str) -> str:
+    """Normalised dedup key combining title + company, source-agnostic."""
+    text = re.sub(r"[^a-z0-9 ]", "", (title + " " + company).lower())
+    words = [w for w in text.split() if w not in _STOP and len(w) > 2]
+    return " ".join(sorted(words))          # sorted so order doesn't matter
+
+
 _BASE_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -254,7 +270,8 @@ def fetch_jobs(config: dict, limit: int | None = None) -> list[dict]:
     max_exp    = filters.get("max_experience_years", 99)
     job_types  = [t.lower() for t in filters.get("job_types", [])]
 
-    seen = _load_seen()
+    seen      = _load_seen()       # set of job IDs already processed
+    seen_keys: set[str] = set()    # normalised title+company dedup (cross-source)
     all_jobs: list[dict] = []
 
     fetchers = [
@@ -266,27 +283,29 @@ def fetch_jobs(config: dict, limit: int | None = None) -> list[dict]:
         for location in search_cfg["locations"]:
             if len(all_jobs) >= max_jobs:
                 break
-            loc = location.replace(", India", "").strip()
-            # LinkedIn uses "Remote India" → "India"
+            loc    = location.replace(", India", "").strip()
             li_loc = "India" if "Remote" in location else loc
 
             for src_name, fetcher in fetchers:
                 if len(all_jobs) >= max_jobs:
                     break
                 logger.info(f"[{src_name}] '{query}' in '{loc}'")
-
-                if src_name == "LinkedIn":
-                    raw = fetcher(query, li_loc, days=days)
-                else:
-                    raw = fetcher(query, loc)
-
+                raw = fetcher(query, li_loc if src_name == "LinkedIn" else loc,
+                              **({} if src_name == "Shine" else {"days": days}))
                 time.sleep(0.4)
 
                 for job in raw:
                     if not job["title"] or job["id"] in seen:
                         continue
 
-                    # Exclude keyword filter
+                    # Cross-source dedup: same role at same company from LinkedIn + Shine
+                    nk = _norm_key(job["title"], job["company"])
+                    if nk and nk in seen_keys:
+                        logger.debug(f"Dedup (title+company): {job['title']} @ {job['company']}")
+                        seen.add(job["id"])   # mark ID so we skip it in future runs too
+                        continue
+
+                    # Keyword exclude filter
                     text = (job["title"] + " " + job.get("description", "")[:300]).lower()
                     if any(kw in text for kw in exclude):
                         continue
@@ -294,25 +313,21 @@ def fetch_jobs(config: dict, limit: int | None = None) -> list[dict]:
                     # Experience filter
                     if job.get("experience"):
                         nums = re.findall(r"\d+", job["experience"])
-                        if nums:
-                            job_exp = int(nums[0])
-                            if job_exp < min_exp or job_exp > max_exp:
-                                continue
-
-                    # Job type filter (remote / fulltime)
-                    if job_types:
-                        is_remote_job = job.get("is_remote", False)
-                        if "remote" in job_types and not is_remote_job:
-                            pass  # don't skip — show both unless only remote requested
-                        if job_types == ["remote"] and not is_remote_job:
+                        if nums and (int(nums[0]) < min_exp or int(nums[0]) > max_exp):
                             continue
+
+                    # Job type filter
+                    if job_types == ["remote"] and not job.get("is_remote", False):
+                        continue
 
                     all_jobs.append(job)
                     seen.add(job["id"])
+                    if nk:
+                        seen_keys.add(nk)
 
                     if len(all_jobs) >= max_jobs:
                         break
 
     _save_seen(seen)
-    logger.info(f"Total fetched: {len(all_jobs)} new jobs")
+    logger.info(f"Total fetched: {len(all_jobs)} new jobs (cross-source dedup active)")
     return all_jobs

@@ -111,7 +111,44 @@
     <p style="color:#999;font-size:13px">Full description not loaded yet — will be fetched when you tailor the resume.</p>
     {% endif %}
     {% if job.apply_link %}
-    <a class="apply-link" href="{{ job.apply_link }}" target="_blank" rel="noopener">Apply on {{ job.source }} →</a>
+    <a class="apply-link" href="{{ job.apply_link }}" target="_blank" rel="noopener"
+       onclick="markApplied()">Apply on {{ job.source }} →</a>
+    {% endif %}
+
+    <!-- Applied status -->
+    <div style="margin-top:16px;display:flex;align-items:center;gap:10px">
+      {% if job.applied_at %}
+      <span style="background:#e8f5e9;color:#1b5e20;border:1.5px solid #a5d6a7;
+                   padding:6px 14px;border-radius:6px;font-size:13px;font-weight:700">
+        ✓ Applied on {{ job.applied_at[:10] }}
+      </span>
+      <button onclick="unmarkApplied()"
+              style="border:1px solid #ddd;background:#fff;color:#999;padding:5px 12px;
+                     border-radius:6px;font-size:12px;cursor:pointer">Unmark</button>
+      {% else %}
+      <button id="apply-mark-btn" onclick="markApplied()"
+              style="border:1.5px solid #0d47a1;background:#e8f0fb;color:#0d47a1;
+                     padding:7px 16px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">
+        ✓ Mark as Applied
+      </button>
+      {% endif %}
+    </div>
+
+    <!-- Email responses -->
+    {% if job.email_responses %}
+    <div style="margin-top:20px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;
+                  color:#e65100;margin-bottom:10px">📬 {{ job.email_responses|length }} Email Response(s)</div>
+      {% for r in job.email_responses %}
+      <div style="background:#fff8f0;border:1px solid #ffcc80;border-radius:8px;
+                  padding:12px 14px;margin-bottom:10px">
+        <div style="font-size:12px;font-weight:700;color:#333">{{ r.subject or '(No subject)' }}</div>
+        <div style="font-size:11.5px;color:#888;margin:3px 0">From: {{ r.from }} · {{ r.date[:16] if r.date else '' }}</div>
+        <div style="font-size:12.5px;color:#555;line-height:1.6;margin-top:6px;
+                    white-space:pre-wrap">{{ r.snippet }}</div>
+      </div>
+      {% endfor %}
+    </div>
     {% endif %}
   </div>
 
@@ -180,9 +217,20 @@ function pollTailor(){
 }
 
 {% if tailoring %}
-// Already tailoring — start polling immediately
 pollTailor();
 {% endif %}
+
+function markApplied(){
+  fetch('/apply/{{ job.id }}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({applied:true})})
+    .then(()=>{
+      const btn=document.getElementById('apply-mark-btn');
+      if(btn){ btn.textContent='✓ Applied'; btn.style.background='#e8f5e9'; btn.style.color='#1b5e20'; }
+    });
+}
+function unmarkApplied(){
+  fetch('/apply/{{ job.id }}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({applied:false})})
+    .then(()=>location.reload());
+}
 </script>
 </body>
 </html>

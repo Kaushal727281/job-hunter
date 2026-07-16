@@ -248,6 +248,50 @@ def diff_view(job_id):
     )
 
 
+@app.route("/apply/<job_id>", methods=["POST"])
+def mark_applied(job_id):
+    data = request.get_json(silent=True) or {}
+    applied = data.get("applied", True)
+    job_store.mark_applied(job_id, applied)
+    return jsonify({"ok": True, "applied": applied})
+
+
+_gmail_check_running = False
+
+def _bg_check_responses():
+    global _gmail_check_running
+    try:
+        from gmail_checker import check_responses
+        applied = job_store.applied_jobs()
+        if not applied:
+            return
+        logger.info(f"Checking Gmail for {len(applied)} applied job(s)…")
+        results = check_responses(applied)
+        for job_id, responses in results.items():
+            job_store.set_responses(job_id, responses)
+        logger.info(f"Gmail check done — {len(results)} job(s) with responses")
+    except Exception as e:
+        logger.exception(f"Gmail check failed: {e}")
+    finally:
+        _gmail_check_running = False
+
+
+@app.route("/check-responses", methods=["POST"])
+def check_responses():
+    global _gmail_check_running
+    if _gmail_check_running:
+        return jsonify({"ok": False, "message": "Already checking"})
+    _gmail_check_running = True
+    t = threading.Thread(target=_bg_check_responses, daemon=True)
+    t.start()
+    return jsonify({"ok": True, "message": "Checking Gmail inbox…"})
+
+
+@app.route("/check-responses-status")
+def check_responses_status():
+    return jsonify({"running": _gmail_check_running})
+
+
 @app.route("/clear", methods=["POST"])
 def clear():
     job_store.clear_all()
