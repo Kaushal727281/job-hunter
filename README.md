@@ -34,7 +34,16 @@ A personal job-hunting dashboard that fetches jobs daily from LinkedIn, Glassdoo
 ```bash
 git clone https://github.com/Kaushal727281/job-hunter.git
 cd job-hunter
+```
+
+**macOS / Linux:**
+```bash
 bash setup.sh
+```
+
+**Windows** (double-click or run in Command Prompt):
+```bat
+setup.bat
 ```
 
 The script will:
@@ -78,8 +87,15 @@ Open `config.json` and update:
 
 ### 5. Run the app
 
+**macOS / Linux:**
 ```bash
 source .venv/bin/activate
+python app.py
+```
+
+**Windows:**
+```bat
+.venv\Scripts\activate
 python app.py
 ```
 

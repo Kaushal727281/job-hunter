@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────
-#  Job Hunter — one-time setup script
+#  Job Hunter — macOS / Linux Setup
 #  Run once after cloning:  bash setup.sh
 # ─────────────────────────────────────────────
 set -e
@@ -19,37 +19,57 @@ echo ""
 
 # ── 1. Python version ─────────────────────────
 step "Checking Python version"
-PYTHON=$(command -v python3 || command -v python || true)
+PYTHON=""
+for cmd in python3 python3.12 python3.11 python3.10 python; do
+  if command -v "$cmd" &>/dev/null; then
+    VER=$($cmd -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null || echo "0.0")
+    MAJOR=$(echo $VER | cut -d. -f1)
+    MINOR=$(echo $VER | cut -d. -f2)
+    if [ "$MAJOR" -ge 3 ] && [ "$MINOR" -ge 10 ]; then
+      PYTHON=$cmd
+      break
+    fi
+  fi
+done
+
 if [ -z "$PYTHON" ]; then
-  err "Python not found. Install Python 3.10+ from https://python.org"
+  err "Python 3.10+ not found."
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    err "Install via Homebrew:  brew install python"
+    err "Or download from:      https://python.org"
+  else
+    err "Install via:  sudo apt install python3  (Ubuntu/Debian)"
+    err "Or download:  https://python.org"
+  fi
   exit 1
 fi
-PY_VER=$($PYTHON -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
-PY_MAJOR=$($PYTHON -c "import sys; print(sys.version_info.major)")
-PY_MINOR=$($PYTHON -c "import sys; print(sys.version_info.minor)")
-if [ "$PY_MAJOR" -lt 3 ] || { [ "$PY_MAJOR" -eq 3 ] && [ "$PY_MINOR" -lt 10 ]; }; then
-  err "Python $PY_VER found but 3.10+ is required."
-  exit 1
-fi
-ok "Python $PY_VER"
+ok "Python $($PYTHON --version) at $(which $PYTHON)"
 
 # ── 2. Virtual environment ────────────────────
 step "Setting up virtual environment"
+
+# Determine correct activate path (Unix = bin/activate)
+ACTIVATE=".venv/bin/activate"
+
 if [ ! -d ".venv" ]; then
-  $PYTHON -m venv .venv 2>/dev/null || true
-  # On Ubuntu/Debian, python3-venv may not be installed
-  if [ ! -f ".venv/bin/activate" ]; then
-    warn "venv creation failed. Trying to install python3-venv..."
+  # Try creating venv
+  if ! $PYTHON -m venv .venv 2>/dev/null; then
+    # Ubuntu/Debian: python3-venv may be missing
     if command -v apt-get &>/dev/null; then
+      warn "Installing python3-venv..."
       sudo apt-get install -y python3-venv python3-pip -q
       $PYTHON -m venv .venv
     elif command -v yum &>/dev/null; then
-      sudo yum install -y python3-venv -q
+      warn "Installing python3-venv..."
+      sudo yum install -y python3 python3-pip -q
+      $PYTHON -m venv .venv
+    elif command -v brew &>/dev/null; then
+      warn "Trying Homebrew python..."
+      brew install python -q
       $PYTHON -m venv .venv
     else
       err "Could not create virtual environment."
-      err "Please run: pip install -r requirements.txt  (system-wide)"
-      err "Then re-run this script."
+      err "Try:  pip3 install -r requirements.txt  (without venv)"
       exit 1
     fi
   fi
@@ -58,14 +78,15 @@ else
   ok ".venv already exists — skipping"
 fi
 
-# Activate
-if [ -f ".venv/bin/activate" ]; then
-  source .venv/bin/activate
-  ok "Activated .venv"
-else
-  err ".venv/bin/activate not found — venv setup failed"
+# Verify activate script exists
+if [ ! -f "$ACTIVATE" ]; then
+  err ".venv was created but $ACTIVATE not found."
+  err "Delete .venv and re-run:  rm -rf .venv && bash setup.sh"
   exit 1
 fi
+
+source "$ACTIVATE"
+ok "Activated .venv"
 
 # ── 3. Install dependencies ───────────────────
 step "Installing Python dependencies"
@@ -83,10 +104,8 @@ else
   ok ".env already exists — skipping"
 fi
 
-# Check if GROQ_API_KEY is still a placeholder
 if grep -q "your_groq_api_key_here" .env 2>/dev/null; then
-  warn "GROQ_API_KEY is not set in .env — tailoring won't work until you add it"
-  warn "Get a free key at: https://console.groq.com"
+  warn "GROQ_API_KEY is not set — get a free key at: https://console.groq.com"
 else
   ok "GROQ_API_KEY looks set"
 fi
@@ -96,7 +115,7 @@ step "Setting up config.json"
 if [ ! -f "config.json" ]; then
   cp config.example.json config.json
   ok "Created config.json from config.example.json"
-  warn "Open config.json and update your name, email, and job queries"
+  warn "Open config.json and update your name + job queries"
 else
   ok "config.json already exists — skipping"
 fi
@@ -104,20 +123,25 @@ fi
 # ── 6. Chrome / Chromium check ────────────────
 step "Checking for Chrome / Chromium (needed for PDF generation)"
 CHROME_FOUND=false
+
+# macOS paths (Intel + Apple Silicon M1/M2/M4)
 for path in \
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
   "/Applications/Chromium.app/Contents/MacOS/Chromium" \
+  "$HOME/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
   "/usr/bin/google-chrome" \
   "/usr/bin/chromium-browser" \
-  "/usr/bin/chromium"; do
+  "/usr/bin/chromium" \
+  "/snap/bin/chromium"; do
   if [ -f "$path" ]; then
     ok "Found: $path"
     CHROME_FOUND=true
     break
   fi
 done
+
 if [ "$CHROME_FOUND" = false ]; then
-  for name in google-chrome chromium chromium-browser; do
+  for name in google-chrome google-chrome-stable chromium chromium-browser; do
     if command -v $name &>/dev/null; then
       ok "Found in PATH: $(command -v $name)"
       CHROME_FOUND=true
@@ -125,9 +149,14 @@ if [ "$CHROME_FOUND" = false ]; then
     fi
   done
 fi
+
 if [ "$CHROME_FOUND" = false ]; then
   warn "Chrome / Chromium not found — PDF downloads won't work"
-  warn "Install Google Chrome from: https://www.google.com/chrome/"
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    warn "Install: https://www.google.com/chrome/"
+  else
+    warn "Install: sudo apt install chromium-browser  or  https://www.google.com/chrome/"
+  fi
 fi
 
 # ── 7. Output dir ─────────────────────────────
