@@ -30,20 +30,58 @@ def _decode_str(raw) -> str:
 
 
 def _get_body(msg) -> str:
-    """Extract plain-text body snippet from email."""
+    """Extract plain-text body snippet from email. Falls back to HTML→text."""
+    plain, html_part = "", ""
     try:
         if msg.is_multipart():
             for part in msg.walk():
-                if part.get_content_type() == "text/plain":
-                    payload = part.get_payload(decode=True)
-                    if payload:
-                        return payload.decode("utf-8", errors="replace")[:300].strip()
+                ct = part.get_content_type()
+                payload = part.get_payload(decode=True)
+                if not payload:
+                    continue
+                text = payload.decode("utf-8", errors="replace")
+                if ct == "text/plain" and not plain:
+                    plain = text[:2000]
+                elif ct == "text/html" and not html_part:
+                    html_part = text[:100_000]   # parse full HTML; truncate text after extraction
         else:
             payload = msg.get_payload(decode=True)
             if payload:
-                return payload.decode("utf-8", errors="replace")[:300].strip()
+                plain = payload.decode("utf-8", errors="replace")[:2000]
     except Exception:
         pass
+
+    import html as _html
+
+    def _clean(text: str) -> str:
+        """Unescape HTML entities, strip ERB/template artifacts, collapse whitespace."""
+        text = _html.unescape(text)
+        text = re.sub(r'<%.*?%>', '', text, flags=re.DOTALL)   # closed tags
+        text = re.sub(r'<%.*', '', text, flags=re.DOTALL)       # unclosed/truncated tags
+        text = re.sub(r'\s+', ' ', text).strip()
+        return text
+
+    def _html_to_text(raw: str) -> str:
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(raw, "html.parser")
+        for tag in soup(["script", "style", "head"]):
+            tag.decompose()
+        return _clean(soup.get_text(separator=" ", strip=True))
+
+    def _looks_like_html(text: str) -> bool:
+        return bool(re.search(r'<[a-zA-Z][^>]{0,50}>', text))
+
+    if plain and not _looks_like_html(plain):
+        text = _clean(plain)
+        if len(text) > 20:
+            return text[:300]
+
+    # Use HTML part (or plain that is actually HTML markup)
+    source = html_part or (plain if _looks_like_html(plain) else "")
+    if source:
+        text = _html_to_text(source)
+        return text[:300]
+
     return ""
 
 
@@ -118,20 +156,21 @@ def check_responses(applied_jobs: list[dict]) -> dict:
 
                         # Build a direct Gmail URL using the RFC822 Message-ID header
                         # Format: https://mail.google.com/mail/u/0/#search/rfc822msgid:<id>
-                        raw_msg_id = msg.get("Message-ID", "")
-                        # Strip angle brackets: <abc@domain.com> → abc@domain.com
-                        clean_msg_id = raw_msg_id.strip().strip("<>")
-                        if clean_msg_id:
+                        import urllib.parse
+                        # authuser= forces Gmail to open in the correct account
+                        gmail_acct = os.getenv("GMAIL_ADDRESS", "")
+                        authuser = f"?authuser={urllib.parse.quote(gmail_acct)}" if gmail_acct else ""
+                        if subject:
                             gmail_url = (
-                                f"https://mail.google.com/mail/u/0/"
-                                f"#search/rfc822msgid%3A{clean_msg_id}"
+                                f"https://mail.google.com/mail/u/0{authuser}#search/"
+                                + urllib.parse.quote(f'subject:"{subject}"')
                             )
                         else:
-                            # Fallback: search by subject
-                            import urllib.parse
+                            raw_msg_id = msg.get("Message-ID", "")
+                            clean_msg_id = raw_msg_id.strip().strip("<>")
                             gmail_url = (
-                                "https://mail.google.com/mail/u/0/#search/"
-                                + urllib.parse.quote(f'subject:"{subject}"')
+                                f"https://mail.google.com/mail/u/0{authuser}#search/"
+                                + urllib.parse.quote(f"rfc822msgid:{clean_msg_id}")
                             )
 
                         responses.append({

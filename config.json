@@ -9,14 +9,30 @@
       "Lead Java Engineer",
       "Senior Java Developer",
       "Java Tech Lead",
-      "Senior Software Engineer Java"
+      "Senior Software Engineer Java",
+      "Principal Software Engineer",
+      "Senior Backend Engineer",
+      "Engineering Manager Java",
+      "Senior Data Analyst",
+      "Data Engineer",
+      "Senior Full Stack Developer",
+      "Cloud Solutions Architect",
+      "Senior DevOps Engineer",
+      "Senior Python Developer",
+      "API Lead Engineer",
+      "Microservices Architect"
     ],
     "locations": [
       "Bengaluru",
+      "Delhi NCR",
+      "Hyderabad",
+      "Mumbai",
+      "Pune",
       "Remote India"
     ],
     "days_old": 3,
-    "max_jobs_per_run": 20
+    "max_jobs_per_run": 60,
+    "sources": ["LinkedIn", "Shine", "Foundit", "RemoteOK", "WeWorkRemotely", "HNJobs", "Indeed"]
   },
   "filters": {
     "exclude_keywords": ["intern", "fresher", "0-2 years", "junior", "trainee"],

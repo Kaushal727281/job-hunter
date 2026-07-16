@@ -9,6 +9,8 @@ import logging
 import threading
 import difflib
 import re
+import time
+from datetime import datetime, date
 from pathlib import Path
 from flask import Flask, render_template, jsonify, request, Response
 from bs4 import BeautifulSoup
@@ -21,10 +23,24 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-CONFIG_FILE = Path(__file__).parent / "config.json"
+CONFIG_FILE  = Path(__file__).parent / "config.json"
+LAST_FETCH_FILE = Path(__file__).parent / "output" / "last_fetch.json"
 
 _fetch_status = {"running": False, "message": "Idle", "last_run": None}
 _tailor_running: set[str] = set()
+
+
+def _get_last_fetch_date() -> str:
+    """Return the date string of the last completed fetch, or ''."""
+    try:
+        return json.loads(LAST_FETCH_FILE.read_text()).get("date", "")
+    except Exception:
+        return ""
+
+
+def _save_last_fetch_date():
+    LAST_FETCH_FILE.parent.mkdir(exist_ok=True)
+    LAST_FETCH_FILE.write_text(json.dumps({"date": str(date.today())}))
 
 
 def _load_config():
@@ -41,7 +57,8 @@ def _bg_fetch():
         config = _load_config()
         jobs = fetch_jobs(config)
         added = job_store.upsert_jobs(jobs)
-        _fetch_status = {"running": False, "message": f"Done — {added} new jobs added", "last_run": None}
+        _save_last_fetch_date()
+        _fetch_status = {"running": False, "message": f"Done — {added} new jobs added", "last_run": str(date.today())}
         logger.info(f"Fetch complete: {added} new jobs")
     except Exception as e:
         logger.exception("Fetch failed")
@@ -85,12 +102,12 @@ def _bg_tailor(job_id: str):
 @app.route("/")
 def index():
     jobs = job_store.all_jobs()
-    # Sort: tailored + high score first, then by date
     def sort_key(j):
         tr = j.get("tailor_result") or {}
         return (tr.get("match_score", 0) if tr else -1, j.get("fetched_date", ""))
     jobs.sort(key=sort_key, reverse=True)
-    return render_template("index.html", jobs=jobs, status=_fetch_status)
+    status = {**_fetch_status, "last_run": _get_last_fetch_date()}
+    return render_template("index.html", jobs=jobs, status=status)
 
 
 @app.route("/fetch", methods=["POST"])
@@ -298,10 +315,34 @@ def clear():
     return jsonify({"ok": True})
 
 
+def _daily_scheduler():
+    """Background thread: trigger a fetch every day at 08:00 local time."""
+    while True:
+        now = datetime.now()
+        # Seconds until next 08:00
+        target = now.replace(hour=8, minute=0, second=0, microsecond=0)
+        if now >= target:
+            target = target.replace(day=target.day + 1)
+        wait_secs = (target - now).total_seconds()
+        logger.info(f"Daily scheduler: next fetch in {wait_secs/3600:.1f} h (at 08:00)")
+        time.sleep(wait_secs)
+        if not _fetch_status["running"]:
+            logger.info("Daily scheduler: triggering morning fetch")
+            t = threading.Thread(target=_bg_fetch, daemon=True)
+            t.start()
+
+
 if __name__ == "__main__":
-    # Auto-fetch on startup if no jobs stored
-    if not job_store.all_jobs():
-        logger.info("No jobs found — auto-fetching on startup")
+    # Auto-fetch on startup if not already fetched today
+    if _get_last_fetch_date() != str(date.today()):
+        logger.info("New day detected — auto-fetching jobs on startup")
         t = threading.Thread(target=_bg_fetch, daemon=True)
         t.start()
+    else:
+        logger.info(f"Already fetched today ({date.today()}) — skipping startup fetch")
+
+    # Start background daily scheduler (fires at 08:00 every morning)
+    sched = threading.Thread(target=_daily_scheduler, daemon=True)
+    sched.start()
+
     app.run(debug=False, host="0.0.0.0", port=5000, use_reloader=False)

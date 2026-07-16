@@ -25,8 +25,8 @@
     #status-msg{font-size:13px;opacity:.85}
 
     /* ── Filters ── */
-    .toolbar{padding:12px 32px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;
-             border-bottom:1px solid #dde4ed;background:#fff}
+    .toolbar{padding:10px 32px;display:flex;gap:6px 8px;align-items:center;flex-wrap:wrap;
+             border-bottom:1px solid #dde4ed;background:#fff;row-gap:8px}
     .filter-group{display:flex;align-items:center;gap:5px}
     .filter-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;
                   color:#999;margin-right:2px;white-space:nowrap}
@@ -53,9 +53,17 @@
                  color:#888;margin-bottom:6px;display:flex;align-items:center;gap:6px}
     .badge-naukri{background:#ffe0e0;color:#c62828;padding:2px 7px;border-radius:10px}
     .badge-linkedin{background:#e3f2fd;color:#1565c0;padding:2px 7px;border-radius:10px}
+    .badge-indeed{background:#f3e5f5;color:#6a1b9a;padding:2px 7px;border-radius:10px}
+    .badge-remoteok{background:#e0f2f1;color:#00695c;padding:2px 7px;border-radius:10px}
+    .badge-instahyre{background:#fff8e1;color:#f57f17;padding:2px 7px;border-radius:10px}
+    .badge-ziprecruiter{background:#e8eaf6;color:#283593;padding:2px 7px;border-radius:10px}
+    .badge-hnjobs{background:#fff3e0;color:#bf360c;padding:2px 7px;border-radius:10px}
+    .badge-shine{background:#fce4ec;color:#880e4f;padding:2px 7px;border-radius:10px}
     .badge-remote{background:#e8f5e9;color:#2e7d32;padding:2px 7px;border-radius:10px}
     .badge-applied{background:#e8f5e9;color:#1b5e20;padding:2px 7px;border-radius:10px;font-weight:700}
     .badge-responded{background:#fff3e0;color:#e65100;padding:2px 7px;border-radius:10px;font-weight:700}
+    .badge-product{background:#e3f2fd;color:#0d47a1;padding:2px 7px;border-radius:10px;font-weight:600;font-size:11px}
+    .badge-service{background:#f3e5f5;color:#6a1b9a;padding:2px 7px;border-radius:10px;font-weight:600;font-size:11px}
     .card-title{font-size:15px;font-weight:700;color:#0d47a1;line-height:1.3;margin-bottom:3px}
     .card-company{font-size:13px;font-weight:600;color:#333}
     .card-meta{font-size:12px;color:#777;margin-top:3px}
@@ -104,6 +112,25 @@
     #toast{position:fixed;bottom:24px;right:24px;background:#323232;color:#fff;padding:12px 20px;
            border-radius:8px;font-size:13px;opacity:0;transition:opacity .3s;z-index:999;pointer-events:none}
     #toast.show{opacity:1}
+
+    /* ── Response Modal ── */
+    #resp-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;
+                         align-items:center;justify-content:center}
+    #resp-modal-overlay.open{display:flex}
+    #resp-modal{background:#fff;border-radius:12px;width:min(560px,92vw);max-height:80vh;
+                overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.25);display:flex;flex-direction:column}
+    #resp-modal-head{padding:16px 20px;border-bottom:1px solid #eee;display:flex;
+                     align-items:center;justify-content:space-between;flex-shrink:0}
+    #resp-modal-head h3{font-size:15px;font-weight:700;color:#0d47a1}
+    #resp-modal-close{border:none;background:none;font-size:20px;cursor:pointer;color:#999;line-height:1}
+    #resp-modal-body{padding:16px 20px;display:flex;flex-direction:column;gap:12px}
+    .resp-card{background:#fff8f0;border:1px solid #ffcc80;border-radius:8px;padding:13px 15px}
+    .resp-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:5px}
+    .resp-subject{font-size:13px;font-weight:700;color:#bf360c}
+    .resp-open{flex-shrink:0;background:#e65100;color:#fff;font-size:11px;font-weight:600;
+               padding:3px 10px;border-radius:10px;text-decoration:none}
+    .resp-meta{font-size:11.5px;color:#888;margin-bottom:6px}
+    .resp-snippet{font-size:12.5px;color:#444;line-height:1.6}
   </style>
 </head>
 <body>
@@ -111,7 +138,7 @@
 <header>
   <h1>🎯 Job Hunter <span>— Kaushal Kumar Jha</span></h1>
   <div class="header-right">
-    <span id="status-msg">{{ status.message }}</span>
+    <span id="status-msg">{{ status.message }}{% if status.last_run and not status.running %} · Last fetch: {{ status.last_run }}{% endif %}</span>
     <button class="btn btn-white" id="fetch-btn" onclick="startFetch()">Fetch New Jobs</button>
     <button class="btn btn-outline" id="resp-btn" onclick="checkResponses()">📬 Check Responses</button>
     <button class="btn btn-outline" onclick="if(confirm('Clear all jobs?')) clearAll()">Clear All</button>
@@ -122,9 +149,14 @@
   <!-- Source filter -->
   <div class="filter-group">
     <span class="filter-label">Source</span>
-    <button class="filter-btn active" data-filter="source" data-val="all"    onclick="applyFilters(this,'source')">All</button>
-    <button class="filter-btn"        data-filter="source" data-val="LinkedIn" onclick="applyFilters(this,'source')">LinkedIn ({{ jobs|selectattr('source','eq','LinkedIn')|list|length }})</button>
-    <button class="filter-btn"        data-filter="source" data-val="Shine"    onclick="applyFilters(this,'source')">Shine ({{ jobs|selectattr('source','eq','Shine')|list|length }})</button>
+    <button class="filter-btn active" data-filter="source" data-val="all"              onclick="applyFilters(this,'source')">All</button>
+    <button class="filter-btn"        data-filter="source" data-val="LinkedIn"         onclick="applyFilters(this,'source')">LinkedIn ({{ jobs|selectattr('source','eq','LinkedIn')|list|length }})</button>
+    <button class="filter-btn"        data-filter="source" data-val="Shine"            onclick="applyFilters(this,'source')">Shine ({{ jobs|selectattr('source','eq','Shine')|list|length }})</button>
+    <button class="filter-btn"        data-filter="source" data-val="Foundit"          onclick="applyFilters(this,'source')">Foundit ({{ jobs|selectattr('source','eq','Foundit')|list|length }})</button>
+    <button class="filter-btn"        data-filter="source" data-val="RemoteOK"         onclick="applyFilters(this,'source')">RemoteOK ({{ jobs|selectattr('source','eq','RemoteOK')|list|length }})</button>
+    <button class="filter-btn"        data-filter="source" data-val="WeWorkRemotely"   onclick="applyFilters(this,'source')">WWR ({{ jobs|selectattr('source','eq','WeWorkRemotely')|list|length }})</button>
+    <button class="filter-btn"        data-filter="source" data-val="HNJobs"           onclick="applyFilters(this,'source')">HN Jobs ({{ jobs|selectattr('source','eq','HNJobs')|list|length }})</button>
+    <button class="filter-btn"        data-filter="source" data-val="Indeed"           onclick="applyFilters(this,'source')">Indeed ({{ jobs|selectattr('source','eq','Indeed')|list|length }})</button>
   </div>
 
   <div class="toolbar-divider"></div>
@@ -132,16 +164,33 @@
   <!-- Location filter -->
   <div class="filter-group">
     <span class="filter-label">Location</span>
-    <button class="filter-btn active" data-filter="loc" data-val="all"       onclick="applyFilters(this,'loc')">All</button>
-    <button class="filter-btn"        data-filter="loc" data-val="Bengaluru" onclick="applyFilters(this,'loc')">Bengaluru</button>
-    <button class="filter-btn"        data-filter="loc" data-val="remote"    onclick="applyFilters(this,'loc')">Remote</button>
+    <button class="filter-btn active" data-filter="loc" data-val="all"         onclick="applyFilters(this,'loc')">All</button>
+    <button class="filter-btn"        data-filter="loc" data-val="bengaluru"   onclick="applyFilters(this,'loc')">Bengaluru</button>
+    <button class="filter-btn"        data-filter="loc" data-val="delhi"       onclick="applyFilters(this,'loc')">Delhi NCR</button>
+    <button class="filter-btn"        data-filter="loc" data-val="hyderabad"   onclick="applyFilters(this,'loc')">Hyderabad</button>
+    <button class="filter-btn"        data-filter="loc" data-val="mumbai"      onclick="applyFilters(this,'loc')">Mumbai</button>
+    <button class="filter-btn"        data-filter="loc" data-val="pune"        onclick="applyFilters(this,'loc')">Pune</button>
+    <button class="filter-btn"        data-filter="loc" data-val="remote"      onclick="applyFilters(this,'loc')">Remote</button>
+  </div>
+
+  <div class="toolbar-divider"></div>
+
+  <!-- Role filter -->
+  <div class="filter-group">
+    <span class="filter-label">Role</span>
+    <button class="filter-btn active" data-filter="role" data-val="all"      onclick="applyFilters(this,'role')">All</button>
+    <button class="filter-btn"        data-filter="role" data-val="java"     onclick="applyFilters(this,'role')">Java</button>
+    <button class="filter-btn"        data-filter="role" data-val="data"     onclick="applyFilters(this,'role')">Data</button>
+    <button class="filter-btn"        data-filter="role" data-val="devops"   onclick="applyFilters(this,'role')">DevOps</button>
+    <button class="filter-btn"        data-filter="role" data-val="fullstack" onclick="applyFilters(this,'role')">Full Stack</button>
+    <button class="filter-btn"        data-filter="role" data-val="cloud"    onclick="applyFilters(this,'role')">Cloud</button>
   </div>
 
   <div class="toolbar-divider"></div>
 
   <!-- Experience filter -->
   <div class="filter-group">
-    <span class="filter-label">Experience</span>
+    <span class="filter-label">Exp</span>
     <button class="filter-btn active" data-filter="exp" data-val="all"  onclick="applyFilters(this,'exp')">All</button>
     <button class="filter-btn"        data-filter="exp" data-val="0-5"  onclick="applyFilters(this,'exp')">0–5 yrs</button>
     <button class="filter-btn"        data-filter="exp" data-val="5-10" onclick="applyFilters(this,'exp')">5–10 yrs</button>
@@ -159,6 +208,16 @@
     <button class="filter-btn"        data-filter="status" data-val="responded" onclick="applyFilters(this,'status')">Responded ({{ jobs|selectattr('email_responses')|list|length }})</button>
   </div>
 
+  <div class="toolbar-divider"></div>
+
+  <!-- Company Type filter -->
+  <div class="filter-group">
+    <span class="filter-label">Company</span>
+    <button class="filter-btn active" data-filter="cotype" data-val="all"     onclick="applyFilters(this,'cotype')">All</button>
+    <button class="filter-btn"        data-filter="cotype" data-val="Product" onclick="applyFilters(this,'cotype')">🏭 Product ({{ jobs|selectattr('company_type','eq','Product')|list|length }})</button>
+    <button class="filter-btn"        data-filter="cotype" data-val="Service" onclick="applyFilters(this,'cotype')">🔧 Service ({{ jobs|selectattr('company_type','eq','Service')|list|length }})</button>
+  </div>
+
   <input class="search-box" id="search" type="text" placeholder="Search role, company…" oninput="applyFilters()"/>
 </div>
 
@@ -174,14 +233,18 @@
        data-responded="{{ 'yes' if job.email_responses else 'no' }}"
        data-loc="{{ job.location|lower }}"
        data-expmin="{{ job.experience.split('–')[0].strip() if job.experience and '–' in job.experience else '' }}"
-       data-text="{{ (job.title + ' ' + job.company + ' ' + job.location)|lower }}">
+       data-text="{{ (job.title + ' ' + job.company + ' ' + job.location)|lower }}"
+       data-responses="{{ job.email_responses | tojson | forceescape if job.email_responses else '[]' }}"
+       data-companytype="{{ job.company_type or 'Unknown' }}">
 
     <div class="card-header">
       <div class="card-source">
         <span class="badge-{{ job.source|lower }}">{{ job.source }}</span>
+        {% if job.company_type == 'Product' %}<span class="badge-product">🏭 Product</span>{% endif %}
+        {% if job.company_type == 'Service' %}<span class="badge-service">🔧 Service</span>{% endif %}
         {% if job.is_remote %}<span class="badge-remote">Remote</span>{% endif %}
         {% if job.applied_at %}<span class="badge-applied">✓ Applied</span>{% endif %}
-        {% if job.email_responses %}<span class="badge-responded">📬 Response!</span>{% endif %}
+        {% if job.email_responses %}<span class="badge-responded" style="cursor:pointer" onclick="showResponses(event,'{{ job.id }}')">📬 {{ job.email_responses|length }} Response{{ 's' if job.email_responses|length > 1 else '' }}</span>{% endif %}
         <span style="margin-left:auto;font-size:11px;color:#aaa">{{ job.fetched_date }}</span>
       </div>
       <div class="card-title">{{ job.title }}</div>
@@ -189,8 +252,20 @@
       <div class="card-meta">
         📍 {{ job.location or '—' }}
         {% if job.experience %} &nbsp;·&nbsp; 🧑‍💼 {{ job.experience }}{% endif %}
-        {% if job.salary and job.salary != 'Not disclosed' %} &nbsp;·&nbsp; 💰 {{ job.salary }}{% endif %}
+        {% if job.salary and job.salary != 'Not disclosed' %} &nbsp;·&nbsp; 💰 {{ job.salary }}
+        {% elif job.salary_estimate %} &nbsp;·&nbsp; 💰 {{ job.salary_estimate }}{% endif %}
       </div>
+      {% if job.company_rating %}
+      <div style="margin-top:5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        <span style="font-size:12px;color:#f57c00;font-weight:700">
+          {{ '★' * (job.company_rating | int) }}{{ '☆' * (5 - job.company_rating | int) }}
+          {{ "%.1f"|format(job.company_rating) }}
+        </span>
+        {% if job.company_tags %}
+        <span style="font-size:11px;color:#888">{{ job.company_tags }}</span>
+        {% endif %}
+      </div>
+      {% endif %}
     </div>
 
     <div class="card-body">
@@ -254,6 +329,17 @@
 
 <div id="toast"></div>
 
+<!-- Response Modal -->
+<div id="resp-modal-overlay" onclick="closeRespModal(event)">
+  <div id="resp-modal">
+    <div id="resp-modal-head">
+      <h3 id="resp-modal-title">Email Responses</h3>
+      <button id="resp-modal-close" onclick="closeRespModal()">✕</button>
+    </div>
+    <div id="resp-modal-body"></div>
+  </div>
+</div>
+
 <script>
 let fetchTimer = null;
 
@@ -316,7 +402,7 @@ function pollTailor(jobId){
 }
 
 // Active filter state
-const activeFilters = {source:'all', loc:'all', exp:'all', status:'all'};
+const activeFilters = {source:'all', loc:'all', role:'all', exp:'all', status:'all', cotype:'all'};
 
 function applyFilters(btn, group){
   if(btn && group){
@@ -333,8 +419,29 @@ function applyFilters(btn, group){
     // Location
     if(show && activeFilters.loc !== 'all'){
       const loc = (c.dataset.loc||'').toLowerCase();
-      if(activeFilters.loc === 'remote' && !loc.includes('remote')) show=false;
-      if(activeFilters.loc === 'Bengaluru' && !loc.includes('bengaluru') && !loc.includes('bangalore')) show=false;
+      const locMap = {
+        'bengaluru': ['bengaluru','bangalore'],
+        'delhi':     ['delhi','ncr','noida','gurgaon','gurugram'],
+        'hyderabad': ['hyderabad'],
+        'mumbai':    ['mumbai'],
+        'pune':      ['pune'],
+        'remote':    ['remote'],
+      };
+      const terms = locMap[activeFilters.loc] || [activeFilters.loc];
+      if(!terms.some(t => loc.includes(t))) show=false;
+    }
+    // Role
+    if(show && activeFilters.role !== 'all'){
+      const title = (c.dataset.text||'').toLowerCase();
+      const roleMap = {
+        'java':      ['java'],
+        'data':      ['data analyst','data engineer','data scientist','analytics'],
+        'devops':    ['devops','sre','platform engineer','infrastructure'],
+        'fullstack': ['full stack','fullstack','frontend','backend'],
+        'cloud':     ['cloud','aws','azure','gcp','architect'],
+      };
+      const terms = roleMap[activeFilters.role] || [activeFilters.role];
+      if(!terms.some(t => title.includes(t))) show=false;
     }
     // Experience
     if(show && activeFilters.exp !== 'all'){
@@ -343,6 +450,8 @@ function applyFilters(btn, group){
       if(activeFilters.exp === '5-10' && (expMin < 5  || expMin >= 10)) show=false;
       if(activeFilters.exp === '10+'  && expMin < 10) show=false;
     }
+    // Company type
+    if(show && activeFilters.cotype !== 'all' && c.dataset.companytype !== activeFilters.cotype) show=false;
     // Status
     if(show && activeFilters.status === 'tailored'   && c.dataset.tailored   !== 'yes') show=false;
     if(show && activeFilters.status === 'applied'    && c.dataset.applied    !== 'yes') show=false;
@@ -402,6 +511,40 @@ function checkResponses(){
 
 // Resume auto-poll if fetch was running before reload
 if("{{ status.running }}"==="True") pollFetch();
+
+function showResponses(evt, jobId){
+  if(evt) evt.stopPropagation();
+  const card = document.getElementById('card-'+jobId);
+  let responses = [];
+  try{ responses = JSON.parse(card.dataset.responses || '[]'); }catch(e){}
+  if(!responses.length){ toast('No responses stored yet'); return; }
+
+  const body = document.getElementById('resp-modal-body');
+  body.innerHTML = responses.map(r => `
+    <div class="resp-card">
+      <div class="resp-card-top">
+        <div class="resp-subject">${escHtml(r.subject||'(No subject)')}</div>
+        <a class="resp-open" href="${escHtml(r.gmail_url||'#')}" target="_blank" rel="noopener">Open in Gmail ↗</a>
+      </div>
+      <div class="resp-meta">From: ${escHtml(r.from||'')} &nbsp;·&nbsp; ${escHtml((r.date||'').slice(0,25))}</div>
+      <div class="resp-snippet">${escHtml(r.snippet||'')}</div>
+    </div>`).join('');
+
+  const jobTitle = card.querySelector('.card-title')?.textContent || '';
+  document.getElementById('resp-modal-title').textContent =
+    `📬 ${responses.length} Response${responses.length>1?'s':''} — ${jobTitle}`;
+  document.getElementById('resp-modal-overlay').classList.add('open');
+}
+
+function closeRespModal(evt){
+  if(evt && evt.target !== document.getElementById('resp-modal-overlay') &&
+     evt.target !== document.getElementById('resp-modal-close')) return;
+  document.getElementById('resp-modal-overlay').classList.remove('open');
+}
+
+function escHtml(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 </script>
 </body>
 </html>
