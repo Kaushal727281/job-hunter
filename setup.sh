@@ -36,15 +36,36 @@ ok "Python $PY_VER"
 # ── 2. Virtual environment ────────────────────
 step "Setting up virtual environment"
 if [ ! -d ".venv" ]; then
-  $PYTHON -m venv .venv
+  $PYTHON -m venv .venv 2>/dev/null || true
+  # On Ubuntu/Debian, python3-venv may not be installed
+  if [ ! -f ".venv/bin/activate" ]; then
+    warn "venv creation failed. Trying to install python3-venv..."
+    if command -v apt-get &>/dev/null; then
+      sudo apt-get install -y python3-venv python3-pip -q
+      $PYTHON -m venv .venv
+    elif command -v yum &>/dev/null; then
+      sudo yum install -y python3-venv -q
+      $PYTHON -m venv .venv
+    else
+      err "Could not create virtual environment."
+      err "Please run: pip install -r requirements.txt  (system-wide)"
+      err "Then re-run this script."
+      exit 1
+    fi
+  fi
   ok "Created .venv"
 else
   ok ".venv already exists — skipping"
 fi
 
 # Activate
-source .venv/bin/activate
-ok "Activated .venv"
+if [ -f ".venv/bin/activate" ]; then
+  source .venv/bin/activate
+  ok "Activated .venv"
+else
+  err ".venv/bin/activate not found — venv setup failed"
+  exit 1
+fi
 
 # ── 3. Install dependencies ───────────────────
 step "Installing Python dependencies"
