@@ -455,13 +455,21 @@ def diff_view(job_id):
     )
 
 
+def _get_cover_letter(tr: dict) -> str:
+    """Extract cover letter as a plain string, handling list or string storage."""
+    raw = tr.get("cover_letter") or tr.get("cover_note", "")
+    if isinstance(raw, list):
+        raw = "\n\n".join(raw)
+    return raw or ""
+
+
 @app.route("/cover/<job_id>")
 def cover_letter_html(job_id):
     job = job_store.get_job(job_id)
     if not job or not job.get("tailor_result"):
         return "Resume not tailored yet — tailor first to generate a cover letter.", 404
     tr = job["tailor_result"]
-    letter = tr.get("cover_letter") or tr.get("cover_note", "")
+    letter = _get_cover_letter(tr)
     if not letter:
         return "No cover letter found. Re-tailor this job to generate one.", 404
     config = _load_config()
@@ -480,7 +488,7 @@ def cover_letter_pdf(job_id):
     if not job or not job.get("tailor_result"):
         return "Resume not tailored yet", 404
     tr = job["tailor_result"]
-    letter = tr.get("cover_letter") or tr.get("cover_note", "")
+    letter = _get_cover_letter(tr)
     if not letter:
         return "No cover letter found. Re-tailor this job to generate one.", 404
     config = _load_config()
