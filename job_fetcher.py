@@ -82,6 +82,7 @@ _STOP = {
 # ── Company type & rating ──────────────────────────────────────────────────
 
 _PRODUCT_COS = {
+    # Indian unicorns / startups
     "flipkart", "swiggy", "zomato", "ola", "paytm", "phonepe", "razorpay",
     "groww", "zerodha", "cred", "meesho", "nykaa", "byju", "unacademy",
     "freshworks", "zoho", "browserstack", "postman", "hasura", "chargebee",
@@ -90,7 +91,9 @@ _PRODUCT_COS = {
     "juspay", "cashfree", "slice", "smallcase", "darwinbox", "leadsquared",
     "whatfix", "sprinklr", "innovaccer", "druva", "icertis", "mindtickle",
     "niyo", "jupiter", "fi money", "delhivery", "porter", "blackbuck",
-    "sharechat", "dailyhunt", "udaan", "moglix", "zetwerk",
+    "sharechat", "dailyhunt", "udaan", "moglix", "zetwerk", "coindcx",
+    "customerxps", "tazapay", "pismo", "ibs software", "astrome",
+    # Global product / SaaS / cloud
     "google", "microsoft", "amazon", "apple", "meta", "netflix", "adobe",
     "salesforce", "oracle", "sap", "servicenow", "workday", "atlassian",
     "github", "gitlab", "hashicorp", "elastic", "mongodb", "databricks",
@@ -100,13 +103,19 @@ _PRODUCT_COS = {
     "dropbox", "docusign", "vmware", "nutanix", "palo alto networks",
     "crowdstrike", "qualcomm", "intel", "nvidia", "arm", "broadcom",
     "paypal", "visa", "mastercard", "booking.com", "airbnb", "expedia",
-    "linkedin", "walmart labs", "jpmorgan", "goldman sachs", "morgan stanley",
-    "deutsche bank", "wells fargo", "citibank", "american express",
-    "samsung", "sony", "siemens", "bosch", "philips", "honeywell",
+    "linkedin", "walmart global tech", "walmart labs",
+    "samsung", "sony", "siemens", "bosch", "philips", "honeywell", "dell",
     "uber", "lyft", "twitter", "pinterest", "snap", "tiktok", "bytedance",
+    "adyen", "clickhouse", "cornerstone ondemand", "coupa", "cvent",
+    "elsevier", "morningstar", "netapp", "nielseniq", "perforce",
+    "qualys", "thinkproject", "blackbaud", "billtrust", "comcast",
+    # Fintech / banks with strong product engineering
+    "jpmorgan", "goldman sachs", "morgan stanley", "deutsche bank",
+    "wells fargo", "citibank", "american express", "ebay",
 }
 
 _SERVICE_COS = {
+    # Indian IT services
     "tcs", "tata consultancy", "infosys", "wipro", "hcl", "hcltech",
     "tech mahindra", "mphasis", "ltimindtree", "lti", "mindtree",
     "hexaware", "mastech", "kpit", "persistent", "cyient", "zensar",
@@ -114,6 +123,16 @@ _SERVICE_COS = {
     "capgemini", "cognizant", "dxc", "cgi", "unisys", "ntt data",
     "fujitsu", "atos", "deloitte", "pwc", "ey", "kpmg", "nagarro",
     "globant", "epam", "infobeans", "kellton",
+    # From cache
+    "3pillar", "anz banking", "ameriprise", "career crafterz", "dtcc",
+    "emergys", "hnr tech", "infinite computer", "ingram micro",
+    "intercontinental exchange", "kgisl", "luxoft", "nomura",
+    "quantum integrators", "sisa", "sahaj software", "standard chartered",
+    "tapsoft", "tarento", "uplers", "verity search", "eclerx", "hackajob",
+    # Banks / financial firms without "bank" in the name
+    "barclays", "citi", "société générale", "societe generale",
+    "jpmorgan", "bnp paribas", "credit suisse", "ubs", "hsbc",
+    "ing ", "ing bank", "rabobank", "lloyds", "natwest", "santander",
 }
 
 # Curated company ratings (0–5) with culture tags
@@ -187,8 +206,19 @@ def _classify_company(company: str) -> str:
     for name in _SERVICE_COS:
         if name in lc:
             return "Service"
-    if re.search(r'\b(technologies|tech solutions|it solutions|outsourcing'
-                 r'|staffing|consulting|infotech|infosystems|softtech)\b', lc):
+    # Keyword patterns → Service
+    if re.search(
+        r'\b(technologies|tech solutions|it solutions|outsourcing'
+        r'|staffing|consulting|infotech|infosystems|softtech'
+        r'|manpower|recruitment|search limited|talent|resourcing'
+        r'|global services|managed services|systems integrat'
+        r'|it services|software services|digital services)\b',
+        lc
+    ):
+        return "Service"
+    # Banks / financial services lean Service (back-office / consulting heavy)
+    if re.search(r'\b(bank|banking|financial services|insurance|securities'
+                 r'|asset management|wealth management|capital markets)\b', lc):
         return "Service"
     return "Unknown"
 
@@ -207,43 +237,6 @@ def _save_company_cache(cache: dict) -> None:
     _COMPANY_CACHE_FILE.write_text(json.dumps(cache, indent=2))
 
 
-def _groq_classify_companies(companies: list) -> dict:
-    """Batch-classify companies as Product/Service/Unknown using Groq LLM."""
-    if not companies:
-        return {}
-    try:
-        from groq import Groq
-        client = Groq(api_key=os.getenv("GROQ_API_KEY", ""))
-        results: dict = {}
-        for i in range(0, len(companies), 30):
-            batch = companies[i:i + 30]
-            lines = "\n".join(f"{idx + 1}. {c}" for idx, c in enumerate(batch))
-            prompt = (
-                "Classify each company below as exactly one of: Product, Service, or Unknown.\n"
-                "  Product = builds its own software products/platforms (e.g. Google, Zoho, Freshworks, Razorpay)\n"
-                "  Service = IT services / consulting / outsourcing / staffing (e.g. TCS, Infosys, Accenture, Wipro)\n"
-                "  Unknown = cannot determine with confidence\n\n"
-                f"Companies:\n{lines}\n\n"
-                "Reply with ONLY a JSON object mapping the exact company name to its type. "
-                "Example: {\"Google\": \"Product\", \"TCS\": \"Service\"}"
-            )
-            resp = client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=600,
-                temperature=0.1,
-            )
-            raw = resp.choices[0].message.content.strip()
-            if raw.startswith("```"):
-                raw = raw.split("```", 2)[1]
-                if raw.startswith("json"):
-                    raw = raw[4:]
-                raw = raw.rsplit("```", 1)[0].strip()
-            results.update(json.loads(raw))
-        return results
-    except Exception as e:
-        logger.debug(f"Groq company classification failed: {e}")
-        return {}
 
 
 def _rate_company(company: str) -> dict:
@@ -1000,22 +993,22 @@ def fetch_jobs(config: dict, limit: int | None = None) -> list[dict]:
     _save_seen(seen)
     logger.info(f"Total: {len(all_jobs)} new jobs (dedup active)")
 
-    # ── Groq-classify companies still marked Unknown ──────────────────────
+    # ── Re-classify any remaining Unknown companies using keyword rules ──────
+    # (No Groq needed — _classify_company uses expanded keyword lists)
     cache = _load_company_cache()
-    unknown_cos = list({j["company"] for j in all_jobs
-                        if j.get("company_type") == "Unknown" and j.get("company")})
-    to_classify = [c for c in unknown_cos if c not in cache]
-    if to_classify:
-        logger.info(f"  Classifying {len(to_classify)} unknown companies via Groq…")
-        new_types = _groq_classify_companies(to_classify)
-        cache.update(new_types)
-        _save_company_cache(cache)
-        logger.info(f"  Classification done — {len(new_types)} companies typed")
-    # Apply cache to all Unknown jobs in this batch
     for job in all_jobs:
         if job.get("company_type") == "Unknown":
-            classified = cache.get(job.get("company", ""), "Unknown")
-            if classified in ("Product", "Service"):
-                job["company_type"] = classified
+            company = job.get("company", "")
+            # Check persistent cache first (entries saved from before)
+            cached = cache.get(company)
+            if cached in ("Product", "Service"):
+                job["company_type"] = cached
+            else:
+                # Fall back to keyword classification
+                classified = _classify_company(company)
+                if classified in ("Product", "Service"):
+                    job["company_type"] = classified
+                    cache[company] = classified
+    _save_company_cache(cache)
 
     return all_jobs
