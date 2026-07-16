@@ -339,22 +339,37 @@ Return ONLY valid JSON, no markdown fences, no extra text."""
     result.setdefault("cover_note", "")
 
     # Post-process summary — strip "as a [title] at [company]" phrases the model keeps adding
-    company_name = re.escape(job.get("company", ""))
+    company_raw = job.get("company", "").strip()
     summary = result.get("summary", "")
-    if company_name:
-        # Remove "as a/an <anything> at <company>" (with optional trailing punctuation)
+    if company_raw and summary:
+        ce = re.escape(company_raw)
+        # Pattern A: exact company name (anywhere — not just at end)
         summary = re.sub(
-            r"\s+as\s+(?:a\s+|an\s+)?.+?\s+at\s+" + company_name + r"[.,]?",
-            ".",
-            summary,
-            flags=re.IGNORECASE,
+            r",?\s+as\s+(?:an?\s+)?.+?\s+at\s+" + ce + r"[.,]?",
+            ".", summary, flags=re.IGNORECASE,
         ).strip()
-        # Also strip bare "at <company>" at end of sentences
+        # Pattern B: bare "at Company" at end
         summary = re.sub(
-            r"\s+at\s+" + company_name + r"[.,]?\s*$",
-            ".",
-            summary,
-            flags=re.IGNORECASE,
+            r",?\s+at\s+" + ce + r"[.,]?\s*$",
+            ".", summary, flags=re.IGNORECASE,
+        ).strip()
+        # Pattern C: first significant word of company
+        # Catches mismatches like stored "Deutsche Bank AG" vs text "Deutsche Bank"
+        sig_words = [w for w in re.sub(r"[^a-zA-Z0-9 ]", "", company_raw).split()
+                     if len(w) > 3 and w.lower() not in {"the", "and", "pvt", "ltd", "inc", "corp"}]
+        if sig_words:
+            cw = re.escape(sig_words[0])
+            summary = re.sub(
+                r",?\s+as\s+(?:an?\s+)?.+?\s+at\s+" + cw + r"\b[^.!?]*[.,]?",
+                ".", summary, flags=re.IGNORECASE,
+            ).strip()
+        # Pattern D: company-agnostic safety net
+        # Matches "as a Title at Company." where the phrase ends with a period
+        # (followed by a new capital sentence or end of string — not a comma)
+        summary = re.sub(
+            r",?\s+as\s+(?:an?\s+)?[A-Z][\w\s,/]*?\s+at\s+[A-Z]\w+(?:\s+[A-Z]\w+)*[.,]?"
+            r"(?=\s+[A-Z]|\s*$)",
+            ".", summary,
         ).strip()
     result["summary"] = summary
 
