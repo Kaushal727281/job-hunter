@@ -538,6 +538,12 @@ def check_responses_status():
     return jsonify({"running": _gmail_check_running})
 
 
+@app.route("/remove/<job_id>", methods=["POST"])
+def remove_job(job_id):
+    job_store.remove_job(job_id)
+    return jsonify({"ok": True})
+
+
 @app.route("/clear", methods=["POST"])
 def clear():
     job_store.clear_all()

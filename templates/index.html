@@ -95,6 +95,8 @@
     .btn-apply:hover{background:#f0f4ff}
     .btn-tailor{background:#fff3e0;color:#e65100;border:1.5px solid #ffcc02}
     .btn-tailor:hover{background:#ffe0b2}
+    .btn-remove{background:#fff;color:#c62828;border:1.5px solid #ef9a9a;margin-left:auto}
+    .btn-remove:hover{background:#ffebee}
     .btn-disabled{opacity:.45;cursor:not-allowed}
     a.btn-sm{text-decoration:none;display:inline-block}
 
@@ -384,6 +386,7 @@
               style="{{ 'background:#e8f5e9;color:#1b5e20;border:1.5px solid #a5d6a7' if job.applied_at else 'background:#f5f5f5;color:#777;border:1.5px solid #ddd' }}"
               data-applied="{{ 'yes' if job.applied_at else 'no' }}"
               onclick="toggleApplied('{{ job.id }}', this)">{{ '✓ Applied' if job.applied_at else 'Mark Applied' }}</button>
+      <button class="btn-sm btn-remove" onclick="removeJob('{{ job.id }}', this)">✕ Remove</button>
     </div>
   </div>
   {% endfor %}
@@ -674,6 +677,17 @@ function applyFilters(btn, group){
 
 function clearAll(){
   fetch('/clear',{method:'POST'}).then(()=>location.reload());
+}
+
+function removeJob(jobId, btn){
+  if(!confirm('Remove this job? It won\'t come back unless you fetch again.')) return;
+  fetch(`/remove/${jobId}`,{method:'POST'}).then(r=>r.json()).then(d=>{
+    if(d.ok){
+      const card=document.getElementById('card-'+jobId);
+      if(card){ card.style.transition='opacity .3s'; card.style.opacity='0';
+        setTimeout(()=>card.remove(), 300); }
+    }
+  });
 }
 
 function toggleApplied(jobId, btn){

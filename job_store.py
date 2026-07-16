@@ -88,6 +88,13 @@ def applied_jobs() -> list[dict]:
         return [j for j in _read() if j.get("applied_at")]
 
 
+def remove_job(job_id: str):
+    """Permanently delete a single job by id."""
+    with _lock:
+        jobs = _read()
+        _write([j for j in jobs if j["id"] != job_id])
+
+
 def clear_all():
     with _lock:
         _write([])
