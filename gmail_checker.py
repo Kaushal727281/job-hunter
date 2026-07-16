@@ -10,8 +10,9 @@ import json
 import os
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from email.header import decode_header
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -109,6 +110,21 @@ def _imap_since(applied_at: str) -> str:
         return ""
 
 
+def _email_after_apply(date_str: str, applied_at: str) -> bool:
+    """Return True if the email's Date header is on or after the applied_at datetime."""
+    if not applied_at:
+        return True   # no apply date recorded — allow everything
+    try:
+        applied_dt = datetime.fromisoformat(applied_at).replace(tzinfo=timezone.utc)
+        email_dt   = parsedate_to_datetime(date_str)
+        # Make both offset-aware for comparison
+        if email_dt.tzinfo is None:
+            email_dt = email_dt.replace(tzinfo=timezone.utc)
+        return email_dt >= applied_dt
+    except Exception:
+        return True   # can't parse — allow through
+
+
 def _company_key(company: str) -> str:
     """First meaningful word of the company name for search."""
     stop = {"private", "limited", "pvt", "ltd", "inc", "corp", "technologies",
@@ -182,6 +198,11 @@ def check_responses(applied_jobs: list[dict]) -> dict:
 
                         # Skip our own sent emails / no-reply
                         if addr.lower() in from_addr.lower():
+                            continue
+
+                        # Skip emails received before the job was applied for
+                        if not _email_after_apply(date_str, applied_at):
+                            logger.debug(f"  Skipping pre-apply email: {date_str[:30]} < {applied_at}")
                             continue
 
                         # Build a direct Gmail URL using the RFC822 Message-ID header

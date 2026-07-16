@@ -1,7 +1,7 @@
 {
   "candidate": {
     "name": "Kaushal Kumar Jha",
-    "email": "kaushalkumarjha727219@gmail.com",
+    "email": "47393kaushalkumarjha727219@gmail.comlinkedin",
     "total_experience_years": 8
   },
   "job_search": {
@@ -32,10 +32,24 @@
     ],
     "days_old": 3,
     "max_jobs_per_run": 60,
-    "sources": ["LinkedIn", "Shine", "Glassdoor", "RemoteOK", "WeWorkRemotely", "HNJobs", "Indeed"]
+    "sources": [
+      "LinkedIn",
+      "Shine",
+      "Glassdoor",
+      "RemoteOK",
+      "WeWorkRemotely",
+      "HNJobs",
+      "Indeed"
+    ]
   },
   "filters": {
-    "exclude_keywords": ["intern", "fresher", "0-2 years", "junior", "trainee"],
+    "exclude_keywords": [
+      "intern",
+      "fresher",
+      "0-2 years",
+      "junior",
+      "trainee"
+    ],
     "min_experience_years": 4,
     "max_experience_years": 15,
     "job_types": [],

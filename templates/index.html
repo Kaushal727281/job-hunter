@@ -396,10 +396,10 @@
       <div style="margin-top:12px">
         <div class="upload-zone" onclick="document.getElementById('resume-upload-input').click()">
           <div style="font-size:28px">📄</div>
-          <strong>Click to upload your HTML resume</strong>
-          <p>The resume will replace the current one and be used for all future tailoring</p>
+          <strong>Click to upload your resume</strong>
+          <p>Supports <b>.html</b> (best quality) and <b>.pdf</b> (auto-converted)</p>
         </div>
-        <input type="file" id="resume-upload-input" accept=".html" onchange="uploadResume(this)"/>
+        <input type="file" id="resume-upload-input" accept=".html,.htm,.pdf" onchange="uploadResume(this)"/>
         <div class="upload-meta" id="upload-meta"></div>
         <div class="no-struct-warn" id="no-struct-warn">
           ⚠️ This resume doesn't use the standard CSS classes (<code>summary-text</code>, <code>.job</code> divs).

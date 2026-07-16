@@ -319,6 +319,217 @@ def clear():
 
 BASE_RESUME_PATH = Path(__file__).parent / "base_resume.html"
 
+_DATE_PAT = re.compile(
+    r"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[\s.,]*\d{4}"
+    r"|\d{1,2}[/\-]\d{4}"
+    r"|\d{4}\s*[-–—]\s*(\d{4}|Present|Current|Till\s*date|Now)",
+    re.I,
+)
+# Matches both spaced ("SUMMARY", "PROFESSIONAL SUMMARY") and
+# concatenated ("PROFESSIONALSUMMARY") forms produced after normalisation
+_SECTION_PAT = re.compile(
+    r"^(SUMMARY|PROFILE|OBJECTIVE|PROFESSIONAL\s*SUMMARY|CAREER\s*SUMMARY|ABOUT\s*ME"
+    r"|EXPERIENCE|WORK\s*EXPERIENCE|PROFESSIONAL\s*EXPERIENCE|EMPLOYMENT|WORK\s*HISTORY"
+    r"|EDUCATION|ACADEMIC|QUALIFICATIONS|SKILLS|TECHNICAL\s*SKILLS|CORE\s*SKILLS"
+    r"|CERTIFICATIONS|PROJECTS|ACHIEVEMENTS|INTERESTS|LANGUAGES)$",
+    re.I,
+)
+
+
+def _pdf_to_html(pdf_bytes: bytes) -> str:
+    """Convert a PDF resume to HTML compatible with the tailoring engine."""
+    from pdfminer.high_level import extract_text
+    import io, warnings
+    warnings.filterwarnings("ignore")
+
+    raw = extract_text(io.BytesIO(pdf_bytes))
+
+    # Normalise spaced-letter headers: "P R O F I L E" → "PROFILE"
+    raw = re.sub(r"\b([A-Z])((?:\s+[A-Z]){2,})\b",
+                 lambda m: (m.group(1) + m.group(2)).replace(" ", ""), raw)
+
+    lines = [ln.strip() for ln in raw.splitlines() if ln.strip()]
+
+    # ── Name: first plausible name line (not a section header, date, or URL) ─
+    name = ""
+    for ln in lines[:12]:
+        if _SECTION_PAT.match(ln) or _DATE_PAT.search(ln):
+            continue
+        if re.search(r"http|www|@|\d{5,}", ln):
+            continue
+        ln_clean = re.sub(r"\s*[–—-]\s*Resume.*", "", ln, flags=re.I).strip()
+        if 4 < len(ln_clean) < 50 and re.match(r"[A-Z][a-zA-Z]", ln_clean):
+            name = ln_clean
+            break
+
+    # ── Email: scan full text, find cleanest match ────────────────────────
+    # TLD must be followed by a non-letter (or end of string) to avoid
+    # matching "gmail.comlinkedin" artifacts from multi-column PDF merging.
+    full_text = " ".join(lines)
+    email = ""
+    for m in re.finditer(r"[\w.+-]+@[\w-]+\.[a-zA-Z]{2,6}(?=[^a-zA-Z]|$)", full_text):
+        candidate = m.group(0)
+        # skip if the local-part is glued to preceding alphabetical text
+        start = m.start()
+        before = full_text[max(0, start-1):start]
+        if before.isalpha():
+            continue
+        email = candidate
+        break
+
+    # ── Split lines into sections ─────────────────────────────────────────
+    sections: dict[str, list[str]] = {"_preamble": []}
+    current = "_preamble"
+    for ln in lines:
+        norm = re.sub(r"\s+", "", ln).upper()  # strip all spaces for matching
+        # check against section pattern (spaces stripped)
+        if _SECTION_PAT.match(norm):
+            current = norm
+            sections.setdefault(current, [])
+        else:
+            sections.setdefault(current, []).append(ln)
+
+    def _get_section(*keys) -> list[str]:
+        for k in keys:
+            k_norm = re.sub(r"\s+", "", k).upper()
+            for sk in sections:
+                if k_norm in sk:
+                    return sections[sk]
+        return []
+
+    summary_lines = _get_section("SUMMARY", "PROFILE", "OBJECTIVE", "ABOUT")
+    exp_lines     = _get_section("EXPERIENCE", "EMPLOYMENT", "WORK HISTORY", "WORKHISTORY")
+
+    # Fallback: if summary section is empty (common with multi-column PDFs),
+    # collect long sentence-like lines from all pre-experience sections
+    if not summary_lines:
+        exp_key = next((k for k in sections if "EXPERIENCE" in k or "EMPLOYMENT" in k), None)
+        exp_section_reached = False
+        for k, lns in sections.items():
+            if k == exp_key:
+                break
+            for ln in lns:
+                if (len(ln) > 60
+                        and not _DATE_PAT.search(ln)
+                        and not re.match(r"^[\w]+$", ln)   # skip single-word lines
+                        and re.search(r"[a-z]{3,}", ln)):   # has lowercase (sentence-like)
+                    summary_lines.append(ln)
+
+    # ── Parse experience into job blocks ──────────────────────────────────
+    # Structure in most PDFs: title → company → date → location → bullets...
+    job_blocks: list[dict] = []
+    cur_job: dict | None   = None
+    pending_header: list[str] = []   # lines before a date line
+
+    for ln in exp_lines:
+        if _DATE_PAT.search(ln):
+            # commit pending header lines as title/company of new job
+            if cur_job:
+                job_blocks.append(cur_job)
+            title   = pending_header[0] if pending_header else ln
+            company = pending_header[1] if len(pending_header) > 1 else ""
+            cur_job = {
+                "title":   title,
+                "company": company,
+                "date":    _DATE_PAT.search(ln).group(0),
+                "bullets": [],
+            }
+            pending_header = []
+        elif cur_job is None:
+            # still looking for first date — collect as header candidates
+            if ln and not re.search(r"http|www", ln, re.I):
+                pending_header.append(ln)
+        else:
+            # inside a job block
+            if re.match(r"^[•\-*▸►→]|^\d+\.", ln):
+                bullet = re.sub(r"^[•\-*▸►→\d.]\s*", "", ln).strip()
+                cur_job["bullets"].append(bullet)
+            elif len(ln) > 30 and not _DATE_PAT.search(ln):
+                cur_job["bullets"].append(ln)
+            else:
+                pending_header = [ln]   # short line = likely start of next job title
+
+    if cur_job:
+        job_blocks.append(cur_job)
+
+    # Filter out false-positive job blocks (page numbers, timestamps, short junk)
+    job_blocks = [
+        jb for jb in job_blocks
+        if len(jb["title"]) > 5
+        and not _DATE_PAT.match(jb["title"])
+        and not re.match(r"^\d+/\d+$", jb["title"])   # page number "1/2"
+        and not re.match(r"^\d{2}/\d{2}/\d{4}", jb["title"])  # date "16/07/2026"
+        and (jb["bullets"] or jb["company"])  # must have content
+    ]
+
+    # ── Phone: reject date-like matches and prefer 10-digit Indian numbers ──
+    phone_candidates = re.findall(r"(\+?91[\s\-]?[6-9]\d{9}|[6-9]\d{9}|\+?\d[\d\s\-().]{8,14}\d)", full_text)
+    phone = ""
+    for pc in phone_candidates:
+        pc = pc.strip()
+        if re.match(r"\d{4}-\d{2}-\d{2}", pc):
+            continue
+        digits = re.sub(r"\D", "", pc)
+        if len(digits) >= 10:
+            phone = pc
+            break
+
+    # ── Build HTML ────────────────────────────────────────────────────────
+    def esc(s: str) -> str:
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    jobs_html = ""
+    for jb in job_blocks:
+        bullets_html = "".join(f"<li>{esc(b)}</li>" for b in jb["bullets"] if b)
+        jobs_html += f"""
+        <div class="job">
+          <div class="job-title">{esc(jb['title'])}</div>
+          <div class="job-company">{esc(jb['company'])}</div>
+          <div class="job-date">{esc(jb['date'])}</div>
+          <ul>{bullets_html}</ul>
+        </div>"""
+
+    summary_html = esc(" ".join(summary_lines)) if summary_lines else ""
+
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>{esc(name)} – Resume</title>
+  <style>
+    body{{font-family:'Segoe UI',Arial,sans-serif;max-width:860px;margin:40px auto;padding:0 32px;color:#1e1e1e}}
+    h1{{font-size:28px;font-weight:700;margin-bottom:4px}}
+    .contact{{font-size:13px;color:#555;margin-bottom:18px}}
+    .section-title{{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;
+                    color:#0d47a1;border-bottom:1.5px solid #0d47a1;padding-bottom:4px;margin:22px 0 10px}}
+    .summary-text{{font-size:14px;line-height:1.7;color:#333}}
+    .job{{margin-bottom:18px}}
+    .job-title{{font-size:15px;font-weight:700}}
+    .job-company{{font-size:13px;color:#555}}
+    .job-date{{font-size:12px;color:#888;margin-bottom:6px}}
+    ul{{margin:6px 0 0 18px;padding:0}}
+    li{{font-size:13px;line-height:1.65;margin-bottom:3px}}
+  </style>
+</head>
+<body>
+  <h1>{esc(name)}</h1>
+  <div class="contact">
+    {f'<a href="mailto:{esc(email)}">{esc(email)}</a>' if email else ''}
+    {f' &nbsp;·&nbsp; {esc(phone)}' if phone else ''}
+  </div>
+
+  <div class="section-title">Professional Summary</div>
+  <div class="summary-text">{summary_html}</div>
+
+  <div class="section-title">Professional Experience</div>
+  {jobs_html if jobs_html else '<p style="color:#999;font-size:13px">Experience section could not be parsed — please review the imported resume.</p>'}
+
+</body>
+</html>"""
+
+    meta = {"name": name, "email": email, "phone": phone}
+    return html, meta
+
 
 def _extract_resume_meta(html: str) -> dict:
     """Extract candidate name, email and phone from resume HTML."""
@@ -355,16 +566,26 @@ def _extract_resume_meta(html: str) -> dict:
 
 @app.route("/upload-resume", methods=["POST"])
 def upload_resume():
-    """Accept an HTML resume file, save as base_resume.html, update config."""
+    """Accept an HTML or PDF resume file, save as base_resume.html, update config."""
     f = request.files.get("resume")
     if not f or not f.filename:
         return jsonify({"ok": False, "message": "No file uploaded"}), 400
-    if not f.filename.lower().endswith(".html"):
-        return jsonify({"ok": False, "message": "Only .html files are supported"}), 400
 
-    html = f.read().decode("utf-8", errors="replace")
+    fname = f.filename.lower()
+    raw_bytes = f.read()
 
-    # Validate it has some content
+    pdf_meta = None
+    if fname.endswith(".pdf"):
+        try:
+            html, pdf_meta = _pdf_to_html(raw_bytes)
+        except Exception as e:
+            logger.exception("PDF conversion failed")
+            return jsonify({"ok": False, "message": f"PDF conversion failed: {e}"}), 400
+    elif fname.endswith(".html") or fname.endswith(".htm"):
+        html = raw_bytes.decode("utf-8", errors="replace")
+    else:
+        return jsonify({"ok": False, "message": "Only .html or .pdf files are supported"}), 400
+
     if len(html.strip()) < 200:
         return jsonify({"ok": False, "message": "File seems too small or empty"}), 400
 
@@ -375,8 +596,9 @@ def upload_resume():
 
     BASE_RESUME_PATH.write_text(html, encoding="utf-8")
 
-    # Extract metadata from the HTML
-    meta = _extract_resume_meta(html)
+    # Use metadata extracted directly from PDF (avoids re-parsing glued HTML artifacts)
+    # For HTML uploads, parse metadata from the HTML structure
+    meta = pdf_meta if pdf_meta is not None else _extract_resume_meta(html)
 
     # Update config.json candidate section with extracted info
     cfg = _load_config()
