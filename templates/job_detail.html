@@ -291,7 +291,8 @@ function pollTailor(){
       } else if(!d.running){
         clearInterval(t);
         _hideTailorOverlay();
-        alert('Tailoring failed — check terminal logs');
+        const errMsg = d.error || 'Tailoring failed — check terminal logs';
+        alert('❌ ' + errMsg);
         location.reload();
       }
     });

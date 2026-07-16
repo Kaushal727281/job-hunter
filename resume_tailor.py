@@ -10,6 +10,7 @@ This keeps tokens well under Groq's free-tier limit (12K TPM).
 import os
 import re
 import json
+import time
 import logging
 import truststore
 from pathlib import Path
@@ -271,12 +272,31 @@ Return ONLY valid JSON, no markdown fences, no extra text."""
     logger.info(f"Tailoring resume for: {job['title']} at {job['company']} "
                 f"(prompt ~{len(prompt)//4} tokens)")
 
-    response = client.chat.completions.create(
-        model=MODEL,
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=4096,
-        temperature=0.3,
-    )
+    # Retry up to 2 times on transient 429 rate-limit (short wait only; daily limit won't recover)
+    last_exc = None
+    for attempt in range(3):
+        try:
+            response = client.chat.completions.create(
+                model=MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=4096,
+                temperature=0.3,
+            )
+            break
+        except Exception as e:
+            last_exc = e
+            err_str = str(e)
+            # If daily token limit exceeded, no point retrying
+            if "tokens per day" in err_str or "TPD" in err_str:
+                raise
+            if "429" in err_str and attempt < 2:
+                wait = 5 * (attempt + 1)
+                logger.warning(f"Groq 429 on attempt {attempt+1}, retrying in {wait}s…")
+                time.sleep(wait)
+            else:
+                raise
+    else:
+        raise last_exc  # all retries exhausted
 
     raw = response.choices[0].message.content.strip()
 

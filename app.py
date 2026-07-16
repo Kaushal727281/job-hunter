@@ -65,7 +65,11 @@ def _bg_fetch():
         _fetch_status = {"running": False, "message": f"Error: {e}", "last_run": None}
 
 
-def _bg_tailor(job_id: str):
+def _bg_tailor(job_id: str, prev_result: dict = None, prev_pdf: str = None):
+    """
+    Run tailor in background. prev_result/prev_pdf are the values cleared before
+    starting so we can restore them if something goes wrong.
+    """
     try:
         job = job_store.get_job(job_id)
         if not job:
@@ -89,10 +93,36 @@ def _bg_tailor(job_id: str):
             tailor_result=result,
             pdf_path=str(pdf_path),
             description=full_desc,
+            tailor_error=None,
         )
         logger.info(f"Tailored: {job['title']} @ {job['company']} — score {result.get('match_score')}/10")
+
     except Exception as e:
         logger.exception(f"Tailor failed for {job_id}")
+
+        # Build a human-readable error message
+        err_str = str(e)
+        if "429" in err_str or "rate_limit" in err_str.lower() or "Rate limit" in err_str:
+            import re as _re
+            m = _re.search(r"try again in ([\w\s.]+)\.", err_str, _re.I)
+            retry = m.group(1).strip() if m else "a few minutes"
+            error_msg = f"Groq rate limit reached — please try again in {retry}."
+        elif "GROQ_API_KEY" in err_str:
+            error_msg = "GROQ_API_KEY is not set. Add it to your .env file."
+        elif "JSONDecodeError" in type(e).__name__ or "json" in err_str.lower():
+            error_msg = "AI returned an unexpected response. Try again."
+        else:
+            error_msg = f"Tailoring failed: {err_str[:120]}"
+
+        # Restore previous result so the user isn't left with a blank resume
+        restore = {}
+        if prev_result:
+            restore["tailor_result"] = prev_result
+        if prev_pdf:
+            restore["pdf_path"] = prev_pdf
+        restore["tailor_error"] = error_msg
+        job_store.update_job(job_id, **restore)
+
     finally:
         _tailor_running.discard(job_id)
 
@@ -128,8 +158,16 @@ def fetch_status():
 def tailor(job_id):
     if job_id in _tailor_running:
         return jsonify({"ok": False, "message": "Already tailoring"})
+    job = job_store.get_job(job_id)
+    if not job:
+        return jsonify({"ok": False, "message": "Job not found"})
     _tailor_running.add(job_id)
-    t = threading.Thread(target=_bg_tailor, args=(job_id,), daemon=True)
+    # Snapshot existing result so we can restore it if the tailor fails
+    prev_result = job.get("tailor_result")
+    prev_pdf    = job.get("pdf_path")
+    # Clear now so polling returns done=False until fresh output arrives
+    job_store.update_job(job_id, tailor_result=None, pdf_path=None, tailor_error=None)
+    t = threading.Thread(target=_bg_tailor, args=(job_id, prev_result, prev_pdf), daemon=True)
     t.start()
     return jsonify({"ok": True, "message": "Tailoring started"})
 
@@ -138,8 +176,9 @@ def tailor(job_id):
 def tailor_status(job_id):
     running = job_id in _tailor_running
     job = job_store.get_job(job_id)
-    done = bool(job and job.get("tailor_result"))
-    return jsonify({"running": running, "done": done})
+    done  = bool(job and job.get("tailor_result"))
+    error = job.get("tailor_error") if job else None
+    return jsonify({"running": running, "done": done, "error": error})
 
 
 @app.route("/job/<job_id>")

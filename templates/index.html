@@ -596,7 +596,8 @@ function pollTailor(jobId, title, company){
         _hideTailorOverlay();
         const btn=document.getElementById('tailor-btn-'+jobId);
         if(btn){ btn.innerHTML='✨ Tailor Resume'; btn.disabled=false; }
-        toast('❌ Tailoring failed — check terminal logs');
+        const errMsg = d.error || 'Tailoring failed — check terminal logs';
+        toast('❌ ' + errMsg, 8000);
       }
     });
   }, 3000);
