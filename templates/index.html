@@ -684,7 +684,7 @@ function clearAll(){
 }
 
 function removeJob(jobId, btn){
-  if(!confirm('Remove this job? It won\'t come back unless you fetch again.')) return;
+  if(!confirm('Remove this job? It will be permanently hidden and won\'t reappear on future fetches.')) return;
   fetch(`/remove/${jobId}`,{method:'POST'}).then(r=>r.json()).then(d=>{
     if(d.ok){
       const card=document.getElementById('card-'+jobId);
