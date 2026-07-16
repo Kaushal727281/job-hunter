@@ -177,8 +177,12 @@ def check_responses(applied_jobs: list[dict]) -> dict:
             seen_ids: set = set()
             responses = []
 
-            # Search by company name in FROM and SUBJECT, filtered by apply date
-            for criterion in [f'{since_clause}FROM "{key}"', f'{since_clause}SUBJECT "{key}"']:
+            # Search by company name in FROM, SUBJECT, and BODY (catches links like workatoptum.com)
+            for criterion in [
+                f'{since_clause}FROM "{key}"',
+                f'{since_clause}SUBJECT "{key}"',
+                f'{since_clause}BODY "{key}"',
+            ]:
                 try:
                     status, data = mail.search(None, criterion)
                     if status != "OK" or not data[0]:
@@ -196,8 +200,28 @@ def check_responses(applied_jobs: list[dict]) -> dict:
                         date_str = msg.get("Date", "")
                         snippet  = _get_body(msg)
 
-                        # Skip our own sent emails / no-reply
+                        # Skip our own sent emails
                         if addr.lower() in from_addr.lower():
+                            continue
+
+                        # Skip social/notification emails that aren't job responses
+                        _NOISE_SUBJECTS = (
+                            "add ", "connect with", "people you may know",
+                            "invitation to connect", "viewed your profile",
+                            "endorsed you", "new message from", "follow",
+                            "unsubscribe", "newsletter", "your weekly",
+                        )
+                        _NOISE_SENDERS = (
+                            "messages-noreply@linkedin.com",
+                            "invitations@linkedin.com",
+                            "notifications@linkedin.com",
+                            "jobalerts@linkedin.com",
+                        )
+                        subj_low = subject.lower()
+                        from_low = from_addr.lower()
+                        if any(s in subj_low for s in _NOISE_SUBJECTS):
+                            continue
+                        if any(s in from_low for s in _NOISE_SENDERS):
                             continue
 
                         # Skip emails received before the job was applied for
