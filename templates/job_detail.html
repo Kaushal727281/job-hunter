@@ -153,21 +153,12 @@
 
     <!-- Applied status -->
     <div style="margin-top:16px;display:flex;align-items:center;gap:10px">
-      {% if job.applied_at %}
-      <span style="background:#e8f5e9;color:#1b5e20;border:1.5px solid #a5d6a7;
-                   padding:6px 14px;border-radius:6px;font-size:13px;font-weight:700">
-        ✓ Applied on {{ job.applied_at[:10] }}
-      </span>
-      <button onclick="unmarkApplied()"
-              style="border:1px solid #ddd;background:#fff;color:#999;padding:5px 12px;
-                     border-radius:6px;font-size:12px;cursor:pointer">Unmark</button>
-      {% else %}
-      <button id="apply-mark-btn" onclick="markApplied()"
-              style="border:1.5px solid #0d47a1;background:#e8f0fb;color:#0d47a1;
+      <button id="apply-mark-btn" onclick="toggleApplied(this)"
+              data-applied="{{ 'yes' if job.applied_at else 'no' }}"
+              style="{{ 'border:1.5px solid #a5d6a7;background:#e8f5e9;color:#1b5e20' if job.applied_at else 'border:1.5px solid #0d47a1;background:#e8f0fb;color:#0d47a1' }};
                      padding:7px 16px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">
-        ✓ Mark as Applied
+        {{ '✓ Applied — click to unmark' if job.applied_at else '✓ Mark as Applied' }}
       </button>
-      {% endif %}
     </div>
 
     <!-- Email responses -->
@@ -316,16 +307,20 @@ document.addEventListener('click', function(e){
   }
 });
 
-function markApplied(){
-  fetch('/apply/{{ job.id }}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({applied:true})})
+function toggleApplied(btn){
+  const applying = btn.dataset.applied !== 'yes';
+  fetch('/apply/{{ job.id }}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({applied:applying})})
     .then(()=>{
-      const btn=document.getElementById('apply-mark-btn');
-      if(btn){ btn.textContent='✓ Applied'; btn.style.background='#e8f5e9'; btn.style.color='#1b5e20'; }
+      if(applying){
+        btn.textContent='✓ Applied — click to unmark';
+        btn.style.cssText='border:1.5px solid #a5d6a7;background:#e8f5e9;color:#1b5e20;padding:7px 16px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer';
+        btn.dataset.applied='yes';
+      } else {
+        btn.textContent='✓ Mark as Applied';
+        btn.style.cssText='border:1.5px solid #0d47a1;background:#e8f0fb;color:#0d47a1;padding:7px 16px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer';
+        btn.dataset.applied='no';
+      }
     });
-}
-function unmarkApplied(){
-  fetch('/apply/{{ job.id }}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({applied:false})})
-    .then(()=>location.reload());
 }
 </script>
 </body>

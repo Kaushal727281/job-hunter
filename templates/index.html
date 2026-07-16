@@ -380,14 +380,10 @@
         <button class="btn-sm btn-apply">Apply →</button>
       </a>
       {% endif %}
-      {% if job.applied_at %}
-      <button class="btn-sm" style="background:#e8f5e9;color:#1b5e20;border:1.5px solid #a5d6a7"
-              onclick="unmarkApplied('{{ job.id }}', this)">✓ Applied</button>
-      {% else %}
-      <button class="btn-sm" style="background:#f5f5f5;color:#777;border:1.5px solid #ddd"
-              id="apply-mark-{{ job.id }}"
-              onclick="markApplied('{{ job.id }}', this)">Mark Applied</button>
-      {% endif %}
+      <button class="btn-sm" id="apply-mark-{{ job.id }}"
+              style="{{ 'background:#e8f5e9;color:#1b5e20;border:1.5px solid #a5d6a7' if job.applied_at else 'background:#f5f5f5;color:#777;border:1.5px solid #ddd' }}"
+              data-applied="{{ 'yes' if job.applied_at else 'no' }}"
+              onclick="toggleApplied('{{ job.id }}', this)">{{ '✓ Applied' if job.applied_at else 'Mark Applied' }}</button>
     </div>
   </div>
   {% endfor %}
@@ -680,29 +676,37 @@ function clearAll(){
   fetch('/clear',{method:'POST'}).then(()=>location.reload());
 }
 
-function markApplied(jobId, btn){
-  fetch(`/apply/${jobId}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({applied:true})})
+function toggleApplied(jobId, btn){
+  const applying = btn.dataset.applied !== 'yes';
+  fetch(`/apply/${jobId}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({applied:applying})})
     .then(r=>r.json()).then(()=>{
-      // Update the card badge
       const card = document.getElementById('card-'+jobId);
-      if(card){
-        card.dataset.applied='yes';
-        const src = card.querySelector('.card-source');
-        if(src && !src.querySelector('.badge-applied')){
-          const b=document.createElement('span');
-          b.className='badge-applied'; b.textContent='✓ Applied';
-          src.insertBefore(b, src.querySelector('span[style]'));
+      if(applying){
+        btn.textContent='✓ Applied';
+        btn.style.cssText='background:#e8f5e9;color:#1b5e20;border:1.5px solid #a5d6a7';
+        btn.dataset.applied='yes';
+        if(card){
+          card.dataset.applied='yes';
+          const src=card.querySelector('.card-source');
+          if(src && !src.querySelector('.badge-applied')){
+            const b=document.createElement('span');
+            b.className='badge-applied'; b.textContent='✓ Applied';
+            src.insertBefore(b, src.querySelector('span[style]'));
+          }
         }
+        toast('Marked as applied!');
+      } else {
+        btn.textContent='Mark Applied';
+        btn.style.cssText='background:#f5f5f5;color:#777;border:1.5px solid #ddd';
+        btn.dataset.applied='no';
+        if(card){
+          card.dataset.applied='no';
+          const badge=card.querySelector('.badge-applied');
+          if(badge) badge.remove();
+        }
+        toast('Removed from applied.');
       }
-      // Swap button
-      if(btn){ btn.textContent='✓ Applied'; btn.style.cssText='background:#e8f5e9;color:#1b5e20;border:1.5px solid #a5d6a7'; }
-      toast('Marked as applied!');
     });
-}
-
-function unmarkApplied(jobId, btn){
-  fetch(`/apply/${jobId}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({applied:false})})
-    .then(()=>{ toast('Unmarked'); setTimeout(()=>location.reload(),600); });
 }
 
 function checkResponses(){
