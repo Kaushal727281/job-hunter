@@ -325,6 +325,31 @@ Return ONLY valid JSON, no markdown fences, no extra text."""
             raw = raw[4:]
         raw = raw.rsplit("```", 1)[0].strip()
 
+    # Sanitize: replace literal control chars inside JSON string values
+    # (Groq sometimes embeds literal newlines in multi-line cover letters)
+    def _fix_control_chars(s: str) -> str:
+        out, in_str, esc = [], False, False
+        for ch in s:
+            if esc:
+                out.append(ch); esc = False
+            elif ch == '\\':
+                out.append(ch); esc = True
+            elif ch == '"':
+                out.append(ch); in_str = not in_str
+            elif in_str and ch == '\n':
+                out.append('\\n')
+            elif in_str and ch == '\r':
+                out.append('\\r')
+            elif in_str and ch == '\t':
+                out.append('\\t')
+            elif in_str and ord(ch) < 0x20:
+                pass  # drop other control chars inside strings
+            else:
+                out.append(ch)
+        return ''.join(out)
+
+    raw = _fix_control_chars(raw)
+
     try:
         result = json.loads(raw)
     except json.JSONDecodeError as e:
