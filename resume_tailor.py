@@ -243,7 +243,7 @@ Location: {job['location']} {'(Remote)' if job.get('is_remote') else ''}
 {resume_text}
 
 ## Instructions
-1. **SUMMARY**: Rewrite to directly address this role (2-3 sentences). Name the company, echo key phrases from the JD verbatim, quantify impact where possible.
+1. **SUMMARY**: Rewrite as a candidate APPLYING for this role — never write as if already employed there. 2-3 sentences: start with years of experience + core strengths, weave in 2-3 key phrases from the JD verbatim, end with what the candidate brings to THIS company. Use phrases like "brings X years of..." or "seeking to contribute..." — NOT "as a [title] at [company]".
 
 2. **NEW_ATS_KEYWORDS**: List up to 8 keywords/phrases from the JD that are NOT yet in the candidate's skills but the candidate genuinely has based on their experience (e.g. if JD says "Agile" and resume shows sprint/scrum work, include it). Return as a JSON array of short strings.
 
