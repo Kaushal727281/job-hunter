@@ -107,7 +107,7 @@ def index():
         return (tr.get("match_score", 0) if tr else -1, j.get("fetched_date", ""))
     jobs.sort(key=sort_key, reverse=True)
     status = {**_fetch_status, "last_run": _get_last_fetch_date()}
-    return render_template("index.html", jobs=jobs, status=status)
+    return render_template("index.html", jobs=jobs, status=status, config=_load_config())
 
 
 @app.route("/fetch", methods=["POST"])
@@ -313,6 +313,116 @@ def check_responses_status():
 def clear():
     job_store.clear_all()
     return jsonify({"ok": True})
+
+
+# ── Resume Import & Settings ──────────────────────────────────────────────
+
+BASE_RESUME_PATH = Path(__file__).parent / "base_resume.html"
+
+
+def _extract_resume_meta(html: str) -> dict:
+    """Extract candidate name, email and phone from resume HTML."""
+    soup = BeautifulSoup(html, "html.parser")
+
+    # Name — first <h1> or element with class containing 'name'
+    name = ""
+    h1 = soup.find("h1")
+    if h1:
+        name = h1.get_text(strip=True)
+    if not name:
+        el = soup.find(class_=re.compile(r"\bname\b", re.I))
+        if el:
+            name = el.get_text(strip=True)
+
+    # Email — mailto: href first, then regex scan
+    email = ""
+    mailto = soup.find("a", href=re.compile(r"^mailto:", re.I))
+    if mailto:
+        email = mailto["href"].replace("mailto:", "").strip()
+    if not email:
+        m = re.search(r"[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}", soup.get_text())
+        if m:
+            email = m.group(0)
+
+    # Phone — common Indian/international patterns
+    phone = ""
+    m = re.search(r"(\+?[\d\s\-().]{10,16})", soup.get_text())
+    if m:
+        phone = m.group(1).strip()
+
+    return {"name": name, "email": email, "phone": phone}
+
+
+@app.route("/upload-resume", methods=["POST"])
+def upload_resume():
+    """Accept an HTML resume file, save as base_resume.html, update config."""
+    f = request.files.get("resume")
+    if not f or not f.filename:
+        return jsonify({"ok": False, "message": "No file uploaded"}), 400
+    if not f.filename.lower().endswith(".html"):
+        return jsonify({"ok": False, "message": "Only .html files are supported"}), 400
+
+    html = f.read().decode("utf-8", errors="replace")
+
+    # Validate it has some content
+    if len(html.strip()) < 200:
+        return jsonify({"ok": False, "message": "File seems too small or empty"}), 400
+
+    # Save as new base resume (keep backup of previous)
+    backup = BASE_RESUME_PATH.with_suffix(".html.bak")
+    if BASE_RESUME_PATH.exists():
+        backup.write_bytes(BASE_RESUME_PATH.read_bytes())
+
+    BASE_RESUME_PATH.write_text(html, encoding="utf-8")
+
+    # Extract metadata from the HTML
+    meta = _extract_resume_meta(html)
+
+    # Update config.json candidate section with extracted info
+    cfg = _load_config()
+    if meta["name"]:
+        cfg["candidate"]["name"] = meta["name"]
+    if meta["email"]:
+        cfg["candidate"]["email"] = meta["email"]
+    CONFIG_FILE.write_text(json.dumps(cfg, indent=2))
+
+    logger.info(f"Resume imported: {meta['name']} <{meta['email']}>")
+    return jsonify({
+        "ok": True,
+        "message": "Resume imported successfully",
+        "meta": meta,
+        "has_structure": bool(BeautifulSoup(html, "html.parser").find(class_="summary-text")),
+    })
+
+
+@app.route("/resume-base")
+def resume_base():
+    """Show the current base resume HTML."""
+    if not BASE_RESUME_PATH.exists():
+        return "No base resume found", 404
+    return Response(BASE_RESUME_PATH.read_text(encoding="utf-8"), mimetype="text/html")
+
+
+@app.route("/settings", methods=["GET", "POST"])
+def settings():
+    if request.method == "POST":
+        data = request.get_json(silent=True) or {}
+        cfg = _load_config()
+        for field in ("name", "email", "total_experience_years"):
+            if field in data:
+                val = data[field]
+                if field == "total_experience_years":
+                    try:
+                        val = int(val)
+                    except (ValueError, TypeError):
+                        continue
+                cfg["candidate"][field] = val
+        CONFIG_FILE.write_text(json.dumps(cfg, indent=2))
+        logger.info(f"Settings updated: {cfg['candidate']}")
+        return jsonify({"ok": True, "candidate": cfg["candidate"]})
+    cfg = _load_config()
+    has_resume = BASE_RESUME_PATH.exists()
+    return jsonify({"candidate": cfg["candidate"], "has_resume": has_resume})
 
 
 def _daily_scheduler():

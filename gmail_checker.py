@@ -6,15 +6,29 @@ Uses IMAP with your Gmail App Password — no extra API keys needed.
 
 import imaplib
 import email
+import json
 import os
 import logging
 import re
 from datetime import datetime
 from email.header import decode_header
+from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
 logger = logging.getLogger(__name__)
+_CONFIG_FILE = Path(__file__).parent / "config.json"
+
+
+def _get_gmail_address() -> str:
+    """Return Gmail address: .env GMAIL_ADDRESS first, then config.json candidate.email."""
+    addr = os.getenv("GMAIL_ADDRESS", "")
+    if addr:
+        return addr
+    try:
+        return json.loads(_CONFIG_FILE.read_text()).get("candidate", {}).get("email", "")
+    except Exception:
+        return ""
 
 
 def _decode_str(raw) -> str:
@@ -114,10 +128,10 @@ def check_responses(applied_jobs: list[dict]) -> dict:
     Returns:
         { job_id: [ {from, subject, snippet, date, msg_id}, ... ] }
     """
-    addr = os.getenv("GMAIL_ADDRESS")
+    addr = _get_gmail_address()
     pwd  = os.getenv("GMAIL_APP_PASSWORD")
     if not addr or not pwd:
-        raise EnvironmentError("GMAIL_ADDRESS / GMAIL_APP_PASSWORD not set in .env")
+        raise EnvironmentError("GMAIL_ADDRESS / GMAIL_APP_PASSWORD not set in .env or config.json")
 
     if not applied_jobs:
         return {}
@@ -174,7 +188,7 @@ def check_responses(applied_jobs: list[dict]) -> dict:
                         # Format: https://mail.google.com/mail/u/0/#search/rfc822msgid:<id>
                         import urllib.parse
                         # authuser= forces Gmail to open in the correct account
-                        gmail_acct = os.getenv("GMAIL_ADDRESS", "")
+                        gmail_acct = _get_gmail_address()
                         authuser = f"?authuser={urllib.parse.quote(gmail_acct)}" if gmail_acct else ""
                         if subject:
                             gmail_url = (

@@ -21,8 +21,16 @@ truststore.inject_into_ssl()
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-BASE_RESUME_PATH = Path(__file__).parent / "base_resume.html"
+BASE_RESUME_PATH  = Path(__file__).parent / "base_resume.html"
+CONFIG_FILE       = Path(__file__).parent / "config.json"
 MODEL = "llama-3.3-70b-versatile"
+
+
+def _candidate_name() -> str:
+    try:
+        return json.loads(CONFIG_FILE.read_text()).get("candidate", {}).get("name", "The candidate")
+    except Exception:
+        return "The candidate"
 
 
 def _get_client() -> Groq:
@@ -107,7 +115,8 @@ def tailor_resume(job: dict) -> dict:
 
     client = _get_client()
 
-    prompt = f"""You are a professional resume writer helping Kaushal Kumar Jha tailor his resume for a specific job.
+    candidate_name = _candidate_name()
+    prompt = f"""You are a professional resume writer helping {candidate_name} tailor their resume for a specific job.
 
 ## Target Job
 Title: {job['title']}
@@ -132,7 +141,7 @@ Salary: {job.get('salary', 'Not disclosed')}
     {{"title": "<role>", "company": "<co>", "bullets": ["bullet1", "bullet2", ...]}},
     ...
   ],
-  "cover_note": "<3 sentences why Kaushal is a great fit for this specific role at this company>",
+  "cover_note": "<3 sentences why {candidate_name} is a great fit for this specific role at this company>",
   "match_score": <integer 1-10>,
   "key_matches": ["skill1", "skill2", "skill3", "skill4", "skill5"]
 }}
