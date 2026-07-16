@@ -111,6 +111,7 @@
         </div>
       </div>
       {% endif %}
+      <a href="/cover/{{ job.id }}" target="_blank"><button class="btn btn-outline">📝 Cover Letter</button></a>
       <a href="/diff/{{ job.id }}" target="_blank"><button class="btn btn-outline">🔍 What Changed?</button></a>
       <button class="btn btn-outline" id="retailor-btn" onclick="tailorJob()">Re-tailor</button>
     {% else %}

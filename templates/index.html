@@ -358,6 +358,7 @@
       {% if tr %}
         <button class="btn-sm btn-primary" onclick="window.location='/job/{{ job.id }}'">📄 View Resume</button>
         <a href="/diff/{{ job.id }}" target="_blank" class="btn-sm btn-secondary">🔍 Diff</a>
+        <a href="/cover/{{ job.id }}" target="_blank" class="btn-sm" style="background:#e8f5e9;color:#1b5e20;border:1.5px solid #a5d6a7">📝 Cover Letter</a>
         {% if job.pdf_path %}
         <div class="pdf-split" id="pdf-split-{{ job.id }}">
           <button class="btn-sm btn-secondary" onclick="togglePdfDropdown('{{ job.id }}')">⬇ PDF ▾</button>
@@ -571,6 +572,11 @@ function pollTailor(jobId, title, company){
             diffBtn.href='/diff/'+jobId; diffBtn.target='_blank';
             diffBtn.className='btn-sm btn-secondary';
             diffBtn.textContent='🔍 Diff';
+            const coverBtn = document.createElement('a');
+            coverBtn.href='/cover/'+jobId; coverBtn.target='_blank';
+            coverBtn.className='btn-sm';
+            coverBtn.style.cssText='background:#e8f5e9;color:#1b5e20;border:1.5px solid #a5d6a7';
+            coverBtn.textContent='📝 Cover Letter';
             const pdfSplit = document.createElement('div');
             pdfSplit.className='pdf-split'; pdfSplit.id='pdf-split-'+jobId;
             pdfSplit.style.marginLeft='4px';
@@ -584,7 +590,7 @@ function pollTailor(jobId, title, company){
               `<a href="/pdf/${jobId}/executive" target="_blank">Executive</a>`+
               `<a href="/pdf/${jobId}/compact"   target="_blank">Compact</a>`+
               `</div>`;
-            wrap.prepend(pdfSplit); wrap.prepend(diffBtn); wrap.prepend(viewBtn);
+            wrap.prepend(pdfSplit); wrap.prepend(coverBtn); wrap.prepend(diffBtn); wrap.prepend(viewBtn);
           }
           const card = document.getElementById('card-'+jobId);
           if(card) card.dataset.tailored='yes';

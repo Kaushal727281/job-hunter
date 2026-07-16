@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Cover Letter — {{ job.title }} at {{ job.company }}</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Georgia&family=Inter:wght@400;600&display=swap');
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Georgia,"Times New Roman",serif;background:#f5f5f0;min-height:100vh;padding:40px 20px}
+    .page{max-width:720px;margin:0 auto;background:#fff;padding:64px 72px;box-shadow:0 2px 24px rgba(0,0,0,.1);border-radius:4px}
+
+    /* Header */
+    .header{border-bottom:2px solid #1a237e;padding-bottom:20px;margin-bottom:32px}
+    .candidate-name{font-size:24px;font-weight:700;color:#1a237e;letter-spacing:.5px;font-family:'Inter',sans-serif}
+    .candidate-email{font-size:13px;color:#555;margin-top:4px;font-family:'Inter',sans-serif}
+    .job-ref{margin-top:10px;font-size:12px;color:#888;font-family:'Inter',sans-serif}
+
+    /* Letter body */
+    .salutation{font-size:15px;margin-bottom:20px;font-weight:600}
+    .letter-body p{font-size:14.5px;line-height:1.85;color:#222;margin-bottom:18px;text-align:justify}
+
+    /* Closing */
+    .closing{margin-top:28px;font-size:14.5px;line-height:2}
+    .sig-name{font-weight:700;color:#1a237e;font-size:15px;margin-top:6px}
+
+    /* Action bar (not printed) */
+    .actions{
+      max-width:720px;margin:24px auto 0;display:flex;gap:10px;
+      font-family:'Inter',sans-serif;
+    }
+    .actions a, .actions button{
+      padding:9px 18px;border-radius:6px;font-size:13px;font-weight:600;
+      cursor:pointer;text-decoration:none;border:none;
+    }
+    .btn-pdf{background:#0d47a1;color:#fff}
+    .btn-back{background:#f0f4f9;color:#333;border:1.5px solid #c5cae9}
+
+    @media print{
+      body{background:#fff;padding:0}
+      .page{box-shadow:none;padding:40px 52px}
+      .actions{display:none}
+    }
+  </style>
+</head>
+<body>
+
+<div class="actions">
+  <a href="/cover/{{ job.id }}/pdf" class="btn-pdf">⬇ Download PDF</a>
+  <button class="btn-back" onclick="history.back()">← Back</button>
+</div>
+
+<div class="page">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="candidate-name">{{ candidate_name }}</div>
+    {% if candidate_email %}
+    <div class="candidate-email">{{ candidate_email }}</div>
+    {% endif %}
+    <div class="job-ref">Re: {{ job.title }} — {{ job.company }}{% if job.location %}, {{ job.location }}{% endif %}</div>
+  </div>
+
+  <!-- Salutation -->
+  <p class="salutation">Dear Hiring Manager,</p>
+
+  <!-- Letter paragraphs -->
+  <div class="letter-body">
+    {% for para in letter.split('\n\n') %}
+      {% set p = para.strip() %}
+      {% if p %}
+      <p>{{ p }}</p>
+      {% endif %}
+    {% endfor %}
+  </div>
+
+  <!-- Closing -->
+  <div class="closing">
+    Sincerely,<br>
+    <span class="sig-name">{{ candidate_name }}</span>
+  </div>
+
+</div>
+</body>
+</html>

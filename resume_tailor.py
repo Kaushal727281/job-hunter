@@ -254,6 +254,15 @@ Location: {job['location']} {'(Remote)' if job.get('is_remote') else ''}
 
 4. **BOLD_KEYWORDS**: Return up to 15 keywords/short phrases that appear in BOTH the JD and the tailored resume — these will be bolded in the final PDF so recruiters see instant matches. Pick the most impactful technical terms and action phrases.
 
+5. **COVER_LETTER**: Write a full professional cover letter (~200 words, 4 paragraphs):
+   - Para 1: Enthusiastic opening — name the specific role + company, hook with a key strength.
+   - Para 2: Why THIS company specifically — research-based reason (product, mission, tech stack).
+   - Para 3: Your top 2-3 relevant achievements from the resume that directly match the JD.
+   - Para 4: Confident closing — express availability, invite for interview, professional sign-off.
+   Address it to "Hiring Manager" at {job['company']}. Do NOT include a date or address block — just the letter body paragraphs separated by blank lines.
+
+6. **COVER_NOTE**: 1-2 sentence teaser (for dashboard preview) summarising why this is a strong match.
+
 Return ONLY valid JSON with this exact structure:
 {{
   "summary": "<new summary>",
@@ -261,7 +270,8 @@ Return ONLY valid JSON with this exact structure:
   "jobs": [
     {{"title": "<role>", "company": "<co>", "bullets": ["bullet1", "bullet2", ...]}}
   ],
-  "cover_note": "<3 sentences — specific to this role at {job['company']}>",
+  "cover_letter": "<full 4-paragraph cover letter body>",
+  "cover_note": "<1-2 sentence teaser>",
   "match_score": <1-10>,
   "key_matches": ["skill1", "skill2", "skill3", "skill4", "skill5"],
   "bold_keywords": ["Spring Boot", "microservices", "Java 8", "REST APIs"]
@@ -310,9 +320,11 @@ Return ONLY valid JSON, no markdown fences, no extra text."""
     result = json.loads(raw)
 
     # Validate required keys
-    for key in ("summary", "jobs", "cover_note", "match_score", "key_matches"):
+    for key in ("summary", "jobs", "match_score", "key_matches"):
         if key not in result:
             raise ValueError(f"Groq response missing key: {key}")
+    result.setdefault("cover_letter", result.get("cover_note", ""))
+    result.setdefault("cover_note", "")
 
     result.setdefault("new_ats_keywords", [])
     result.setdefault("bold_keywords", result.get("key_matches", []))

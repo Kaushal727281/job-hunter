@@ -440,6 +440,59 @@ def diff_view(job_id):
     )
 
 
+@app.route("/cover/<job_id>")
+def cover_letter_html(job_id):
+    job = job_store.get_job(job_id)
+    if not job or not job.get("tailor_result"):
+        return "Resume not tailored yet — tailor first to generate a cover letter.", 404
+    tr = job["tailor_result"]
+    letter = tr.get("cover_letter") or tr.get("cover_note", "")
+    if not letter:
+        return "No cover letter found. Re-tailor this job to generate one.", 404
+    config = _load_config()
+    candidate = config.get("candidate", {})
+    return render_template("cover_letter.html",
+        job=job,
+        letter=letter,
+        candidate_name=candidate.get("name", ""),
+        candidate_email=candidate.get("email", ""),
+    )
+
+
+@app.route("/cover/<job_id>/pdf")
+def cover_letter_pdf(job_id):
+    job = job_store.get_job(job_id)
+    if not job or not job.get("tailor_result"):
+        return "Resume not tailored yet", 404
+    tr = job["tailor_result"]
+    letter = tr.get("cover_letter") or tr.get("cover_note", "")
+    if not letter:
+        return "No cover letter found. Re-tailor this job to generate one.", 404
+    config = _load_config()
+    candidate = config.get("candidate", {})
+    rendered_html = render_template("cover_letter.html",
+        job=job,
+        letter=letter,
+        candidate_name=candidate.get("name", ""),
+        candidate_email=candidate.get("email", ""),
+    )
+    import tempfile
+    from pdf_generator import html_to_pdf
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        html_path = tmp_path / "cover_letter.html"
+        pdf_path  = tmp_path / "cover_letter.pdf"
+        html_path.write_text(rendered_html, encoding="utf-8")
+        html_to_pdf(html_path, pdf_path)
+        pdf_bytes = pdf_path.read_bytes()
+    safe = (job["company"] + "-" + job["title"]).replace("/", "-").replace(" ", "_")[:40]
+    return Response(
+        pdf_bytes,
+        mimetype="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=cover-{safe}.pdf"},
+    )
+
+
 @app.route("/apply/<job_id>", methods=["POST"])
 def mark_applied(job_id):
     data = request.get_json(silent=True) or {}
