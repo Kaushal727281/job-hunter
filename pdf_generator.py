@@ -43,7 +43,7 @@ def html_to_pdf(html_path: Path, pdf_path: Path) -> Path:
     chrome = _find_chrome()
     cmd = [
         chrome,
-        "--headless",
+        "--headless=old",          # old headless respects --print-to-pdf-no-header
         "--disable-gpu",
         "--no-sandbox",
         "--disable-dev-shm-usage",
