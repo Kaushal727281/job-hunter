@@ -15,7 +15,17 @@
     .header-info{flex:1}
     .header-info h2{font-size:17px;font-weight:700}
     .header-info p{font-size:13px;opacity:.85;margin-top:2px}
-    .header-actions{display:flex;gap:8px}
+    .header-actions{display:flex;gap:8px;align-items:center}
+    /* PDF dropdown */
+    .pdf-split{position:relative;display:inline-flex}
+    .pdf-dropdown{display:none;position:absolute;top:calc(100% + 4px);right:0;
+                  background:#fff;border:1.5px solid #c7d5e8;border-radius:8px;
+                  box-shadow:0 4px 16px rgba(0,0,0,.18);z-index:500;min-width:170px;overflow:hidden}
+    .pdf-split.open .pdf-dropdown{display:block}
+    .pdf-dropdown a{display:block;padding:9px 14px;font-size:12.5px;font-weight:500;
+                    color:#1a237e;text-decoration:none;border-bottom:1px solid #f0f4f9}
+    .pdf-dropdown a:last-child{border-bottom:none}
+    .pdf-dropdown a:hover{background:#e8f0fb}
     .btn{border:none;padding:8px 16px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;transition:.15s}
     .btn-white{background:#fff;color:#0d47a1}
     .btn-white:hover{opacity:.9}
@@ -74,7 +84,17 @@
   <div class="header-actions">
     {% if job.tailor_result %}
       {% if job.pdf_path %}
-      <a href="/pdf/{{ job.id }}"><button class="btn btn-outline">⬇ PDF</button></a>
+      <div class="pdf-split" id="pdf-split-detail">
+        <button class="btn btn-outline" onclick="togglePdfDropdown()">⬇ PDF ▾</button>
+        <div class="pdf-dropdown">
+          <a href="/pdf/{{ job.id }}" target="_blank" style="font-weight:700;color:#0d47a1">⭐ Original (as previewed)</a>
+          <a href="/pdf/{{ job.id }}/classic"   target="_blank">Classic B&amp;W</a>
+          <a href="/pdf/{{ job.id }}/modern"    target="_blank">Modern Sidebar</a>
+          <a href="/pdf/{{ job.id }}/tech"      target="_blank">Tech / FAANG</a>
+          <a href="/pdf/{{ job.id }}/executive" target="_blank">Executive</a>
+          <a href="/pdf/{{ job.id }}/compact"   target="_blank">Compact</a>
+        </div>
+      </div>
       {% endif %}
       <a href="/diff/{{ job.id }}" target="_blank"><button class="btn btn-outline">🔍 What Changed?</button></a>
       <button class="btn btn-outline" id="retailor-btn" onclick="tailorJob()">Re-tailor</button>
@@ -235,6 +255,17 @@ function pollTailor(){
 {% if tailoring %}
 pollTailor();
 {% endif %}
+
+function togglePdfDropdown(){
+  const el = document.getElementById('pdf-split-detail');
+  if(el) el.classList.toggle('open');
+}
+document.addEventListener('click', function(e){
+  if(!e.target.closest('.pdf-split')){
+    const el = document.getElementById('pdf-split-detail');
+    if(el) el.classList.remove('open');
+  }
+});
 
 function markApplied(){
   fetch('/apply/{{ job.id }}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({applied:true})})

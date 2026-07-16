@@ -44,7 +44,7 @@
 
     /* ── Job Card ── */
     .card{background:#fff;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.07);
-          border:1px solid #e8edf5;overflow:hidden;display:flex;flex-direction:column;
+          border:1px solid #e8edf5;display:flex;flex-direction:column;
           transition:box-shadow .2s,transform .2s}
     .card:hover{box-shadow:0 6px 20px rgba(13,71,161,.12);transform:translateY(-2px)}
 
@@ -84,7 +84,7 @@
                 border-left:3px solid #1976d2;padding:8px 10px;border-radius:0 4px 4px 0;
                 margin-top:8px}
 
-    .card-footer{padding:12px 18px;border-top:1px solid #f0f4f9;display:flex;gap:8px;flex-wrap:wrap}
+    .card-footer{padding:12px 18px;border-top:1px solid #f0f4f9;display:flex;gap:8px;flex-wrap:wrap;overflow:visible}
     .btn-sm{padding:7px 14px;font-size:12.5px;border-radius:6px;border:none;cursor:pointer;
             font-weight:600;transition:.15s}
     .btn-primary{background:#0d47a1;color:#fff}
@@ -97,10 +97,8 @@
     .btn-tailor:hover{background:#ffe0b2}
     .btn-disabled{opacity:.45;cursor:not-allowed}
 
-    /* ── PDF Split Button ── */
+    /* ── PDF Dropdown Button ── */
     .pdf-split{position:relative;display:inline-flex}
-    .pdf-split .btn-pdf-main{border-radius:6px 0 0 6px;border-right:1px solid rgba(255,255,255,.3)}
-    .pdf-split .btn-pdf-arrow{border-radius:0 6px 6px 0;padding:7px 9px;font-size:11px}
     .pdf-dropdown{display:none;position:absolute;bottom:calc(100% + 4px);left:0;
                   background:#fff;border:1.5px solid #c7d5e8;border-radius:8px;
                   box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:500;min-width:170px;overflow:hidden}
@@ -344,9 +342,9 @@
         <button class="btn-sm btn-primary" onclick="window.location='/job/{{ job.id }}'">View Resume</button>
         {% if job.pdf_path %}
         <div class="pdf-split" id="pdf-split-{{ job.id }}">
-          <a href="/pdf/{{ job.id }}/classic" class="btn-sm btn-secondary btn-pdf-main" style="text-decoration:none">⬇ PDF</a>
-          <button class="btn-sm btn-secondary btn-pdf-arrow" onclick="togglePdfDropdown('{{ job.id }}')">▾</button>
+          <button class="btn-sm btn-secondary" onclick="togglePdfDropdown('{{ job.id }}')">⬇ PDF ▾</button>
           <div class="pdf-dropdown">
+            <a href="/pdf/{{ job.id }}" target="_blank" style="font-weight:700;color:#0d47a1">⭐ Original (as previewed)</a>
             <a href="/pdf/{{ job.id }}/classic"   target="_blank">Classic B&amp;W</a>
             <a href="/pdf/{{ job.id }}/modern"    target="_blank">Modern Sidebar</a>
             <a href="/pdf/{{ job.id }}/tech"      target="_blank">Tech / FAANG</a>
@@ -518,9 +516,9 @@ function pollTailor(jobId){
             pdfSplit.className='pdf-split'; pdfSplit.id='pdf-split-'+jobId;
             pdfSplit.style.marginLeft='4px';
             pdfSplit.innerHTML=
-              `<a href="/pdf/${jobId}/classic" class="btn-sm btn-secondary btn-pdf-main" style="text-decoration:none">⬇ PDF</a>`+
-              `<button class="btn-sm btn-secondary btn-pdf-arrow" onclick="togglePdfDropdown('${jobId}')">▾</button>`+
+              `<button class="btn-sm btn-secondary" onclick="togglePdfDropdown('${jobId}')">⬇ PDF ▾</button>`+
               `<div class="pdf-dropdown">`+
+              `<a href="/pdf/${jobId}" target="_blank" style="font-weight:700;color:#0d47a1">⭐ Original (as previewed)</a>`+
               `<a href="/pdf/${jobId}/classic"   target="_blank">Classic B&W</a>`+
               `<a href="/pdf/${jobId}/modern"    target="_blank">Modern Sidebar</a>`+
               `<a href="/pdf/${jobId}/tech"      target="_blank">Tech / FAANG</a>`+

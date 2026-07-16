@@ -224,6 +224,8 @@ def _render_layout(job: dict, layout: str) -> str:
     skills_el = soup.find(class_="skills-text")
     if skills_el:
         raw = skills_el.get_text(" ", strip=True)
+        # Strip HTML entity artifacts that Groq sometimes injects as literal text
+        raw = raw.replace("&nbsp;", " ").replace("\u00a0", " ")
         parts = re.split(r"\s*·\s*|\s*,\s*", raw)
         skills = [p.strip() for p in parts if p.strip()]
 
