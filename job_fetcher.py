@@ -14,6 +14,7 @@ Working sources:
 
 import json
 import logging
+import os
 import time
 import re
 import xml.etree.ElementTree as ET
@@ -190,6 +191,59 @@ def _classify_company(company: str) -> str:
                  r'|staffing|consulting|infotech|infosystems|softtech)\b', lc):
         return "Service"
     return "Unknown"
+
+
+_COMPANY_CACHE_FILE = Path(__file__).parent / "company_type_cache.json"
+
+
+def _load_company_cache() -> dict:
+    try:
+        return json.loads(_COMPANY_CACHE_FILE.read_text())
+    except Exception:
+        return {}
+
+
+def _save_company_cache(cache: dict) -> None:
+    _COMPANY_CACHE_FILE.write_text(json.dumps(cache, indent=2))
+
+
+def _groq_classify_companies(companies: list) -> dict:
+    """Batch-classify companies as Product/Service/Unknown using Groq LLM."""
+    if not companies:
+        return {}
+    try:
+        from groq import Groq
+        client = Groq(api_key=os.getenv("GROQ_API_KEY", ""))
+        results: dict = {}
+        for i in range(0, len(companies), 30):
+            batch = companies[i:i + 30]
+            lines = "\n".join(f"{idx + 1}. {c}" for idx, c in enumerate(batch))
+            prompt = (
+                "Classify each company below as exactly one of: Product, Service, or Unknown.\n"
+                "  Product = builds its own software products/platforms (e.g. Google, Zoho, Freshworks, Razorpay)\n"
+                "  Service = IT services / consulting / outsourcing / staffing (e.g. TCS, Infosys, Accenture, Wipro)\n"
+                "  Unknown = cannot determine with confidence\n\n"
+                f"Companies:\n{lines}\n\n"
+                "Reply with ONLY a JSON object mapping the exact company name to its type. "
+                "Example: {\"Google\": \"Product\", \"TCS\": \"Service\"}"
+            )
+            resp = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=600,
+                temperature=0.1,
+            )
+            raw = resp.choices[0].message.content.strip()
+            if raw.startswith("```"):
+                raw = raw.split("```", 2)[1]
+                if raw.startswith("json"):
+                    raw = raw[4:]
+                raw = raw.rsplit("```", 1)[0].strip()
+            results.update(json.loads(raw))
+        return results
+    except Exception as e:
+        logger.debug(f"Groq company classification failed: {e}")
+        return {}
 
 
 def _rate_company(company: str) -> dict:
@@ -945,4 +999,23 @@ def fetch_jobs(config: dict, limit: int | None = None) -> list[dict]:
 
     _save_seen(seen)
     logger.info(f"Total: {len(all_jobs)} new jobs (dedup active)")
+
+    # ── Groq-classify companies still marked Unknown ──────────────────────
+    cache = _load_company_cache()
+    unknown_cos = list({j["company"] for j in all_jobs
+                        if j.get("company_type") == "Unknown" and j.get("company")})
+    to_classify = [c for c in unknown_cos if c not in cache]
+    if to_classify:
+        logger.info(f"  Classifying {len(to_classify)} unknown companies via Groq…")
+        new_types = _groq_classify_companies(to_classify)
+        cache.update(new_types)
+        _save_company_cache(cache)
+        logger.info(f"  Classification done — {len(new_types)} companies typed")
+    # Apply cache to all Unknown jobs in this batch
+    for job in all_jobs:
+        if job.get("company_type") == "Unknown":
+            classified = cache.get(job.get("company", ""), "Unknown")
+            if classified in ("Product", "Service"):
+                job["company_type"] = classified
+
     return all_jobs
