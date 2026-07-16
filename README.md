@@ -27,59 +27,50 @@ A personal job-hunting dashboard that fetches jobs daily from LinkedIn, Glassdoo
 
 ---
 
-## Setup (5 steps)
+## Setup
 
-### 1. Clone and install dependencies
+### 1. Clone and run the setup script
 
 ```bash
 git clone https://github.com/Kaushal727281/job-hunter.git
 cd job-hunter
-pip install -r requirements.txt
+bash setup.sh
 ```
+
+The script will:
+- Check Python 3.10+ is installed
+- Create a `.venv` virtual environment and install all dependencies
+- Copy `.env.example` → `.env` and `config.example.json` → `config.json`
+- Check Chrome/Chromium is available for PDF generation
+- Print exactly what still needs to be done
 
 ### 2. Get a free Groq API key
 
 1. Go to [console.groq.com](https://console.groq.com) → Sign up (free)
 2. Click **API Keys** → **Create API Key**
-3. Copy the key (shown only once)
-
-### 3. Configure your environment
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` and fill in your values:
+3. Copy the key and paste it into `.env`:
 
 ```
 GROQ_API_KEY=gsk_...your_key_here...
-
-# Optional — only needed for the Gmail reply-checker feature
-GMAIL_ADDRESS=you@gmail.com
-GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
 ```
 
-> **Gmail App Password** (only if you want Gmail reply checking):
-> Go to [myaccount.google.com/security](https://myaccount.google.com/security) → Enable 2-Step Verification → Search "App Passwords" → Generate one for Mail.
+> **Optional — Gmail reply checking:**
+> Add `GMAIL_ADDRESS` and `GMAIL_APP_PASSWORD` to `.env`.
+> Get an App Password at [myaccount.google.com/security](https://myaccount.google.com/security) → 2-Step Verification → App Passwords.
 
-### 4. Add your resume and config
+### 3. Add your resume
 
-**Resume:**
-Replace `base_resume.html` with your own resume in HTML format.
-The file must use these CSS classes for the AI tailor to work:
+Replace `base_resume.html` with your own resume in HTML format. The file must use these CSS classes for the AI tailor to work:
 - `.summary-text` — your profile/summary paragraph
 - `.job` — each experience block, with `.job-title`, `.job-company`, `.duration`
-- `ul > li` inside `.job` — bullet points (these get rewritten)
+- `ul > li` inside `.job` — bullet points (these get rewritten per job)
 - `.skill-group` with `.skill-group-label` and `.tag` chips — skills sidebar
 
-> Tip: Open the included `base_resume.html` in a browser first to see the expected structure, then replace the content with your own.
+> Tip: Open the included `base_resume.html` in a browser to see the expected structure, then replace the content with your own.
 
-**Config:**
-```bash
-cp config.example.json config.json
-```
+### 4. Edit config.json
 
-Edit `config.json`:
+Open `config.json` and update:
 - `candidate.name` / `candidate.email` — your details
 - `job_search.queries` — job titles to search for
 - `job_search.locations` — cities or "Remote India"
@@ -88,6 +79,7 @@ Edit `config.json`:
 ### 5. Run the app
 
 ```bash
+source .venv/bin/activate
 python app.py
 ```
 
