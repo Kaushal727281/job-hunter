@@ -24,10 +24,10 @@
     ],
     "locations": [
       "Bengaluru",
-      "Delhi NCR",
       "Hyderabad",
-      "Mumbai",
+      "Delhi NCR",
       "Pune",
+      "Chennai",
       "Remote India"
     ],
     "days_old": 3,
@@ -50,7 +50,7 @@
       "junior",
       "trainee"
     ],
-    "min_experience_years": 4,
+    "min_experience_years": 1,
     "max_experience_years": 15,
     "job_types": [],
     "min_salary_lpa": 0
