@@ -759,17 +759,106 @@ def _fetch_indeed(query: str, location: str) -> list[dict]:
     return jobs
 
 
-# ── Full JD ────────────────────────────────────────────────────────────────
+# ── Full JD fetchers for each source ──────────────────────────────────────
+
+def _fetch_indeed_jd(job_id: str) -> str:
+    jk = job_id.replace("indeed_", "")
+    url = f"https://in.indeed.com/viewjob?jk={jk}"
+    try:
+        sess = _make_session("indeed")
+        resp = sess.get(url, timeout=15)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "html.parser")
+        el = (soup.find(id="jobDescriptionText") or
+              soup.find(class_="jobDescriptionText") or
+              soup.find(attrs={"data-testid": "jobDescriptionText"}))
+        if el:
+            return el.get_text(separator="\n", strip=True)[:4000]
+    except Exception as e:
+        logger.debug(f"Indeed JD: {e}")
+    return ""
+
+
+def _fetch_glassdoor_jd(apply_link: str) -> str:
+    if not apply_link:
+        return ""
+    try:
+        sess = _make_session("glassdoor")
+        resp = sess.get(apply_link, timeout=20)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "html.parser")
+        el = soup.find(class_=re.compile(r"jobDescription", re.I))
+        if el:
+            return el.get_text(separator="\n", strip=True)[:4000]
+    except Exception as e:
+        logger.debug(f"Glassdoor JD: {e}")
+    return ""
+
+
+def _fetch_generic_jd(apply_link: str, source: str = "") -> str:
+    """Generic JD fetcher — tries common description containers, then falls back to body text.
+    Works for HNJobs (YC pages, Ashby, Lever, Greenhouse, Workday, etc.) and any other source."""
+    if not apply_link:
+        return ""
+    try:
+        sess = _make_session(source.lower() or "generic")
+        resp = sess.get(apply_link, timeout=15)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "html.parser")
+
+        # 1. Named containers used by common ATS / job boards
+        for attrs in [
+            {"id": "jobDescriptionText"},                                      # Indeed
+            {"data-testid": "jobDescriptionText"},                             # Indeed
+            {"class": re.compile(r"jobDescription|job.?desc", re.I)},         # Glassdoor, generic
+            {"class": re.compile(r"show_job|job.?detail|job.?posting", re.I)},# YC, generic
+            {"class": re.compile(r"posting.?body|job.?body", re.I)},          # Lever
+            {"id": re.compile(r"job.?desc|content|posting", re.I)},           # generic
+            {"class": re.compile(r"description__text|show-more-less-html", re.I)},  # LinkedIn
+            {"class": re.compile(r"prose|markdown|rich.?text", re.I)},        # modern boards
+            {"class": re.compile(r"content|details|about.?role|responsibilities", re.I)},
+        ]:
+            el = soup.find(attrs=attrs)
+            if el:
+                text = el.get_text(separator="\n", strip=True)
+                if len(text) > 200:
+                    return text[:4000]
+
+        # 2. Fallback: collect all substantial <p> and <li> text from the page body
+        for tag in soup(["script", "style", "nav", "header", "footer"]):
+            tag.decompose()
+        paragraphs = [t.get_text(strip=True) for t in soup.find_all(["p", "li"])
+                      if len(t.get_text(strip=True)) > 40]
+        if paragraphs:
+            return "\n".join(paragraphs[:80])[:4000]
+    except Exception as e:
+        logger.debug(f"{source} JD ({apply_link[:60]}): {e}")
+    return ""
+
+
+def _fetch_hnjobs_jd(apply_link: str) -> str:
+    return _fetch_generic_jd(apply_link, "HNJobs")
+
+
+# ── Full JD dispatcher ─────────────────────────────────────────────────────
 
 def fetch_full_jd(job: dict) -> str:
     existing = job.get("description", "")
     if existing and len(existing) > 400:
         return existing
     src = job.get("source", "")
+    link = job.get("apply_link", "")
     if src == "LinkedIn":
         return _fetch_linkedin_jd(job["id"]) or existing
     if src == "Shine":
-        return _fetch_shine_jd(job.get("apply_link", "")) or existing
+        return _fetch_shine_jd(link) or existing
+    if src == "Indeed":
+        return _fetch_indeed_jd(job["id"]) or existing
+    if src == "Glassdoor":
+        return _fetch_glassdoor_jd(link) or existing
+    # HNJobs, RemoteOK, WeWorkRemotely, and any future source — fetch from apply link
+    if link:
+        return _fetch_generic_jd(link, src) or existing
     return existing
 
 
