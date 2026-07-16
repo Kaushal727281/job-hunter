@@ -243,7 +243,13 @@ Location: {job['location']} {'(Remote)' if job.get('is_remote') else ''}
 {resume_text}
 
 ## Instructions
-1. **SUMMARY**: Rewrite as a candidate APPLYING for this role — never write as if already employed there. 2-3 sentences: start with years of experience + core strengths, weave in 2-3 key phrases from the JD verbatim, end with what the candidate brings to THIS company. Use phrases like "brings X years of..." or "seeking to contribute..." — NOT "as a [title] at [company]".
+1. **SUMMARY**: Rewrite as a candidate APPLYING for this role. STRICT RULES:
+   - NEVER use the phrase "as a [job title] at [company]" — this implies already employed there
+   - NEVER say "at [company]" or "for [company]" at the end of the sentence
+   - DO start with: "[X]+ years of experience in [core skills]..."
+   - DO end with what value the candidate brings, NOT where they are going
+   - BAD example: "...seeking a role as Full Stack Engineer at Deutsche Bank"
+   - GOOD example: "...bringing 7 years of enterprise Java expertise and a proven record of delivering scalable solutions."
 
 2. **NEW_ATS_KEYWORDS**: List up to 8 keywords/phrases from the JD that are NOT yet in the candidate's skills but the candidate genuinely has based on their experience (e.g. if JD says "Agile" and resume shows sprint/scrum work, include it). Return as a JSON array of short strings.
 
@@ -290,7 +296,7 @@ Return ONLY valid JSON, no markdown fences, no extra text."""
                 model=MODEL,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=6000,
-                temperature=0.3,
+                temperature=0.5,
             )
             break
         except Exception as e:
@@ -331,6 +337,26 @@ Return ONLY valid JSON, no markdown fences, no extra text."""
             raise ValueError(f"Groq response missing key: {key}")
     result.setdefault("cover_letter", result.get("cover_note", ""))
     result.setdefault("cover_note", "")
+
+    # Post-process summary — strip "as a [title] at [company]" phrases the model keeps adding
+    company_name = re.escape(job.get("company", ""))
+    summary = result.get("summary", "")
+    if company_name:
+        # Remove "as a/an <anything> at <company>" (with optional trailing punctuation)
+        summary = re.sub(
+            r"\s+as\s+(?:a\s+|an\s+)?.+?\s+at\s+" + company_name + r"[.,]?",
+            ".",
+            summary,
+            flags=re.IGNORECASE,
+        ).strip()
+        # Also strip bare "at <company>" at end of sentences
+        summary = re.sub(
+            r"\s+at\s+" + company_name + r"[.,]?\s*$",
+            ".",
+            summary,
+            flags=re.IGNORECASE,
+        ).strip()
+    result["summary"] = summary
 
     result.setdefault("new_ats_keywords", [])
     result.setdefault("bold_keywords", result.get("key_matches", []))
