@@ -289,7 +289,7 @@ Return ONLY valid JSON, no markdown fences, no extra text."""
             response = client.chat.completions.create(
                 model=MODEL,
                 messages=[{"role": "user", "content": prompt}],
-                max_tokens=4096,
+                max_tokens=6000,
                 temperature=0.3,
             )
             break
@@ -309,6 +309,8 @@ Return ONLY valid JSON, no markdown fences, no extra text."""
         raise last_exc  # all retries exhausted
 
     raw = response.choices[0].message.content.strip()
+    logger.info(f"  Groq raw response length: {len(raw)} chars, "
+                f"finish_reason: {response.choices[0].finish_reason}")
 
     # Strip markdown fences if Groq adds them despite instructions
     if raw.startswith("```"):
@@ -317,7 +319,11 @@ Return ONLY valid JSON, no markdown fences, no extra text."""
             raw = raw[4:]
         raw = raw.rsplit("```", 1)[0].strip()
 
-    result = json.loads(raw)
+    try:
+        result = json.loads(raw)
+    except json.JSONDecodeError as e:
+        logger.error(f"  JSON parse error: {e} — raw tail: {raw[-200:]}")
+        raise
 
     # Validate required keys
     for key in ("summary", "jobs", "match_score", "key_matches"):
