@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>{{ job.title }} – Job Hunter</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f9;color:#1e1e1e;height:100vh;display:flex;flex-direction:column}
+
+    header{background:linear-gradient(135deg,#0d47a1,#1976d2);color:#fff;padding:14px 28px;
+           display:flex;align-items:center;gap:16px;flex-shrink:0}
+    .back{color:#fff;text-decoration:none;font-size:20px;opacity:.8}
+    .back:hover{opacity:1}
+    .header-info{flex:1}
+    .header-info h2{font-size:17px;font-weight:700}
+    .header-info p{font-size:13px;opacity:.85;margin-top:2px}
+    .header-actions{display:flex;gap:8px}
+    .btn{border:none;padding:8px 16px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;transition:.15s}
+    .btn-white{background:#fff;color:#0d47a1}
+    .btn-white:hover{opacity:.9}
+    .btn-outline{background:transparent;border:1.5px solid rgba(255,255,255,.7);color:#fff}
+    .btn-outline:hover{background:rgba(255,255,255,.1)}
+    .btn-tailor{background:#fff3e0;color:#e65100;border:1.5px solid #ffa000}
+
+    .split{display:grid;grid-template-columns:1fr 1fr;flex:1;min-height:0;overflow:hidden}
+
+    /* ── Left: Job Description ── */
+    .jd-panel{overflow-y:auto;padding:24px 28px;border-right:2px solid #dde4ed;background:#fff}
+    .jd-panel h3{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1.4px;
+                 color:#0d47a1;margin-bottom:16px;border-bottom:2px solid #bbcfe8;padding-bottom:6px}
+    .meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
+    .meta-item{background:#f5f8fc;border-radius:6px;padding:10px 14px}
+    .meta-label{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px}
+    .meta-value{font-size:13.5px;font-weight:600;color:#1a1a1a}
+    .jd-text{font-size:13px;color:#444;line-height:1.85;white-space:pre-wrap}
+    .apply-link{display:inline-block;margin-top:20px;background:#0d47a1;color:#fff;padding:10px 20px;
+                border-radius:7px;text-decoration:none;font-weight:600;font-size:13px}
+    .apply-link:hover{background:#1565c0}
+
+    /* ── Right: Resume ── */
+    .resume-panel{overflow:hidden;display:flex;flex-direction:column;background:#f8f9fb}
+    .resume-toolbar{padding:12px 20px;background:#fff;border-bottom:1px solid #dde4ed;
+                    display:flex;align-items:center;gap:10px;flex-shrink:0}
+    .resume-toolbar span{font-size:13px;font-weight:600;color:#333;flex:1}
+
+    {% set tr = job.tailor_result %}
+    {% if tr %}
+    .score-badge{display:inline-flex;align-items:center;justify-content:center;
+                 width:32px;height:32px;border-radius:50%;font-weight:700;font-size:12px;color:#fff;
+                 background:{% if tr.match_score >= 7 %}#2e7d32{% elif tr.match_score >= 5 %}#f57c00{% else %}#999{% endif %}}
+    {% endif %}
+
+    iframe.resume-frame{flex:1;border:none;width:100%;height:100%}
+
+    /* not-tailored placeholder */
+    .not-tailored{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:40px}
+    .not-tailored h3{font-size:18px;color:#555}
+    .not-tailored p{font-size:13px;color:#888;text-align:center;max-width:320px;line-height:1.6}
+
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .spinner{width:16px;height:16px;border:2.5px solid currentColor;border-top-color:transparent;
+             border-radius:50%;animation:spin .7s linear infinite;display:inline-block;vertical-align:middle;margin-right:6px}
+  </style>
+</head>
+<body>
+
+<header>
+  <a href="/" class="back">←</a>
+  <div class="header-info">
+    <h2>{{ job.title }}</h2>
+    <p>{{ job.company }}{% if job.location %} · {{ job.location }}{% endif %}{% if job.posted_at %} · {{ job.posted_at }}{% endif %}</p>
+  </div>
+  <div class="header-actions">
+    {% if job.tailor_result %}
+      {% if job.pdf_path %}
+      <a href="/pdf/{{ job.id }}"><button class="btn btn-outline">⬇ PDF</button></a>
+      {% endif %}
+      <a href="/diff/{{ job.id }}" target="_blank"><button class="btn btn-outline">🔍 What Changed?</button></a>
+      <button class="btn btn-outline" id="retailor-btn" onclick="tailorJob()">Re-tailor</button>
+    {% else %}
+      <button class="btn btn-white" id="tailor-btn" onclick="tailorJob()">✨ Tailor Resume</button>
+    {% endif %}
+    {% if job.apply_link %}
+    <a href="{{ job.apply_link }}" target="_blank" rel="noopener"><button class="btn btn-outline">Apply →</button></a>
+    {% endif %}
+  </div>
+</header>
+
+<div class="split">
+
+  <!-- Left: Job Description -->
+  <div class="jd-panel">
+    <h3>Job Description</h3>
+    <div class="meta-grid">
+      <div class="meta-item"><div class="meta-label">Source</div><div class="meta-value">{{ job.source }}</div></div>
+      <div class="meta-item"><div class="meta-label">Salary</div><div class="meta-value">{{ job.salary or '—' }}</div></div>
+      {% if job.experience %}
+      <div class="meta-item"><div class="meta-label">Experience</div><div class="meta-value">{{ job.experience }}</div></div>
+      {% endif %}
+      {% if job.tailor_result %}
+      <div class="meta-item">
+        <div class="meta-label">Match Score</div>
+        <div class="meta-value">{{ job.tailor_result.match_score }}/10</div>
+      </div>
+      {% endif %}
+    </div>
+    {% if job.description %}
+    <div class="jd-text">{{ job.description }}</div>
+    {% else %}
+    <p style="color:#999;font-size:13px">Full description not loaded yet — will be fetched when you tailor the resume.</p>
+    {% endif %}
+    {% if job.apply_link %}
+    <a class="apply-link" href="{{ job.apply_link }}" target="_blank" rel="noopener">Apply on {{ job.source }} →</a>
+    {% endif %}
+  </div>
+
+  <!-- Right: Resume -->
+  <div class="resume-panel" id="resume-panel">
+    {% if job.tailor_result %}
+    <div class="resume-toolbar">
+      <span>Tailored Resume</span>
+      <div class="score-badge">{{ job.tailor_result.match_score }}</div>
+      {% if job.tailor_result.key_matches %}
+      <span style="font-size:12px;color:#666">{{ job.tailor_result.key_matches | join(', ') }}</span>
+      {% endif %}
+    </div>
+    <iframe class="resume-frame" src="/resume/{{ job.id }}" title="Tailored Resume"></iframe>
+
+    {% elif tailoring %}
+    <div class="not-tailored">
+      <span class="spinner" style="width:32px;height:32px;border-width:4px;color:#0d47a1"></span>
+      <h3>Tailoring in progress…</h3>
+      <p>Groq AI is rewriting your resume for this role. Usually takes 20–30 seconds.</p>
+    </div>
+
+    {% else %}
+    <div class="not-tailored" id="not-tailored-msg">
+      <div style="font-size:48px">📄</div>
+      <h3>Resume not tailored yet</h3>
+      <p>Click "Tailor Resume" to have Groq AI customise your resume for this specific job description.</p>
+      <button class="btn btn-tailor" style="padding:11px 24px;font-size:14px" id="tailor-btn2" onclick="tailorJob()">✨ Tailor Resume</button>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+function tailorJob(){
+  ['tailor-btn','tailor-btn2','retailor-btn'].forEach(id=>{
+    const b=document.getElementById(id);
+    if(b){b.innerHTML='<span class="spinner"></span>Working…';b.disabled=true;}
+  });
+  fetch('/tailor/{{ job.id }}',{method:'POST'}).then(r=>r.json()).then(d=>{
+    const panel=document.getElementById('resume-panel');
+    panel.innerHTML=`
+      <div class="not-tailored">
+        <span class="spinner" style="width:32px;height:32px;border-width:4px;color:#0d47a1"></span>
+        <h3>Tailoring in progress…</h3>
+        <p>Groq AI is rewriting your resume. Usually 20–30 seconds.</p>
+      </div>`;
+    pollTailor();
+  });
+}
+
+function pollTailor(){
+  const t=setInterval(()=>{
+    fetch('/tailor-status/{{ job.id }}').then(r=>r.json()).then(d=>{
+      if(d.done){
+        clearInterval(t);
+        location.reload();
+      } else if(!d.running){
+        clearInterval(t);
+        alert('Tailoring failed — check terminal logs');
+        location.reload();
+      }
+    });
+  }, 3000);
+}
+
+{% if tailoring %}
+// Already tailoring — start polling immediately
+pollTailor();
+{% endif %}
+</script>
+</body>
+</html>

@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>What Changed – {{ job.title }}</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f9;color:#1e1e1e}
+
+    header{background:linear-gradient(135deg,#0d47a1,#1976d2);color:#fff;
+           padding:18px 32px;display:flex;align-items:center;gap:16px}
+    .back{color:#fff;text-decoration:none;font-size:20px;opacity:.8}
+    .back:hover{opacity:1}
+    header h2{font-size:17px;font-weight:700}
+    header p{font-size:13px;opacity:.85;margin-top:2px}
+
+    .container{max-width:1100px;margin:28px auto;padding:0 24px}
+
+    /* ── Score / meta bar ── */
+    .meta-bar{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:24px;align-items:center}
+    .score-pill{display:inline-flex;align-items:center;gap:8px;background:#fff;
+                border:2px solid #0d47a1;border-radius:24px;padding:6px 16px;font-weight:700;font-size:14px;color:#0d47a1}
+    .score-num{font-size:22px;font-weight:800;color:#0d47a1}
+    .tag{background:#e8f0fb;color:#1565c0;border-radius:4px;padding:3px 9px;font-size:12px;font-weight:600}
+    .cover-box{background:#fff;border-left:4px solid #1976d2;padding:12px 16px;border-radius:0 8px 8px 0;
+               font-size:13px;color:#444;line-height:1.7;flex:1;min-width:260px}
+    .cover-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#1976d2;margin-bottom:4px}
+
+    /* ── Legend ── */
+    .legend{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:20px;
+            background:#fff;padding:10px 18px;border-radius:8px;border:1px solid #e0e8f0;
+            font-size:13px;align-items:center}
+    .legend span{display:flex;align-items:center;gap:6px}
+    ins{background:#c8f7c5;color:#155724;text-decoration:none;padding:1px 2px;border-radius:2px}
+    del{background:#ffd7d7;color:#721c24;text-decoration:line-through;padding:1px 2px;border-radius:2px}
+
+    /* ── Section card ── */
+    .section-card{background:#fff;border-radius:10px;border:1px solid #dde4ed;
+                  box-shadow:0 2px 8px rgba(0,0,0,.06);margin-bottom:24px;overflow:hidden}
+    .section-header{background:#f0f4f9;padding:12px 20px;font-size:11px;font-weight:700;
+                    text-transform:uppercase;letter-spacing:1.4px;color:#0d47a1;
+                    border-bottom:1px solid #dde4ed;display:flex;align-items:center;gap:10px}
+    .badge-changed{background:#fff3e0;color:#e65100;border:1px solid #ffcc02;
+                   border-radius:12px;padding:2px 9px;font-size:11px;font-weight:700;text-transform:none;letter-spacing:0}
+    .badge-same{background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;
+                border-radius:12px;padding:2px 9px;font-size:11px;font-weight:700;text-transform:none;letter-spacing:0}
+
+    /* ── Summary diff ── */
+    .summary-body{padding:20px 24px}
+    .diff-row{display:grid;grid-template-columns:1fr 1fr;gap:0}
+    .diff-col{padding:14px 18px}
+    .diff-col+.diff-col{border-left:2px solid #e0e8f0}
+    .col-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px}
+    .col-orig .col-label{color:#c62828}
+    .col-tail .col-label{color:#2e7d32}
+    .text-body{font-size:13px;line-height:1.8;color:#333}
+
+    /* ── Bullet diff ── */
+    .job-role{padding:14px 20px 0;font-size:13px;font-weight:700;color:#0d47a1}
+    .job-company{padding:2px 20px 10px;font-size:12px;color:#666}
+    .bullet-list{padding:0 20px 16px;list-style:none}
+    .bullet-list li{padding:5px 0 5px 18px;font-size:13px;line-height:1.7;color:#333;
+                    border-bottom:1px solid #f5f8fc;position:relative}
+    .bullet-list li:last-child{border-bottom:none}
+    .bullet-list li::before{content:"•";position:absolute;left:4px;color:#1976d2;font-weight:700}
+
+    /* bullet state indicators */
+    .b-equal::before{color:#bbb}
+    .b-changed{background:#fffde7}
+    .b-changed::before{content:"✏";left:2px;font-size:11px}
+    .b-added{background:#f0fff4}
+    .b-added::before{content:"＋";left:1px;font-size:11px;color:#2e7d32}
+    .b-removed{background:#fff5f5;text-decoration:line-through;color:#aaa}
+    .b-removed::before{content:"−";left:2px;font-size:11px;color:#c62828}
+
+    .no-change{padding:14px 20px;font-size:13px;color:#aaa;font-style:italic}
+  </style>
+</head>
+<body>
+
+<header>
+  <a href="/job/{{ job.id }}" class="back">←</a>
+  <div>
+    <h2>🔍 What Changed — {{ job.title }}</h2>
+    <p>{{ job.company }}{% if job.location %} · {{ job.location }}{% endif %}</p>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- Score + key matches + cover note -->
+  <div class="meta-bar">
+    <div class="score-pill">
+      <span class="score-num">{{ match_score }}</span>/10 match
+    </div>
+    {% for k in key_matches %}
+    <span class="tag">{{ k }}</span>
+    {% endfor %}
+    {% if cover_note %}
+    <div class="cover-box">
+      <div class="cover-label">Cover Note</div>
+      {{ cover_note }}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Legend -->
+  <div class="legend">
+    <strong>Legend:</strong>
+    <span><ins>Added / reworded</ins></span>
+    <span><del>Removed / replaced</del></span>
+    <span style="background:#fffde7;padding:2px 8px;border-radius:4px">✏ Reworded bullet</span>
+    <span style="background:#f0fff4;padding:2px 8px;border-radius:4px">＋ New/promoted bullet</span>
+    <span style="background:#fff5f5;padding:2px 8px;border-radius:4px;text-decoration:line-through;color:#aaa">− Deprioritised</span>
+  </div>
+
+  <!-- Summary diff -->
+  {% set summary_changed = (orig_summary != tail_summary) %}
+  <div class="section-card">
+    <div class="section-header">
+      Summary
+      {% if summary_changed %}
+      <span class="badge-changed">✏ Rewritten</span>
+      {% else %}
+      <span class="badge-same">✓ Unchanged</span>
+      {% endif %}
+    </div>
+    {% if summary_changed %}
+    <div class="diff-row">
+      <div class="diff-col col-orig">
+        <div class="col-label">Original</div>
+        <div class="text-body">{{ orig_summary }}</div>
+      </div>
+      <div class="diff-col col-tail">
+        <div class="col-label">Tailored</div>
+        <div class="text-body">{{ summary_diff | safe }}</div>
+      </div>
+    </div>
+    {% else %}
+    <div class="no-change">Summary was not changed for this role.</div>
+    {% endif %}
+  </div>
+
+  <!-- Experience bullet diffs -->
+  {% for jd in jobs_diff %}
+  {% set any_change = jd.bullets | selectattr('type', 'ne', 'equal') | list | length > 0 %}
+  <div class="section-card">
+    <div class="section-header">
+      {{ jd.title }}
+      {% if any_change %}
+      <span class="badge-changed">✏ {{ jd.bullets | selectattr('type', 'ne', 'equal') | list | length }} bullet(s) changed</span>
+      {% else %}
+      <span class="badge-same">✓ Unchanged</span>
+      {% endif %}
+    </div>
+    <div class="job-role">{{ jd.title }}</div>
+    <div class="job-company">{{ jd.company }}</div>
+    {% if any_change %}
+    <ul class="bullet-list">
+      {% for b in jd.bullets %}
+      {% if b.type == 'equal' %}
+        <li class="b-equal">{{ b.text }}</li>
+      {% elif b.type == 'changed' %}
+        <li class="b-changed">{{ b.diff | safe }}</li>
+      {% elif b.type == 'added' %}
+        <li class="b-added">{{ b.text }}</li>
+      {% elif b.type == 'removed' %}
+        <li class="b-removed">{{ b.text }}</li>
+      {% endif %}
+      {% endfor %}
+    </ul>
+    {% else %}
+    <div class="no-change">Bullets were not changed for this role.</div>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+</div>
+</body>
+</html>

@@ -1,0 +1,7 @@
+.env
+seen_jobs.json
+output/
+job_hunter.log
+__pycache__/
+*.pyc
+.DS_Store

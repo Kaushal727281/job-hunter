@@ -1,0 +1,34 @@
+{
+  "candidate": {
+    "name": "Kaushal Kumar Jha",
+    "email": "kaushalkumarjha727219@gmail.com",
+    "total_experience_years": 8
+  },
+  "job_search": {
+    "queries": [
+      "Lead Java Engineer",
+      "Senior Java Developer",
+      "Java Tech Lead",
+      "Senior Software Engineer Java"
+    ],
+    "locations": [
+      "Bengaluru",
+      "Remote India"
+    ],
+    "days_old": 3,
+    "max_jobs_per_run": 20
+  },
+  "filters": {
+    "exclude_keywords": ["intern", "fresher", "0-2 years", "junior", "trainee"],
+    "min_experience_years": 4,
+    "max_experience_years": 15,
+    "job_types": [],
+    "min_salary_lpa": 0
+  },
+  "email": {
+    "send_hour": 8,
+    "top_n_with_pdf": 5,
+    "subject_prefix": "[Job Digest]"
+  },
+  "output_dir": "output"
+}

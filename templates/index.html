@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Job Hunter</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f9;color:#1e1e1e;min-height:100vh}
+
+    /* ── Header ── */
+    header{background:linear-gradient(135deg,#0d47a1,#1976d2);color:#fff;padding:20px 32px;
+           display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;
+           box-shadow:0 2px 12px rgba(0,0,0,0.18)}
+    header h1{font-size:22px;font-weight:700;letter-spacing:.4px}
+    header h1 span{opacity:.75;font-weight:400;font-size:16px;margin-left:10px}
+    .header-right{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .btn{border:none;border-radius:6px;padding:9px 18px;font-size:13px;font-weight:600;
+         cursor:pointer;transition:opacity .15s,transform .1s}
+    .btn:active{transform:scale(.97)}
+    .btn-white{background:#fff;color:#0d47a1}
+    .btn-white:hover{opacity:.9}
+    .btn-outline{background:transparent;border:1.5px solid rgba(255,255,255,.7);color:#fff}
+    .btn-outline:hover{background:rgba(255,255,255,.1)}
+    #status-msg{font-size:13px;opacity:.85}
+
+    /* ── Filters ── */
+    .toolbar{padding:12px 32px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+             border-bottom:1px solid #dde4ed;background:#fff}
+    .filter-group{display:flex;align-items:center;gap:5px}
+    .filter-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;
+                  color:#999;margin-right:2px;white-space:nowrap}
+    .toolbar-divider{width:1px;height:24px;background:#dde4ed;margin:0 4px}
+    .filter-btn{border:1.5px solid #c7d5e8;background:#fff;color:#555;border-radius:20px;
+                padding:5px 13px;font-size:12px;font-weight:500;cursor:pointer;transition:.15s}
+    .filter-btn.active,.filter-btn:hover{background:#0d47a1;border-color:#0d47a1;color:#fff}
+    .search-box{margin-left:auto;border:1.5px solid #c7d5e8;border-radius:6px;padding:6px 12px;
+                font-size:13px;width:200px;outline:none}
+    .search-box:focus{border-color:#1976d2}
+
+    /* ── Grid ── */
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));
+          gap:18px;padding:24px 32px}
+
+    /* ── Job Card ── */
+    .card{background:#fff;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.07);
+          border:1px solid #e8edf5;overflow:hidden;display:flex;flex-direction:column;
+          transition:box-shadow .2s,transform .2s}
+    .card:hover{box-shadow:0 6px 20px rgba(13,71,161,.12);transform:translateY(-2px)}
+
+    .card-header{padding:16px 18px 10px;border-bottom:1px solid #f0f4f9}
+    .card-source{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;
+                 color:#888;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+    .badge-naukri{background:#ffe0e0;color:#c62828;padding:2px 7px;border-radius:10px}
+    .badge-linkedin{background:#e3f2fd;color:#1565c0;padding:2px 7px;border-radius:10px}
+    .badge-remote{background:#e8f5e9;color:#2e7d32;padding:2px 7px;border-radius:10px}
+    .card-title{font-size:15px;font-weight:700;color:#0d47a1;line-height:1.3;margin-bottom:3px}
+    .card-company{font-size:13px;font-weight:600;color:#333}
+    .card-meta{font-size:12px;color:#777;margin-top:3px}
+
+    .card-body{padding:12px 18px;flex:1}
+    .tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+    .tag{background:#e8f0fb;color:#1565c0;border-radius:4px;padding:2px 8px;font-size:11.5px;font-weight:500}
+
+    .score-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+    .score-badge{display:inline-flex;align-items:center;justify-content:center;
+                 width:38px;height:38px;border-radius:50%;font-weight:700;font-size:13px;color:#fff}
+    .score-high{background:#2e7d32}
+    .score-mid{background:#f57c00}
+    .score-low{background:#bbb}
+    .score-label{font-size:12px;color:#666}
+
+    .cover-note{font-size:12px;color:#555;line-height:1.6;background:#f9fafb;
+                border-left:3px solid #1976d2;padding:8px 10px;border-radius:0 4px 4px 0;
+                margin-top:8px}
+
+    .card-footer{padding:12px 18px;border-top:1px solid #f0f4f9;display:flex;gap:8px;flex-wrap:wrap}
+    .btn-sm{padding:7px 14px;font-size:12.5px;border-radius:6px;border:none;cursor:pointer;
+            font-weight:600;transition:.15s}
+    .btn-primary{background:#0d47a1;color:#fff}
+    .btn-primary:hover{background:#1565c0}
+    .btn-secondary{background:#e8f0fb;color:#0d47a1}
+    .btn-secondary:hover{background:#c7d5e8}
+    .btn-apply{background:#fff;border:1.5px solid #0d47a1;color:#0d47a1}
+    .btn-apply:hover{background:#f0f4ff}
+    .btn-tailor{background:#fff3e0;color:#e65100;border:1.5px solid #ffcc02}
+    .btn-tailor:hover{background:#ffe0b2}
+    .btn-disabled{opacity:.45;cursor:not-allowed}
+
+    /* ── Empty state ── */
+    .empty{text-align:center;padding:64px 32px;color:#888}
+    .empty h2{font-size:20px;margin-bottom:10px;color:#555}
+    .empty p{font-size:14px;margin-bottom:24px}
+
+    /* ── Spinner ── */
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .spinner{width:16px;height:16px;border:2.5px solid #fff;border-top-color:transparent;
+             border-radius:50%;animation:spin .7s linear infinite;display:inline-block;vertical-align:middle;margin-right:6px}
+    .spinner-dark{border-color:#0d47a1;border-top-color:transparent}
+
+    /* ── Toast ── */
+    #toast{position:fixed;bottom:24px;right:24px;background:#323232;color:#fff;padding:12px 20px;
+           border-radius:8px;font-size:13px;opacity:0;transition:opacity .3s;z-index:999;pointer-events:none}
+    #toast.show{opacity:1}
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🎯 Job Hunter <span>— Kaushal Kumar Jha</span></h1>
+  <div class="header-right">
+    <span id="status-msg">{{ status.message }}</span>
+    <button class="btn btn-white" id="fetch-btn" onclick="startFetch()">Fetch New Jobs</button>
+    <button class="btn btn-outline" onclick="if(confirm('Clear all jobs?')) clearAll()">Clear All</button>
+  </div>
+</header>
+
+<div class="toolbar">
+  <!-- Source filter -->
+  <div class="filter-group">
+    <span class="filter-label">Source</span>
+    <button class="filter-btn active" data-filter="source" data-val="all"    onclick="applyFilters(this,'source')">All</button>
+    <button class="filter-btn"        data-filter="source" data-val="LinkedIn" onclick="applyFilters(this,'source')">LinkedIn ({{ jobs|selectattr('source','eq','LinkedIn')|list|length }})</button>
+    <button class="filter-btn"        data-filter="source" data-val="Shine"    onclick="applyFilters(this,'source')">Shine ({{ jobs|selectattr('source','eq','Shine')|list|length }})</button>
+  </div>
+
+  <div class="toolbar-divider"></div>
+
+  <!-- Location filter -->
+  <div class="filter-group">
+    <span class="filter-label">Location</span>
+    <button class="filter-btn active" data-filter="loc" data-val="all"       onclick="applyFilters(this,'loc')">All</button>
+    <button class="filter-btn"        data-filter="loc" data-val="Bengaluru" onclick="applyFilters(this,'loc')">Bengaluru</button>
+    <button class="filter-btn"        data-filter="loc" data-val="remote"    onclick="applyFilters(this,'loc')">Remote</button>
+  </div>
+
+  <div class="toolbar-divider"></div>
+
+  <!-- Experience filter -->
+  <div class="filter-group">
+    <span class="filter-label">Experience</span>
+    <button class="filter-btn active" data-filter="exp" data-val="all"  onclick="applyFilters(this,'exp')">All</button>
+    <button class="filter-btn"        data-filter="exp" data-val="0-5"  onclick="applyFilters(this,'exp')">0–5 yrs</button>
+    <button class="filter-btn"        data-filter="exp" data-val="5-10" onclick="applyFilters(this,'exp')">5–10 yrs</button>
+    <button class="filter-btn"        data-filter="exp" data-val="10+"  onclick="applyFilters(this,'exp')">10+ yrs</button>
+  </div>
+
+  <div class="toolbar-divider"></div>
+
+  <!-- Status filter -->
+  <div class="filter-group">
+    <span class="filter-label">Status</span>
+    <button class="filter-btn active" data-filter="status" data-val="all"      onclick="applyFilters(this,'status')">All ({{ jobs|length }})</button>
+    <button class="filter-btn"        data-filter="status" data-val="tailored" onclick="applyFilters(this,'status')">Tailored ({{ jobs|selectattr('tailor_result')|list|length }})</button>
+  </div>
+
+  <input class="search-box" id="search" type="text" placeholder="Search role, company…" oninput="applyFilters()"/>
+</div>
+
+{% if jobs %}
+<div class="grid" id="job-grid">
+  {% for job in jobs %}
+  {% set tr = job.tailor_result %}
+  {% set score = tr.match_score if tr else 0 %}
+  <div class="card" id="card-{{ job.id }}"
+       data-source="{{ job.source }}"
+       data-tailored="{{ 'yes' if tr else 'no' }}"
+       data-loc="{{ job.location|lower }}"
+       data-expmin="{{ job.experience.split('–')[0].strip() if job.experience and '–' in job.experience else '' }}"
+       data-text="{{ (job.title + ' ' + job.company + ' ' + job.location)|lower }}">
+
+    <div class="card-header">
+      <div class="card-source">
+        <span class="badge-{{ job.source|lower }}">{{ job.source }}</span>
+        {% if job.is_remote %}<span class="badge-remote">Remote</span>{% endif %}
+        <span style="margin-left:auto;font-size:11px;color:#aaa">{{ job.fetched_date }}</span>
+      </div>
+      <div class="card-title">{{ job.title }}</div>
+      <div class="card-company">{{ job.company }}</div>
+      <div class="card-meta">
+        📍 {{ job.location or '—' }}
+        {% if job.experience %} &nbsp;·&nbsp; 🧑‍💼 {{ job.experience }}{% endif %}
+        {% if job.salary and job.salary != 'Not disclosed' %} &nbsp;·&nbsp; 💰 {{ job.salary }}{% endif %}
+      </div>
+    </div>
+
+    <div class="card-body">
+      {% if tr %}
+        <div class="score-row">
+          <div class="score-badge {% if score >= 7 %}score-high{% elif score >= 5 %}score-mid{% else %}score-low{% endif %}">
+            {{ score }}
+          </div>
+          <div class="score-label">Match score<br><strong>{{ score }}/10</strong></div>
+        </div>
+        {% if tr.key_matches %}
+        <div class="tags">
+          {% for k in tr.key_matches %}<span class="tag">{{ k }}</span>{% endfor %}
+        </div>
+        {% endif %}
+        {% if tr.cover_note %}
+        <div class="cover-note">{{ tr.cover_note }}</div>
+        {% endif %}
+      {% elif job.tags %}
+        <div class="tags">
+          {% for t in job.tags[:6] %}<span class="tag">{{ t }}</span>{% endfor %}
+        </div>
+        <div style="font-size:12px;color:#999;margin-top:8px">Resume not tailored yet</div>
+      {% endif %}
+    </div>
+
+    <div class="card-footer">
+      {% if tr %}
+        <button class="btn-sm btn-primary" onclick="window.location='/job/{{ job.id }}'">View Resume</button>
+        {% if job.pdf_path %}
+        <button class="btn-sm btn-secondary" onclick="window.location='/pdf/{{ job.id }}'">⬇ PDF</button>
+        {% endif %}
+      {% else %}
+        <button class="btn-sm btn-tailor" id="tailor-btn-{{ job.id }}" onclick="tailorJob('{{ job.id }}')">✨ Tailor Resume</button>
+      {% endif %}
+      {% if job.apply_link %}
+      <a href="{{ job.apply_link }}" target="_blank" rel="noopener">
+        <button class="btn-sm btn-apply">Apply →</button>
+      </a>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="empty">
+  <h2>No jobs yet</h2>
+  <p>Click <strong>Fetch New Jobs</strong> to scrape Naukri + LinkedIn</p>
+  <button class="btn btn-white" style="background:#0d47a1;color:#fff;padding:11px 24px;border-radius:8px;font-size:14px;border:none;cursor:pointer" onclick="startFetch()">Fetch Now</button>
+</div>
+{% endif %}
+
+<div id="toast"></div>
+
+<script>
+let fetchTimer = null;
+
+function toast(msg, dur=3000){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), dur);
+}
+
+function startFetch(){
+  const btn = document.getElementById('fetch-btn');
+  btn.innerHTML='<span class="spinner"></span>Fetching…';
+  btn.disabled=true;
+  fetch('/fetch',{method:'POST'}).then(r=>r.json()).then(d=>{
+    toast(d.message);
+    pollFetch();
+  });
+}
+
+function pollFetch(){
+  fetchTimer = setInterval(()=>{
+    fetch('/fetch-status').then(r=>r.json()).then(d=>{
+      document.getElementById('status-msg').textContent = d.message;
+      if(!d.running){
+        clearInterval(fetchTimer);
+        document.getElementById('fetch-btn').innerHTML='Fetch New Jobs';
+        document.getElementById('fetch-btn').disabled=false;
+        toast('Done! Refreshing…');
+        setTimeout(()=>location.reload(), 1200);
+      }
+    });
+  }, 2000);
+}
+
+function tailorJob(jobId){
+  const btn = document.getElementById('tailor-btn-'+jobId);
+  btn.innerHTML='<span class="spinner spinner-dark"></span>Tailoring…';
+  btn.disabled=true;
+  fetch('/tailor/'+jobId,{method:'POST'}).then(r=>r.json()).then(d=>{
+    toast('Resume tailoring started (takes ~20s)');
+    pollTailor(jobId);
+  });
+}
+
+function pollTailor(jobId){
+  const timer = setInterval(()=>{
+    fetch('/tailor-status/'+jobId).then(r=>r.json()).then(d=>{
+      if(d.done){
+        clearInterval(timer);
+        toast('Resume ready! Reloading…');
+        setTimeout(()=>location.reload(), 800);
+      } else if(!d.running){
+        clearInterval(timer);
+        const btn=document.getElementById('tailor-btn-'+jobId);
+        if(btn){ btn.innerHTML='✨ Tailor Resume'; btn.disabled=false; }
+        toast('Tailoring failed — check logs');
+      }
+    });
+  }, 3000);
+}
+
+// Active filter state
+const activeFilters = {source:'all', loc:'all', exp:'all', status:'all'};
+
+function applyFilters(btn, group){
+  if(btn && group){
+    document.querySelectorAll(`[data-filter="${group}"]`).forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    activeFilters[group] = btn.dataset.val;
+  }
+  const q = (document.getElementById('search').value||'').toLowerCase();
+
+  document.querySelectorAll('.card').forEach(c=>{
+    let show = true;
+    // Source
+    if(activeFilters.source !== 'all' && c.dataset.source !== activeFilters.source) show=false;
+    // Location
+    if(show && activeFilters.loc !== 'all'){
+      const loc = (c.dataset.loc||'').toLowerCase();
+      if(activeFilters.loc === 'remote' && !loc.includes('remote')) show=false;
+      if(activeFilters.loc === 'Bengaluru' && !loc.includes('bengaluru') && !loc.includes('bangalore')) show=false;
+    }
+    // Experience
+    if(show && activeFilters.exp !== 'all'){
+      const expMin = parseInt(c.dataset.expmin||'0');
+      if(activeFilters.exp === '0-5'  && (expMin < 0  || expMin >= 5))  show=false;
+      if(activeFilters.exp === '5-10' && (expMin < 5  || expMin >= 10)) show=false;
+      if(activeFilters.exp === '10+'  && expMin < 10) show=false;
+    }
+    // Status
+    if(show && activeFilters.status === 'tailored' && c.dataset.tailored !== 'yes') show=false;
+    // Search text
+    if(show && q && !c.dataset.text.includes(q)) show=false;
+    c.style.display = show ? '' : 'none';
+  });
+}
+
+function clearAll(){
+  fetch('/clear',{method:'POST'}).then(()=>location.reload());
+}
+
+// Resume auto-poll if fetch was running before reload
+if("{{ status.running }}"==="True") pollFetch();
+</script>
+</body>
+</html>
