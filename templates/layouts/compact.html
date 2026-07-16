@@ -45,6 +45,8 @@
     .edu-school { font-size: 8.5pt; color: #555; }
     .edu-date   { font-size: 8pt; color: #777; }
     .soft-item  { font-size: 8.5pt; color: #333; margin-bottom: 3px; }
+    /* Bolded ATS keywords */
+    strong { font-weight: 800; }
   </style>
 </head>
 <body>
@@ -66,7 +68,7 @@
   <div class="col-left">
     {% if summary %}
     <div class="section-title">Profile</div>
-    <div class="summary-text">{{ summary }}</div>
+    <div class="summary-text">{{ summary | safe }}</div>
     {% endif %}
 
     {% if jobs %}
@@ -80,7 +82,7 @@
         </div>
         <div class="job-date">{{ job.date }}</div>
       </div>
-      {% if job.bullets %}<ul>{% for b in job.bullets %}<li>{{ b }}</li>{% endfor %}</ul>{% endif %}
+      {% if job.bullets %}<ul>{% for b in job.bullets %}<li>{{ b | safe }}</li>{% endfor %}</ul>{% endif %}
     </div>
     {% endfor %}
     {% endif %}

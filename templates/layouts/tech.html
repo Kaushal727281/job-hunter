@@ -49,6 +49,8 @@
     .edu-school { font-size: 9pt; color: #555; }
     .edu-date   { font-size: 8.5pt; color: #777; }
     .soft-list  { font-size: 9pt; color: #333; line-height: 1.8; }
+    /* Bolded ATS keywords */
+    strong { font-weight: 800; }
   </style>
 </head>
 <body>
@@ -64,7 +66,7 @@
 
 {% if summary %}
 <div class="section-title">Summary</div>
-<div class="summary-text">{{ summary }}</div>
+<div class="summary-text">{{ summary | safe }}</div>
 {% endif %}
 
 {% if skill_groups %}
@@ -91,7 +93,7 @@
     </div>
     <div class="job-date">{{ job.date }}</div>
   </div>
-  {% if job.bullets %}<ul>{% for b in job.bullets %}<li>{{ b }}</li>{% endfor %}</ul>{% endif %}
+  {% if job.bullets %}<ul>{% for b in job.bullets %}<li>{{ b | safe }}</li>{% endfor %}</ul>{% endif %}
 </div>
 {% endfor %}
 {% endif %}

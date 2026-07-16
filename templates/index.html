@@ -96,6 +96,7 @@
     .btn-tailor{background:#fff3e0;color:#e65100;border:1.5px solid #ffcc02}
     .btn-tailor:hover{background:#ffe0b2}
     .btn-disabled{opacity:.45;cursor:not-allowed}
+    a.btn-sm{text-decoration:none;display:inline-block}
 
     /* ── PDF Dropdown Button ── */
     .pdf-split{position:relative;display:inline-flex}
@@ -355,7 +356,8 @@
 
     <div class="card-footer">
       {% if tr %}
-        <button class="btn-sm btn-primary" onclick="window.location='/job/{{ job.id }}'">View Resume</button>
+        <button class="btn-sm btn-primary" onclick="window.location='/job/{{ job.id }}'">📄 View Resume</button>
+        <a href="/diff/{{ job.id }}" target="_blank" class="btn-sm btn-secondary">🔍 Diff</a>
         {% if job.pdf_path %}
         <div class="pdf-split" id="pdf-split-{{ job.id }}">
           <button class="btn-sm btn-secondary" onclick="togglePdfDropdown('{{ job.id }}')">⬇ PDF ▾</button>
@@ -561,12 +563,13 @@ function pollTailor(jobId, title, company){
           if(btn){
             const wrap = btn.parentElement;
             btn.remove();
-            const viewBtn = document.createElement('a');
-            viewBtn.href='/resume/'+jobId; viewBtn.target='_blank';
-            viewBtn.className='btn-sm btn-primary'; viewBtn.textContent='📄 View Resume';
+            const viewBtn = document.createElement('button');
+            viewBtn.className='btn-sm btn-primary';
+            viewBtn.textContent='📄 View Resume';
+            viewBtn.onclick=()=>window.location='/job/'+jobId;
             const diffBtn = document.createElement('a');
             diffBtn.href='/diff/'+jobId; diffBtn.target='_blank';
-            diffBtn.className='btn-sm btn-secondary'; diffBtn.style.marginLeft='4px';
+            diffBtn.className='btn-sm btn-secondary';
             diffBtn.textContent='🔍 Diff';
             const pdfSplit = document.createElement('div');
             pdfSplit.className='pdf-split'; pdfSplit.id='pdf-split-'+jobId;
