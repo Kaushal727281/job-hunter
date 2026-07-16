@@ -116,12 +116,31 @@ def check_responses(applied_jobs: list[dict]) -> dict:
                         if addr.lower() in from_addr.lower():
                             continue
 
+                        # Build a direct Gmail URL using the RFC822 Message-ID header
+                        # Format: https://mail.google.com/mail/u/0/#search/rfc822msgid:<id>
+                        raw_msg_id = msg.get("Message-ID", "")
+                        # Strip angle brackets: <abc@domain.com> → abc@domain.com
+                        clean_msg_id = raw_msg_id.strip().strip("<>")
+                        if clean_msg_id:
+                            gmail_url = (
+                                f"https://mail.google.com/mail/u/0/"
+                                f"#search/rfc822msgid%3A{clean_msg_id}"
+                            )
+                        else:
+                            # Fallback: search by subject
+                            import urllib.parse
+                            gmail_url = (
+                                "https://mail.google.com/mail/u/0/#search/"
+                                + urllib.parse.quote(f'subject:"{subject}"')
+                            )
+
                         responses.append({
-                            "from":    from_addr,
-                            "subject": subject,
-                            "snippet": snippet,
-                            "date":    date_str,
-                            "msg_id":  mid.decode(),
+                            "from":      from_addr,
+                            "subject":   subject,
+                            "snippet":   snippet,
+                            "date":      date_str,
+                            "msg_id":    mid.decode(),
+                            "gmail_url": gmail_url,
                         })
                 except Exception as e:
                     logger.debug(f"IMAP search failed [{criterion}]: {e}")
