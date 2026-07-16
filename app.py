@@ -905,4 +905,5 @@ if __name__ == "__main__":
     sched = threading.Thread(target=_daily_scheduler, daemon=True)
     sched.start()
 
-    app.run(debug=False, host="0.0.0.0", port=5000, use_reloader=False)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(debug=False, host="0.0.0.0", port=port, use_reloader=False)
