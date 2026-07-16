@@ -95,7 +95,7 @@ def _apply_sections(soup: BeautifulSoup, modified: dict) -> BeautifulSoup:
             summary_el.clear()
             summary_el.append(new_summary)
 
-    # New ATS keywords → add a new .skill-group at bottom of sidebar
+    # New ATS keywords → silently append into the last existing .skill-group's .skill-tags
     new_kw = modified.get("new_ats_keywords", [])
     if new_kw:
         sidebar = soup.find(class_="sidebar")
@@ -105,17 +105,18 @@ def _apply_sections(soup: BeautifulSoup, modified: dict) -> BeautifulSoup:
                         for t in sidebar.find_all(class_="tag")}
             fresh = [k for k in new_kw if k.lower() not in existing]
             if fresh:
-                sg_div = soup.new_tag("div", **{"class": "skill-group"})
-                lbl    = soup.new_tag("div", **{"class": "skill-group-label"})
-                lbl.string = "ATS Keywords"
-                tags_div = soup.new_tag("div", **{"class": "skill-tags"})
-                for kw in fresh:
-                    span = soup.new_tag("span", **{"class": "tag"})
-                    span.string = kw
-                    tags_div.append(span)
-                sg_div.append(lbl)
-                sg_div.append(tags_div)
-                sidebar.append(sg_div)
+                # Find the last .skill-group and append to its .skill-tags
+                skill_groups = sidebar.find_all(class_="skill-group")
+                if skill_groups:
+                    last_sg = skill_groups[-1]
+                    tags_div = last_sg.find(class_="skill-tags")
+                    if not tags_div:
+                        tags_div = soup.new_tag("div", **{"class": "skill-tags"})
+                        last_sg.append(tags_div)
+                    for kw in fresh:
+                        span = soup.new_tag("span", **{"class": "tag"})
+                        span.string = kw
+                        tags_div.append(span)
 
     # Old .skills-text fallback
     new_skills = modified.get("skills", "")

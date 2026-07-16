@@ -71,6 +71,21 @@
     @keyframes spin{to{transform:rotate(360deg)}}
     .spinner{width:16px;height:16px;border:2.5px solid currentColor;border-top-color:transparent;
              border-radius:50%;animation:spin .7s linear infinite;display:inline-block;vertical-align:middle;margin-right:6px}
+
+    /* Tailor overlay */
+    #tailor-overlay{display:none;position:fixed;inset:0;background:rgba(10,20,60,.72);
+                    z-index:2000;align-items:center;justify-content:center;backdrop-filter:blur(3px)}
+    #tailor-overlay.active{display:flex}
+    .ov-box{background:#fff;border-radius:14px;padding:36px 44px;text-align:center;
+            box-shadow:0 16px 56px rgba(0,0,0,.35);max-width:420px;width:90%}
+    .ov-spinner{width:52px;height:52px;border:5px solid #e3eaf6;border-top-color:#0d47a1;
+                border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 20px}
+    .ov-box h3{font-size:18px;font-weight:700;color:#0d1b4e;margin-bottom:8px}
+    .ov-box p{font-size:13.5px;color:#666;line-height:1.6}
+    .ov-success-icon{font-size:54px;margin-bottom:12px;display:none}
+    .ov-box.done .ov-spinner{display:none}
+    .ov-box.done .ov-success-icon{display:block}
+    .ov-box.done h3{color:#1b5e20}
   </style>
 </head>
 <body>
@@ -219,21 +234,50 @@
 
 </div>
 
+<!-- Tailor overlay -->
+<div id="tailor-overlay">
+  <div class="ov-box" id="ov-box">
+    <div class="ov-success-icon">✅</div>
+    <div class="ov-spinner"></div>
+    <h3 id="ov-title">Tailoring Resume…</h3>
+    <p id="ov-msg">Groq AI is rewriting your resume for this role.<br>Usually takes 20–30 seconds.</p>
+  </div>
+</div>
+
 <script>
+function _showTailorOverlay(){
+  document.getElementById('tailor-overlay').classList.add('active');
+  const box=document.getElementById('ov-box');
+  box.classList.remove('done');
+  document.getElementById('ov-title').textContent='Tailoring Resume…';
+  document.getElementById('ov-msg').textContent='Groq AI is rewriting your resume for this role. Usually takes 20–30 seconds.';
+}
+function _showTailorSuccess(){
+  const box=document.getElementById('ov-box');
+  box.classList.add('done');
+  document.getElementById('ov-title').textContent='Resume Tailored!';
+  document.getElementById('ov-msg').textContent='Your resume has been optimised. Loading updated view…';
+}
+function _hideTailorOverlay(){
+  document.getElementById('tailor-overlay').classList.remove('active');
+}
+
 function tailorJob(){
-  ['tailor-btn','tailor-btn2','retailor-btn'].forEach(id=>{
-    const b=document.getElementById(id);
-    if(b){b.innerHTML='<span class="spinner"></span>Working…';b.disabled=true;}
-  });
+  _showTailorOverlay();
   fetch('/tailor/{{ job.id }}',{method:'POST'}).then(r=>r.json()).then(d=>{
     const panel=document.getElementById('resume-panel');
-    panel.innerHTML=`
-      <div class="not-tailored">
-        <span class="spinner" style="width:32px;height:32px;border-width:4px;color:#0d47a1"></span>
-        <h3>Tailoring in progress…</h3>
-        <p>Groq AI is rewriting your resume. Usually 20–30 seconds.</p>
-      </div>`;
+    if(panel){
+      panel.innerHTML=`
+        <div class="not-tailored">
+          <span class="spinner" style="width:32px;height:32px;border-width:4px;color:#0d47a1"></span>
+          <h3>Tailoring in progress…</h3>
+          <p>Groq AI is rewriting your resume. Usually 20–30 seconds.</p>
+        </div>`;
+    }
     pollTailor();
+  }).catch(()=>{
+    _hideTailorOverlay();
+    alert('Failed to start tailoring — check terminal logs');
   });
 }
 
@@ -242,9 +286,11 @@ function pollTailor(){
     fetch('/tailor-status/{{ job.id }}').then(r=>r.json()).then(d=>{
       if(d.done){
         clearInterval(t);
-        location.reload();
+        _showTailorSuccess();
+        setTimeout(()=>{ _hideTailorOverlay(); location.reload(); }, 2200);
       } else if(!d.running){
         clearInterval(t);
+        _hideTailorOverlay();
         alert('Tailoring failed — check terminal logs');
         location.reload();
       }
@@ -253,6 +299,7 @@ function pollTailor(){
 }
 
 {% if tailoring %}
+_showTailorOverlay();
 pollTailor();
 {% endif %}
 

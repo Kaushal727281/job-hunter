@@ -108,6 +108,22 @@
     .pdf-dropdown a:last-child{border-bottom:none}
     .pdf-dropdown a:hover{background:#e8f0fb}
 
+    /* ── Tailor Overlay ── */
+    #tailor-overlay{display:none;position:fixed;inset:0;background:rgba(10,20,60,.72);
+                    z-index:2000;align-items:center;justify-content:center;backdrop-filter:blur(3px)}
+    #tailor-overlay.active{display:flex}
+    #tailor-overlay-box{background:#fff;border-radius:14px;padding:36px 44px;text-align:center;
+                        box-shadow:0 16px 56px rgba(0,0,0,.35);max-width:420px;width:90%}
+    #tailor-overlay-box .ov-spinner{width:52px;height:52px;border:5px solid #e3eaf6;
+                                    border-top-color:#0d47a1;border-radius:50%;
+                                    animation:spin .8s linear infinite;margin:0 auto 20px}
+    #tailor-overlay-box h3{font-size:18px;font-weight:700;color:#0d1b4e;margin-bottom:8px}
+    #tailor-overlay-box p{font-size:13.5px;color:#666;line-height:1.6}
+    #tailor-overlay-box .ov-success{font-size:54px;margin-bottom:12px;display:none}
+    #tailor-overlay-box.done .ov-spinner{display:none}
+    #tailor-overlay-box.done .ov-success{display:block}
+    #tailor-overlay-box.done h3{color:#1b5e20}
+
     /* ── Empty state ── */
     .empty{text-align:center;padding:64px 32px;color:#888}
     .empty h2{font-size:20px;margin-bottom:10px;color:#555}
@@ -384,6 +400,16 @@
 
 <div id="toast"></div>
 
+<!-- Tailor Overlay -->
+<div id="tailor-overlay">
+  <div id="tailor-overlay-box">
+    <div class="ov-spinner"></div>
+    <div class="ov-success">✅</div>
+    <h3 id="ov-title">Tailoring Resume…</h3>
+    <p id="ov-msg">AI is analysing the job description and rewriting your resume.<br>This usually takes 20–40 seconds. Please wait.</p>
+  </div>
+</div>
+
 <!-- Settings Modal -->
 <div id="settings-overlay" onclick="closeSettings(event)">
   <div id="settings-modal">
@@ -481,22 +507,52 @@ function pollFetch(){
   }, 2000);
 }
 
+function _showTailorOverlay(title, company){
+  const box = document.getElementById('tailor-overlay-box');
+  box.classList.remove('done');
+  document.getElementById('ov-title').textContent = 'Tailoring Resume…';
+  document.getElementById('ov-msg').innerHTML =
+    `<strong>${title}</strong> @ <strong>${company}</strong><br><br>`+
+    `AI is analysing the job description and rewriting your resume.<br>`+
+    `This usually takes 20–40 seconds — please wait.`;
+  document.getElementById('tailor-overlay').classList.add('active');
+}
+
+function _showTailorSuccess(title, company){
+  const box = document.getElementById('tailor-overlay-box');
+  box.classList.add('done');
+  document.getElementById('ov-title').textContent = 'Resume Tailored!';
+  document.getElementById('ov-msg').innerHTML =
+    `<strong>${title}</strong> @ <strong>${company}</strong><br><br>`+
+    `Your resume has been tailored and keywords bolded. Opening diff view…`;
+}
+
+function _hideTailorOverlay(){
+  document.getElementById('tailor-overlay').classList.remove('active');
+  document.getElementById('tailor-overlay-box').classList.remove('done');
+}
+
 function tailorJob(jobId){
+  const card  = document.getElementById('card-'+jobId);
+  const title   = card ? card.querySelector('.card-title')?.textContent   : 'this job';
+  const company = card ? card.querySelector('.card-company')?.textContent : '';
   const btn = document.getElementById('tailor-btn-'+jobId);
-  btn.innerHTML='<span class="spinner spinner-dark"></span>Tailoring…';
-  btn.disabled=true;
+  if(btn){ btn.innerHTML='<span class="spinner spinner-dark"></span>Tailoring…'; btn.disabled=true; }
+  _showTailorOverlay(title, company);
   fetch('/tailor/'+jobId,{method:'POST'}).then(r=>r.json()).then(d=>{
-    toast('Resume tailoring started (takes ~20s)');
-    pollTailor(jobId);
+    if(!d.ok){ _hideTailorOverlay(); toast('⚠️ '+d.message); return; }
+    pollTailor(jobId, title, company);
   });
 }
 
-function pollTailor(jobId){
+function pollTailor(jobId, title, company){
+  title   = title   || jobId;
+  company = company || '';
   const timer = setInterval(()=>{
     fetch('/tailor-status/'+jobId).then(r=>r.json()).then(d=>{
       if(d.done){
         clearInterval(timer);
-        toast('✅ Resume tailored! Opening…');
+        _showTailorSuccess(title, company);
         // Open tailored resume in new tab; update card buttons in place
         setTimeout(()=>{
           window.open('/diff/'+jobId, '_blank');
@@ -529,12 +585,15 @@ function pollTailor(jobId){
           }
           const card = document.getElementById('card-'+jobId);
           if(card) card.dataset.tailored='yes';
+          // Hide overlay after short success display
+          setTimeout(()=>_hideTailorOverlay(), 2200);
         }, 400);
       } else if(!d.running){
         clearInterval(timer);
+        _hideTailorOverlay();
         const btn=document.getElementById('tailor-btn-'+jobId);
         if(btn){ btn.innerHTML='✨ Tailor Resume'; btn.disabled=false; }
-        toast('Tailoring failed — check logs');
+        toast('❌ Tailoring failed — check terminal logs');
       }
     });
   }, 3000);
