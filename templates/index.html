@@ -46,14 +46,16 @@
     .card{background:#fff;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.07);
           border:1px solid #e8edf5;display:flex;flex-direction:column;
           transition:box-shadow .2s,transform .2s;position:relative}
-    .btn-card-remove{position:absolute;top:8px;right:8px;background:none;border:none;
-          color:#bbb;font-size:16px;cursor:pointer;line-height:1;padding:2px 5px;
-          border-radius:4px;transition:.15s}
+    .card-top-right{position:absolute;top:8px;right:10px;display:flex;flex-direction:column;
+          align-items:flex-end;gap:2px}
+    .card-date{font-size:11px;color:#aaa}
+    .btn-card-remove{background:none;border:none;color:#ccc;font-size:15px;cursor:pointer;
+          line-height:1;padding:1px 4px;border-radius:4px;transition:.15s;align-self:flex-end}
     .btn-card-remove:hover{color:#c62828;background:#ffebee}
-    .card-source{padding-right:28px}
+    .card-source{padding-right:0}
     .card:hover{box-shadow:0 6px 20px rgba(13,71,161,.12);transform:translateY(-2px)}
 
-    .card-header{padding:16px 18px 10px;border-bottom:1px solid #f0f4f9}
+    .card-header{padding:16px 60px 10px 18px;border-bottom:1px solid #f0f4f9}
     .card-source{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;
                  color:#888;margin-bottom:6px;display:flex;align-items:center;gap:6px}
     .badge-naukri{background:#ffe0e0;color:#c62828;padding:2px 7px;border-radius:10px}
@@ -301,7 +303,10 @@
        data-responses="{{ job.email_responses | tojson | forceescape if job.email_responses else '[]' }}"
        data-companytype="{{ job.company_type or 'Unknown' }}">
 
-    <button class="btn-card-remove" title="Remove this job" onclick="removeJob('{{ job.id }}', this)">×</button>
+    <div class="card-top-right">
+      <span class="card-date">{{ job.fetched_date }}</span>
+      <button class="btn-card-remove" title="Remove this job" onclick="removeJob('{{ job.id }}', this)">×</button>
+    </div>
 
     <div class="card-header">
       <div class="card-source">
@@ -311,7 +316,6 @@
         {% if job.is_remote %}<span class="badge-remote">Remote</span>{% endif %}
         {% if job.applied_at %}<span class="badge-applied">✓ Applied</span>{% endif %}
         {% if job.email_responses %}<span class="badge-responded" style="cursor:pointer" onclick="showResponses(event,'{{ job.id }}')">📬 {{ job.email_responses|length }} Response{{ 's' if job.email_responses|length > 1 else '' }}</span>{% endif %}
-        <span style="margin-left:auto;font-size:11px;color:#aaa">{{ job.fetched_date }}</span>
       </div>
       <div class="card-title">{{ job.title }}</div>
       <div class="card-company">{{ job.company }}</div>
