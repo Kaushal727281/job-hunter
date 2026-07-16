@@ -389,8 +389,31 @@ function pollTailor(jobId){
     fetch('/tailor-status/'+jobId).then(r=>r.json()).then(d=>{
       if(d.done){
         clearInterval(timer);
-        toast('Resume ready! Reloading…');
-        setTimeout(()=>location.reload(), 800);
+        toast('✅ Resume tailored! Opening…');
+        // Open tailored resume in new tab; update card buttons in place
+        setTimeout(()=>{
+          window.open('/diff/'+jobId, '_blank');
+          // Swap the tailor button for view/download buttons in place
+          const btn = document.getElementById('tailor-btn-'+jobId);
+          if(btn){
+            const wrap = btn.parentElement;
+            btn.remove();
+            const viewBtn = document.createElement('a');
+            viewBtn.href='/resume/'+jobId; viewBtn.target='_blank';
+            viewBtn.className='btn-sm btn-primary'; viewBtn.textContent='📄 View Resume';
+            const diffBtn = document.createElement('a');
+            diffBtn.href='/diff/'+jobId; diffBtn.target='_blank';
+            diffBtn.className='btn-sm btn-secondary'; diffBtn.style.marginLeft='4px';
+            diffBtn.textContent='🔍 Diff';
+            const pdfBtn = document.createElement('button');
+            pdfBtn.className='btn-sm btn-secondary'; pdfBtn.style.marginLeft='4px';
+            pdfBtn.textContent='⬇ PDF';
+            pdfBtn.onclick=()=>window.location='/pdf/'+jobId;
+            wrap.prepend(pdfBtn); wrap.prepend(diffBtn); wrap.prepend(viewBtn);
+          }
+          const card = document.getElementById('card-'+jobId);
+          if(card) card.dataset.tailored='yes';
+        }, 400);
       } else if(!d.running){
         clearInterval(timer);
         const btn=document.getElementById('tailor-btn-'+jobId);
