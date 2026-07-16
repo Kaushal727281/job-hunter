@@ -29,7 +29,7 @@ def _write(jobs: list[dict]):
 
 def all_jobs() -> list[dict]:
     with _lock:
-        return _read()
+        return [j for j in _read() if not j.get("removed")]
 
 
 def get_job(job_id: str) -> Optional[dict]:
@@ -89,10 +89,13 @@ def applied_jobs() -> list[dict]:
 
 
 def remove_job(job_id: str):
-    """Permanently delete a single job by id."""
+    """Soft-delete a job so it never reappears after re-fetch."""
     with _lock:
         jobs = _read()
-        _write([j for j in jobs if j["id"] != job_id])
+        for j in jobs:
+            if j["id"] == job_id:
+                j["removed"] = True
+        _write(jobs)
 
 
 def clear_all():
