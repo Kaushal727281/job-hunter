@@ -163,7 +163,7 @@ def check_responses(applied_jobs: list[dict]) -> dict:
         for job in applied_jobs:
             job_id     = job["id"]
             company    = job.get("company", "")
-            title      = job.get("title", "")
+
             applied_at = job.get("applied_at", "")
             key        = _company_key(company)
             if not key:
@@ -177,17 +177,8 @@ def check_responses(applied_jobs: list[dict]) -> dict:
             seen_ids: set = set()
             responses = []
 
-            # Also search by job title keyword as fallback (catches LinkedIn/platform replies)
-            title_key = _company_key(title)
-            criteria = [
-                f'{since_clause}FROM "{key}"',
-                f'{since_clause}SUBJECT "{key}"',
-            ]
-            if title_key and title_key.lower() != key.lower():
-                criteria.append(f'{since_clause}SUBJECT "{title_key}"')
-
             # Search by company name in FROM and SUBJECT, filtered by apply date
-            for criterion in criteria:
+            for criterion in [f'{since_clause}FROM "{key}"', f'{since_clause}SUBJECT "{key}"']:
                 try:
                     status, data = mail.search(None, criterion)
                     if status != "OK" or not data[0]:
