@@ -180,88 +180,103 @@ def _render_layout(job: dict, layout: str) -> str:
     html = job["tailor_result"]["resume_html"]
     soup = BeautifulSoup(html, "html.parser")
 
-    # Name
-    name = ""
-    h1 = soup.find("h1")
-    if h1:
-        name = h1.get_text(strip=True)
+    def _txt(el): return el.get_text(" ", strip=True) if el else ""
 
-    # Email / phone
-    email = ""
+    # ── Name & role tagline ──────────────────────────────────────────────
+    name = _txt(soup.find("h1"))
+    role = _txt(soup.find(class_="role"))
+
+    # ── Contact (from .contact-bar) ──────────────────────────────────────
+    email = phone = linkedin = github = ""
     mailto = soup.find("a", href=re.compile(r"^mailto:", re.I))
     if mailto:
         email = mailto["href"].replace("mailto:", "").strip()
-    if not email:
-        m = re.search(r"[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}", soup.get_text())
-        if m:
-            email = m.group(0)
-
-    phone = ""
-    contact_el = soup.find(class_=re.compile(r"contact", re.I))
-    if contact_el:
-        m = re.search(r"(\+?[\d][\d\s\-().]{8,}[\d])", contact_el.get_text())
-        if m:
-            phone = m.group(1).strip()
-
-    # LinkedIn / GitHub links
-    linkedin = ""
-    github = ""
     for a in soup.find_all("a", href=True):
         href = a["href"]
         if "linkedin.com" in href and not linkedin:
             linkedin = href
         elif "github.com" in href and not github:
             github = href
+    contact_bar = soup.find(class_="contact-bar")
+    if contact_bar:
+        m = re.search(r"(\+?[\d][\d\s\-().]{8,}[\d])", contact_bar.get_text())
+        if m:
+            phone = m.group(1).strip()
 
-    # Summary
-    summary = ""
-    summary_el = soup.find(class_="summary-text")
-    if summary_el:
-        summary = summary_el.get_text(" ", strip=True)
+    # ── Summary ───────────────────────────────────────────────────────────
+    summary = _txt(soup.find(class_="summary-text"))
 
-    # Skills — split on ' · ' or ','
-    skills = []
-    skills_el = soup.find(class_="skills-text")
-    if skills_el:
-        raw = skills_el.get_text(" ", strip=True)
-        # Strip HTML entity artifacts that Groq sometimes injects as literal text
-        raw = raw.replace("&nbsp;", " ").replace("\u00a0", " ")
-        parts = re.split(r"\s*·\s*|\s*,\s*", raw)
-        skills = [p.strip() for p in parts if p.strip()]
+    # ── Skill groups (new structure: .skill-group with label + .tag chips) ─
+    skill_groups = []
+    skills_flat  = []
+    for sg in soup.find_all(class_="skill-group"):
+        label = _txt(sg.find(class_="skill-group-label"))
+        tags  = [_txt(t) for t in sg.find_all(class_="tag") if _txt(t)]
+        if tags:
+            skill_groups.append({"label": label, "tags": tags})
+            skills_flat.extend(tags)
 
-    # Jobs
+    # Fallback: old .skills-text single string
+    if not skills_flat:
+        skills_el = soup.find(class_="skills-text")
+        if skills_el:
+            raw = skills_el.get_text(" ", strip=True).replace("&nbsp;", " ").replace("\u00a0", " ")
+            skills_flat = [p.strip() for p in re.split(r"\s*·\s*|\s*,\s*", raw) if p.strip()]
+
+    # ── Jobs (.job → .job-title, .job-company, .duration, ul>li) ──────────
     jobs = []
     for job_div in soup.find_all(class_="job"):
         title_el   = job_div.find(class_="job-title")
         company_el = job_div.find(class_="job-company")
-        date_el    = job_div.find(class_="job-date")
+        # date: try .duration first, then .job-date, then .job-meta
+        date_el    = (job_div.find(class_="duration") or
+                      job_div.find(class_="job-date") or
+                      job_div.find(class_="job-meta"))
         bullets    = [li.get_text(" ", strip=True) for li in job_div.find_all("li")]
         jobs.append({
-            "title":   title_el.get_text(strip=True) if title_el else "",
-            "company": company_el.get_text(strip=True) if company_el else "",
-            "date":    date_el.get_text(strip=True) if date_el else "",
+            "title":   _txt(title_el),
+            "company": _txt(company_el),
+            "date":    _txt(date_el),
             "bullets": bullets,
         })
 
-    # Education
+    # ── Projects (.project) ───────────────────────────────────────────────
+    projects = []
+    for p_div in soup.find_all(class_="project"):
+        pname   = _txt(p_div.find(class_="project-name"))
+        prole   = _txt(p_div.find(class_="project-role"))
+        stack   = [_txt(t) for t in p_div.find_all(class_="tag") if _txt(t)]
+        desc_el = p_div.find("p")
+        desc    = _txt(desc_el)
+        projects.append({"name": pname, "role": prole, "stack": stack, "description": desc})
+
+    # ── Education (.edu-block, .edu-degree, .edu-school, .edu-year/.edu-date) ─
     education = None
-    edu_el = soup.find(class_="edu-entry")
+    edu_el = soup.find(class_="edu-block") or soup.find(class_="edu-entry")
     if edu_el:
-        degree_el = edu_el.find(class_="edu-degree")
-        school_el = edu_el.find(class_="edu-school")
-        date_el   = edu_el.find(class_="edu-date")
         education = {
-            "degree": degree_el.get_text(strip=True) if degree_el else "",
-            "school": school_el.get_text(strip=True) if school_el else "",
-            "date":   date_el.get_text(strip=True) if date_el else "",
+            "degree": _txt(edu_el.find(class_="edu-degree")),
+            "school": _txt(edu_el.find(class_="edu-school")),
+            "date":   _txt(edu_el.find(class_="edu-year") or edu_el.find(class_="edu-date")),
         }
+
+    # ── Soft skills (spans inside "Soft Skills" section) ──────────────────
+    soft_skills = []
+    for title_el in soup.find_all(class_="section-title"):
+        if "soft" in _txt(title_el).lower():
+            tags_el = title_el.find_next_sibling(class_="skill-tags")
+            if tags_el:
+                soft_skills = [s.get_text(strip=True) for s in tags_el.find_all("span") if s.get_text(strip=True)]
+            break
 
     return render_template(
         f"layouts/{layout}.html",
-        name=name, email=email, phone=phone,
-        linkedin=linkedin, github=github,
-        summary=summary, skills=skills,
-        jobs=jobs, education=education,
+        name=name, role=role,
+        email=email, phone=phone, linkedin=linkedin, github=github,
+        summary=summary,
+        skill_groups=skill_groups, skills=skills_flat,
+        jobs=jobs, projects=projects,
+        education=education, soft_skills=soft_skills,
     )
 
 
