@@ -172,6 +172,124 @@ def resume_pdf(job_id):
                     headers={"Content-Disposition": f"attachment; filename=resume.pdf"})
 
 
+_VALID_LAYOUTS = {"classic", "modern", "tech", "executive", "compact"}
+
+
+def _render_layout(job: dict, layout: str) -> str:
+    """Parse the tailored resume HTML and render it with the requested layout template."""
+    html = job["tailor_result"]["resume_html"]
+    soup = BeautifulSoup(html, "html.parser")
+
+    # Name
+    name = ""
+    h1 = soup.find("h1")
+    if h1:
+        name = h1.get_text(strip=True)
+
+    # Email / phone
+    email = ""
+    mailto = soup.find("a", href=re.compile(r"^mailto:", re.I))
+    if mailto:
+        email = mailto["href"].replace("mailto:", "").strip()
+    if not email:
+        m = re.search(r"[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}", soup.get_text())
+        if m:
+            email = m.group(0)
+
+    phone = ""
+    contact_el = soup.find(class_=re.compile(r"contact", re.I))
+    if contact_el:
+        m = re.search(r"(\+?[\d][\d\s\-().]{8,}[\d])", contact_el.get_text())
+        if m:
+            phone = m.group(1).strip()
+
+    # LinkedIn / GitHub links
+    linkedin = ""
+    github = ""
+    for a in soup.find_all("a", href=True):
+        href = a["href"]
+        if "linkedin.com" in href and not linkedin:
+            linkedin = href
+        elif "github.com" in href and not github:
+            github = href
+
+    # Summary
+    summary = ""
+    summary_el = soup.find(class_="summary-text")
+    if summary_el:
+        summary = summary_el.get_text(" ", strip=True)
+
+    # Skills — split on ' · ' or ','
+    skills = []
+    skills_el = soup.find(class_="skills-text")
+    if skills_el:
+        raw = skills_el.get_text(" ", strip=True)
+        parts = re.split(r"\s*·\s*|\s*,\s*", raw)
+        skills = [p.strip() for p in parts if p.strip()]
+
+    # Jobs
+    jobs = []
+    for job_div in soup.find_all(class_="job"):
+        title_el   = job_div.find(class_="job-title")
+        company_el = job_div.find(class_="job-company")
+        date_el    = job_div.find(class_="job-date")
+        bullets    = [li.get_text(" ", strip=True) for li in job_div.find_all("li")]
+        jobs.append({
+            "title":   title_el.get_text(strip=True) if title_el else "",
+            "company": company_el.get_text(strip=True) if company_el else "",
+            "date":    date_el.get_text(strip=True) if date_el else "",
+            "bullets": bullets,
+        })
+
+    # Education
+    education = None
+    edu_el = soup.find(class_="edu-entry")
+    if edu_el:
+        degree_el = edu_el.find(class_="edu-degree")
+        school_el = edu_el.find(class_="edu-school")
+        date_el   = edu_el.find(class_="edu-date")
+        education = {
+            "degree": degree_el.get_text(strip=True) if degree_el else "",
+            "school": school_el.get_text(strip=True) if school_el else "",
+            "date":   date_el.get_text(strip=True) if date_el else "",
+        }
+
+    return render_template(
+        f"layouts/{layout}.html",
+        name=name, email=email, phone=phone,
+        linkedin=linkedin, github=github,
+        summary=summary, skills=skills,
+        jobs=jobs, education=education,
+    )
+
+
+@app.route("/pdf/<job_id>/<layout>")
+def resume_pdf_layout(job_id, layout):
+    if layout not in _VALID_LAYOUTS:
+        return f"Unknown layout '{layout}'. Choose from: {', '.join(sorted(_VALID_LAYOUTS))}", 400
+    job = job_store.get_job(job_id)
+    if not job or not job.get("tailor_result"):
+        return "Resume not tailored yet", 404
+
+    rendered_html = _render_layout(job, layout)
+
+    import tempfile
+    from pdf_generator import html_to_pdf
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        html_path = tmp_path / f"resume-{layout}.html"
+        pdf_path  = tmp_path / f"resume-{layout}.pdf"
+        html_path.write_text(rendered_html, encoding="utf-8")
+        html_to_pdf(html_path, pdf_path)
+        pdf_bytes = pdf_path.read_bytes()
+
+    return Response(
+        pdf_bytes,
+        mimetype="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=resume-{layout}.pdf"},
+    )
+
+
 @app.route("/diff/<job_id>")
 def diff_view(job_id):
     job = job_store.get_job(job_id)

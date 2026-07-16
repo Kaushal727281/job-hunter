@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>{{ name }} – Resume</title>
+  <style>
+    @page { margin: 0; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; display: flex; min-height: 100vh;
+           font-size: 11pt; color: #1e1e1e; }
+
+    /* Sidebar */
+    .sidebar { width: 240px; min-width: 240px; background: #1a237e; color: #e8eaf6;
+               padding: 28px 20px; display: flex; flex-direction: column; gap: 22px; }
+    .sidebar h1 { font-size: 17pt; font-weight: 700; color: #fff; line-height: 1.25; }
+    .sidebar-section-title { font-size: 8.5pt; font-weight: 700; text-transform: uppercase;
+                              letter-spacing: 1.3px; color: #9fa8da; margin-bottom: 8px;
+                              border-bottom: 1px solid #3949ab; padding-bottom: 4px; }
+    .contact-line { font-size: 9.5pt; color: #c5cae9; margin-bottom: 5px; word-break: break-word; }
+    .contact-line a { color: #90caf9; text-decoration: none; }
+    .skill-tag { display: inline-block; background: #283593; color: #e8eaf6; border-radius: 3px;
+                 padding: 2px 8px; font-size: 9pt; margin: 2px 2px 2px 0; }
+    .edu-block .edu-degree { font-size: 10pt; font-weight: 600; color: #e8eaf6; }
+    .edu-block .edu-school { font-size: 9.5pt; color: #9fa8da; }
+    .edu-block .edu-date   { font-size: 9pt; color: #7986cb; margin-top: 2px; }
+
+    /* Main content */
+    .main { flex: 1; padding: 28px 28px 28px 24px; }
+    .section-title { font-size: 10.5pt; font-weight: 700; text-transform: uppercase;
+                     letter-spacing: 1px; color: #1a237e; border-bottom: 2px solid #1a237e;
+                     padding-bottom: 4px; margin: 18px 0 10px; }
+    .section-title:first-child { margin-top: 0; }
+    .summary-text { font-size: 10.5pt; line-height: 1.7; color: #333; }
+    .job { margin-bottom: 16px; }
+    .job-header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+    .job-title { font-size: 11pt; font-weight: 700; color: #0d1a6e; }
+    .job-company { font-size: 10.5pt; color: #444; }
+    .job-date { font-size: 9.5pt; color: #777; white-space: nowrap; }
+    ul { margin: 5px 0 0 18px; padding: 0; }
+    li { font-size: 10pt; line-height: 1.6; margin-bottom: 3px; color: #2a2a2a; }
+  </style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<div class="sidebar">
+  <div>
+    <h1>{{ name }}</h1>
+  </div>
+
+  <div>
+    <div class="sidebar-section-title">Contact</div>
+    {% if email %}<div class="contact-line"><a href="mailto:{{ email }}">{{ email }}</a></div>{% endif %}
+    {% if phone %}<div class="contact-line">{{ phone }}</div>{% endif %}
+    {% if linkedin %}<div class="contact-line"><a href="{{ linkedin }}">LinkedIn</a></div>{% endif %}
+    {% if github %}<div class="contact-line"><a href="{{ github }}">GitHub</a></div>{% endif %}
+  </div>
+
+  {% if skills %}
+  <div>
+    <div class="sidebar-section-title">Skills</div>
+    {% for s in skills %}
+    <span class="skill-tag">{{ s }}</span>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if education %}
+  <div>
+    <div class="sidebar-section-title">Education</div>
+    <div class="edu-block">
+      <div class="edu-degree">{{ education.degree }}</div>
+      <div class="edu-school">{{ education.school }}</div>
+      <div class="edu-date">{{ education.date }}</div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Main content -->
+<div class="main">
+
+  {% if summary %}
+  <div class="section-title">Professional Summary</div>
+  <div class="summary-text">{{ summary }}</div>
+  {% endif %}
+
+  {% if jobs %}
+  <div class="section-title">Professional Experience</div>
+  {% for job in jobs %}
+  <div class="job">
+    <div class="job-header">
+      <div>
+        <span class="job-title">{{ job.title }}</span>
+        {% if job.company %}<span style="color:#888"> — </span><span class="job-company">{{ job.company }}</span>{% endif %}
+      </div>
+      <div class="job-date">{{ job.date }}</div>
+    </div>
+    {% if job.bullets %}
+    <ul>{% for b in job.bullets %}<li>{{ b }}</li>{% endfor %}</ul>
+    {% endif %}
+  </div>
+  {% endfor %}
+  {% endif %}
+
+</div>
+</body>
+</html>

@@ -97,6 +97,19 @@
     .btn-tailor:hover{background:#ffe0b2}
     .btn-disabled{opacity:.45;cursor:not-allowed}
 
+    /* ── PDF Split Button ── */
+    .pdf-split{position:relative;display:inline-flex}
+    .pdf-split .btn-pdf-main{border-radius:6px 0 0 6px;border-right:1px solid rgba(255,255,255,.3)}
+    .pdf-split .btn-pdf-arrow{border-radius:0 6px 6px 0;padding:7px 9px;font-size:11px}
+    .pdf-dropdown{display:none;position:absolute;bottom:calc(100% + 4px);left:0;
+                  background:#fff;border:1.5px solid #c7d5e8;border-radius:8px;
+                  box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:500;min-width:170px;overflow:hidden}
+    .pdf-split.open .pdf-dropdown{display:block}
+    .pdf-dropdown a{display:block;padding:9px 14px;font-size:12.5px;font-weight:500;
+                    color:#1a237e;text-decoration:none;border-bottom:1px solid #f0f4f9}
+    .pdf-dropdown a:last-child{border-bottom:none}
+    .pdf-dropdown a:hover{background:#e8f0fb}
+
     /* ── Empty state ── */
     .empty{text-align:center;padding:64px 32px;color:#888}
     .empty h2{font-size:20px;margin-bottom:10px;color:#555}
@@ -330,7 +343,17 @@
       {% if tr %}
         <button class="btn-sm btn-primary" onclick="window.location='/job/{{ job.id }}'">View Resume</button>
         {% if job.pdf_path %}
-        <button class="btn-sm btn-secondary" onclick="window.location='/pdf/{{ job.id }}'">⬇ PDF</button>
+        <div class="pdf-split" id="pdf-split-{{ job.id }}">
+          <a href="/pdf/{{ job.id }}/classic" class="btn-sm btn-secondary btn-pdf-main" style="text-decoration:none">⬇ PDF</a>
+          <button class="btn-sm btn-secondary btn-pdf-arrow" onclick="togglePdfDropdown('{{ job.id }}')">▾</button>
+          <div class="pdf-dropdown">
+            <a href="/pdf/{{ job.id }}/classic"   target="_blank">Classic B&amp;W</a>
+            <a href="/pdf/{{ job.id }}/modern"    target="_blank">Modern Sidebar</a>
+            <a href="/pdf/{{ job.id }}/tech"      target="_blank">Tech / FAANG</a>
+            <a href="/pdf/{{ job.id }}/executive" target="_blank">Executive</a>
+            <a href="/pdf/{{ job.id }}/compact"   target="_blank">Compact</a>
+          </div>
+        </div>
         {% endif %}
       {% else %}
         <button class="btn-sm btn-tailor" id="tailor-btn-{{ job.id }}" onclick="tailorJob('{{ job.id }}')">✨ Tailor Resume</button>
@@ -491,11 +514,20 @@ function pollTailor(jobId){
             diffBtn.href='/diff/'+jobId; diffBtn.target='_blank';
             diffBtn.className='btn-sm btn-secondary'; diffBtn.style.marginLeft='4px';
             diffBtn.textContent='🔍 Diff';
-            const pdfBtn = document.createElement('button');
-            pdfBtn.className='btn-sm btn-secondary'; pdfBtn.style.marginLeft='4px';
-            pdfBtn.textContent='⬇ PDF';
-            pdfBtn.onclick=()=>window.location='/pdf/'+jobId;
-            wrap.prepend(pdfBtn); wrap.prepend(diffBtn); wrap.prepend(viewBtn);
+            const pdfSplit = document.createElement('div');
+            pdfSplit.className='pdf-split'; pdfSplit.id='pdf-split-'+jobId;
+            pdfSplit.style.marginLeft='4px';
+            pdfSplit.innerHTML=
+              `<a href="/pdf/${jobId}/classic" class="btn-sm btn-secondary btn-pdf-main" style="text-decoration:none">⬇ PDF</a>`+
+              `<button class="btn-sm btn-secondary btn-pdf-arrow" onclick="togglePdfDropdown('${jobId}')">▾</button>`+
+              `<div class="pdf-dropdown">`+
+              `<a href="/pdf/${jobId}/classic"   target="_blank">Classic B&W</a>`+
+              `<a href="/pdf/${jobId}/modern"    target="_blank">Modern Sidebar</a>`+
+              `<a href="/pdf/${jobId}/tech"      target="_blank">Tech / FAANG</a>`+
+              `<a href="/pdf/${jobId}/executive" target="_blank">Executive</a>`+
+              `<a href="/pdf/${jobId}/compact"   target="_blank">Compact</a>`+
+              `</div>`;
+            wrap.prepend(pdfSplit); wrap.prepend(diffBtn); wrap.prepend(viewBtn);
           }
           const card = document.getElementById('card-'+jobId);
           if(card) card.dataset.tailored='yes';
@@ -660,6 +692,21 @@ function closeRespModal(evt){
 function escHtml(s){
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+function togglePdfDropdown(jobId){
+  const el = document.getElementById('pdf-split-'+jobId);
+  if(!el) return;
+  const isOpen = el.classList.contains('open');
+  // close all others
+  document.querySelectorAll('.pdf-split.open').forEach(e=>e.classList.remove('open'));
+  if(!isOpen) el.classList.add('open');
+}
+// Close dropdown when clicking outside
+document.addEventListener('click', function(e){
+  if(!e.target.closest('.pdf-split')){
+    document.querySelectorAll('.pdf-split.open').forEach(el=>el.classList.remove('open'));
+  }
+});
 
 // ── Settings modal ────────────────────────────────────────────────────────
 function openSettings(){

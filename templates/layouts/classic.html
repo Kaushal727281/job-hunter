@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>{{ name }} – Resume</title>
+  <style>
+    @page { margin: 18mm 18mm 18mm 18mm; }
+    body { font-family: Georgia, 'Times New Roman', serif; max-width: 760px; margin: 0 auto;
+           padding: 0 20px; color: #000; font-size: 12pt; line-height: 1.5; }
+    h1 { font-size: 22pt; font-weight: bold; margin: 0 0 4px; letter-spacing: 0.5px; }
+    .contact { font-size: 10pt; color: #333; margin-bottom: 14px; }
+    .contact a { color: #000; text-decoration: none; }
+    hr.divider { border: none; border-top: 1.5px solid #000; margin: 10px 0 6px; }
+    .section-title { font-size: 11pt; font-weight: bold; text-transform: uppercase;
+                     letter-spacing: 1.2px; margin: 16px 0 6px; }
+    .summary-text { font-size: 11pt; line-height: 1.65; }
+    .skills-list { font-size: 11pt; line-height: 1.7; }
+    .job { margin-bottom: 14px; }
+    .job-header { display: flex; justify-content: space-between; align-items: baseline; }
+    .job-title { font-size: 11.5pt; font-weight: bold; }
+    .job-company { font-size: 11pt; font-style: italic; }
+    .job-date { font-size: 10.5pt; color: #333; }
+    ul { margin: 5px 0 0 18px; padding: 0; }
+    li { font-size: 10.5pt; line-height: 1.6; margin-bottom: 2px; }
+    .edu-entry { margin-bottom: 8px; }
+    .edu-degree { font-size: 11pt; font-weight: bold; }
+    .edu-school { font-size: 10.5pt; font-style: italic; }
+    .edu-date { font-size: 10pt; color: #555; }
+  </style>
+</head>
+<body>
+
+<h1>{{ name }}</h1>
+<div class="contact">
+  {% if email %}<a href="mailto:{{ email }}">{{ email }}</a>{% endif %}
+  {% if phone %} &nbsp;·&nbsp; {{ phone }}{% endif %}
+  {% if linkedin %} &nbsp;·&nbsp; <a href="{{ linkedin }}">{{ linkedin }}</a>{% endif %}
+  {% if github %} &nbsp;·&nbsp; <a href="{{ github }}">{{ github }}</a>{% endif %}
+</div>
+<hr class="divider"/>
+
+{% if summary %}
+<div class="section-title">Professional Summary</div>
+<hr class="divider"/>
+<div class="summary-text">{{ summary }}</div>
+{% endif %}
+
+{% if skills %}
+<div class="section-title">Core Skills</div>
+<hr class="divider"/>
+<div class="skills-list">{{ skills | join(' · ') }}</div>
+{% endif %}
+
+{% if jobs %}
+<div class="section-title">Professional Experience</div>
+<hr class="divider"/>
+{% for job in jobs %}
+<div class="job">
+  <div class="job-header">
+    <div>
+      <span class="job-title">{{ job.title }}</span>
+      {% if job.company %}, <span class="job-company">{{ job.company }}</span>{% endif %}
+    </div>
+    <div class="job-date">{{ job.date }}</div>
+  </div>
+  {% if job.bullets %}
+  <ul>
+    {% for b in job.bullets %}<li>{{ b }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+</div>
+{% endfor %}
+{% endif %}
+
+{% if education %}
+<div class="section-title">Education</div>
+<hr class="divider"/>
+<div class="edu-entry">
+  <div class="edu-degree">{{ education.degree }}</div>
+  <div class="edu-school">{{ education.school }}</div>
+  <div class="edu-date">{{ education.date }}</div>
+</div>
+{% endif %}
+
+</body>
+</html>
