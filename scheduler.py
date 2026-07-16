@@ -34,7 +34,7 @@ def job():
 
 
 def main():
-    config = json.loads(CONFIG_PATH.read_text())
+    config = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
     send_hour = config.get("email", {}).get("send_hour", 8)
     run_at = f"{send_hour:02d}:00"
 

@@ -16,7 +16,7 @@ def _read() -> list[dict]:
     STORE_FILE.parent.mkdir(exist_ok=True)
     if STORE_FILE.exists():
         try:
-            return json.loads(STORE_FILE.read_text())
+            return json.loads(STORE_FILE.read_text(encoding="utf-8"))
         except Exception:
             return []
     return []
@@ -24,7 +24,7 @@ def _read() -> list[dict]:
 
 def _write(jobs: list[dict]):
     STORE_FILE.parent.mkdir(exist_ok=True)
-    STORE_FILE.write_text(json.dumps(jobs, indent=2, ensure_ascii=False))
+    STORE_FILE.write_text(json.dumps(jobs, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
 def all_jobs() -> list[dict]:

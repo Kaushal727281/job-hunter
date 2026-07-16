@@ -31,7 +31,7 @@ CONFIG_PATH = Path(__file__).parent / "config.json"
 
 
 def load_config() -> dict:
-    return json.loads(CONFIG_PATH.read_text())
+    return json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
 
 
 def run(test_mode: bool = False):

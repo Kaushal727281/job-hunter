@@ -29,7 +29,7 @@ MODEL = "llama-3.3-70b-versatile"
 
 def _candidate_name() -> str:
     try:
-        return json.loads(CONFIG_FILE.read_text()).get("candidate", {}).get("name", "The candidate")
+        return json.loads(CONFIG_FILE.read_text(encoding="utf-8")).get("candidate", {}).get("name", "The candidate")
     except Exception:
         return "The candidate"
 

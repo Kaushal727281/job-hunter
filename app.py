@@ -33,18 +33,18 @@ _tailor_running: set[str] = set()
 def _get_last_fetch_date() -> str:
     """Return the date string of the last completed fetch, or ''."""
     try:
-        return json.loads(LAST_FETCH_FILE.read_text()).get("date", "")
+        return json.loads(LAST_FETCH_FILE.read_text(encoding="utf-8")).get("date", "")
     except Exception:
         return ""
 
 
 def _save_last_fetch_date():
     LAST_FETCH_FILE.parent.mkdir(exist_ok=True)
-    LAST_FETCH_FILE.write_text(json.dumps({"date": str(date.today())}))
+    LAST_FETCH_FILE.write_text(json.dumps({"date": str(date.today())}), encoding="utf-8")
 
 
 def _load_config():
-    return json.loads(CONFIG_FILE.read_text())
+    return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
 
 
 # ── Background workers ───────────────────────────────────────────────────────
@@ -781,7 +781,7 @@ def upload_resume():
         cfg["candidate"]["name"] = meta["name"]
     if meta["email"]:
         cfg["candidate"]["email"] = meta["email"]
-    CONFIG_FILE.write_text(json.dumps(cfg, indent=2))
+    CONFIG_FILE.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
 
     logger.info(f"Resume imported: {meta['name']} <{meta['email']}>")
     return jsonify({
@@ -814,7 +814,7 @@ def settings():
                     except (ValueError, TypeError):
                         continue
                 cfg["candidate"][field] = val
-        CONFIG_FILE.write_text(json.dumps(cfg, indent=2))
+        CONFIG_FILE.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
         logger.info(f"Settings updated: {cfg['candidate']}")
         return jsonify({"ok": True, "candidate": cfg["candidate"]})
     cfg = _load_config()

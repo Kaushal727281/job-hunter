@@ -27,7 +27,7 @@ def _get_gmail_address() -> str:
     if addr:
         return addr
     try:
-        return json.loads(_CONFIG_FILE.read_text()).get("candidate", {}).get("email", "")
+        return json.loads(_CONFIG_FILE.read_text(encoding="utf-8")).get("candidate", {}).get("email", "")
     except Exception:
         return ""
 

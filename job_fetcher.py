@@ -47,7 +47,7 @@ def _load_cookies(site: str) -> dict:
     if not path.exists():
         return {}
     try:
-        raw = json.loads(path.read_text())
+        raw = json.loads(path.read_text(encoding="utf-8"))
         cookies = {c["name"]: c["value"] for c in raw if "name" in c and "value" in c}
         logger.info(f"  [{site}] Loaded {len(cookies)} cookies from {path.name}")
         return cookies
@@ -228,13 +228,13 @@ _COMPANY_CACHE_FILE = Path(__file__).parent / "company_type_cache.json"
 
 def _load_company_cache() -> dict:
     try:
-        return json.loads(_COMPANY_CACHE_FILE.read_text())
+        return json.loads(_COMPANY_CACHE_FILE.read_text(encoding="utf-8"))
     except Exception:
         return {}
 
 
 def _save_company_cache(cache: dict) -> None:
-    _COMPANY_CACHE_FILE.write_text(json.dumps(cache, indent=2))
+    _COMPANY_CACHE_FILE.write_text(json.dumps(cache, indent=2), encoding="utf-8")
 
 
 
@@ -364,11 +364,11 @@ _BASE_HEADERS = {
 def _load_seen() -> set:
     SEEN_JOBS_FILE.parent.mkdir(exist_ok=True)
     if SEEN_JOBS_FILE.exists():
-        return set(json.loads(SEEN_JOBS_FILE.read_text()))
+        return set(json.loads(SEEN_JOBS_FILE.read_text(encoding="utf-8")))
     return set()
 
 def _save_seen(seen: set):
-    SEEN_JOBS_FILE.write_text(json.dumps(sorted(seen), indent=2))
+    SEEN_JOBS_FILE.write_text(json.dumps(sorted(seen), indent=2), encoding="utf-8")
 
 
 # ── LinkedIn ───────────────────────────────────────────────────────────────
