@@ -209,10 +209,24 @@ def resume_pdf(job_id):
     if not pdf.exists():
         return "PDF file missing", 404
     return Response(pdf.read_bytes(), mimetype="application/pdf",
-                    headers={"Content-Disposition": f"attachment; filename=resume.pdf"})
+                    headers={"Content-Disposition": f"attachment; filename={_pdf_filename(job)}"})
 
 
 _VALID_LAYOUTS = {"classic", "modern", "tech", "executive", "compact"}
+
+
+def _pdf_filename(job: dict, suffix: str = "") -> str:
+    """Build a clean PDF filename: CandidateName_JobTitle[_suffix].pdf"""
+    try:
+        cfg = _load_config()
+        name = cfg.get("candidate", {}).get("name", "Resume")
+    except Exception:
+        name = "Resume"
+    title = job.get("title", "")
+    # Combine name + title, replace spaces/special chars with underscores
+    raw = f"{name}_{title}{'_' + suffix if suffix else ''}"
+    clean = re.sub(r"[^A-Za-z0-9]+", "_", raw).strip("_")
+    return f"{clean}.pdf"
 
 
 def _render_layout(job: dict, layout: str) -> str:
@@ -344,7 +358,7 @@ def resume_pdf_layout(job_id, layout):
     return Response(
         pdf_bytes,
         mimetype="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=resume-{layout}.pdf"},
+        headers={"Content-Disposition": f"attachment; filename={_pdf_filename(job, layout)}"},
     )
 
 
@@ -490,7 +504,7 @@ def cover_letter_pdf(job_id):
     return Response(
         pdf_bytes,
         mimetype="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=cover-{safe}.pdf"},
+        headers={"Content-Disposition": f"attachment; filename={_pdf_filename(job, 'CoverLetter')}"},
     )
 
 
