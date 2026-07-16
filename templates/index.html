@@ -152,7 +152,7 @@
     <button class="filter-btn active" data-filter="source" data-val="all"              onclick="applyFilters(this,'source')">All</button>
     <button class="filter-btn"        data-filter="source" data-val="LinkedIn"         onclick="applyFilters(this,'source')">LinkedIn ({{ jobs|selectattr('source','eq','LinkedIn')|list|length }})</button>
     <button class="filter-btn"        data-filter="source" data-val="Shine"            onclick="applyFilters(this,'source')">Shine ({{ jobs|selectattr('source','eq','Shine')|list|length }})</button>
-    <button class="filter-btn"        data-filter="source" data-val="Foundit"          onclick="applyFilters(this,'source')">Foundit ({{ jobs|selectattr('source','eq','Foundit')|list|length }})</button>
+    <button class="filter-btn"        data-filter="source" data-val="Glassdoor"        onclick="applyFilters(this,'source')">Glassdoor ({{ jobs|selectattr('source','eq','Glassdoor')|list|length }})</button>
     <button class="filter-btn"        data-filter="source" data-val="RemoteOK"         onclick="applyFilters(this,'source')">RemoteOK ({{ jobs|selectattr('source','eq','RemoteOK')|list|length }})</button>
     <button class="filter-btn"        data-filter="source" data-val="WeWorkRemotely"   onclick="applyFilters(this,'source')">WWR ({{ jobs|selectattr('source','eq','WeWorkRemotely')|list|length }})</button>
     <button class="filter-btn"        data-filter="source" data-val="HNJobs"           onclick="applyFilters(this,'source')">HN Jobs ({{ jobs|selectattr('source','eq','HNJobs')|list|length }})</button>

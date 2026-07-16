@@ -32,7 +32,7 @@
     ],
     "days_old": 3,
     "max_jobs_per_run": 60,
-    "sources": ["LinkedIn", "Shine", "Foundit", "RemoteOK", "WeWorkRemotely", "HNJobs", "Indeed"]
+    "sources": ["LinkedIn", "Shine", "Glassdoor", "RemoteOK", "WeWorkRemotely", "HNJobs", "Indeed"]
   },
   "filters": {
     "exclude_keywords": ["intern", "fresher", "0-2 years", "junior", "trainee"],

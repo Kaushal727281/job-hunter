@@ -28,7 +28,48 @@ truststore.inject_into_ssl()
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-SEEN_JOBS_FILE = Path(__file__).parent / "output" / "seen_jobs.json"
+SEEN_JOBS_FILE  = Path(__file__).parent / "output" / "seen_jobs.json"
+COOKIES_DIR     = Path(__file__).parent / "output" / "cookies"
+
+
+# ── Cookie helpers ─────────────────────────────────────────────────────────
+
+def _load_cookies(site: str) -> dict:
+    """
+    Load browser cookies exported by the 'Cookie-Editor' Chrome extension.
+    File: output/cookies/{site}_cookies.json
+    Cookie-Editor exports a JSON array like:
+      [{"name": "CTK", "value": "abc123", "domain": ".indeed.com", ...}, ...]
+    Returns a plain {name: value} dict ready to pass to requests.
+    """
+    path = COOKIES_DIR / f"{site}_cookies.json"
+    if not path.exists():
+        return {}
+    try:
+        raw = json.loads(path.read_text())
+        cookies = {c["name"]: c["value"] for c in raw if "name" in c and "value" in c}
+        logger.info(f"  [{site}] Loaded {len(cookies)} cookies from {path.name}")
+        return cookies
+    except Exception as e:
+        logger.warning(f"  [{site}] Failed to load cookies: {e}")
+        return {}
+
+
+_SSL_VERIFY: bool = False  # corporate Zscaler proxy intercepts SSL; skip cert verification
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+
+def _make_session(site: str, extra_headers: dict | None = None) -> requests.Session:
+    """Return a requests.Session pre-loaded with saved cookies + browser headers."""
+    sess = requests.Session()
+    sess.headers.update(_BASE_HEADERS)
+    sess.verify = _SSL_VERIFY
+    if extra_headers:
+        sess.headers.update(extra_headers)
+    cookies = _load_cookies(site)
+    sess.cookies.update(cookies)
+    return sess
 
 _STOP = {
     "senior", "lead", "principal", "staff", "junior", "associate", "software",
@@ -417,31 +458,38 @@ def _fetch_shine_jd(apply_link: str) -> str:
     return ""
 
 
-# ── Foundit (formerly Monster India) ──────────────────────────────────────
+# ── Glassdoor India ─────────────────────────────────────────────────────────
 
-def _fetch_foundit(query: str, location: str) -> list[dict]:
-    """Scrape Foundit India job cards — HTML rendered."""
-    slug_q = re.sub(r"\s+", "-", query.strip().lower())
-    slug_l = re.sub(r"\s+", "-", location.replace(" ", "-").strip().lower())
-    url = f"https://www.foundit.in/srp/results?query={slug_q}&location={slug_l}"
-    headers = {**_BASE_HEADERS, "Referer": "https://www.foundit.in/"}
+def _fetch_glassdoor(query: str, location: str) -> list[dict]:
+    """Scrape Glassdoor India job cards (server-rendered HTML, 30 results per page)."""
+    loc_slug = re.sub(r"\s+", "-", location.strip().lower())
+    q_slug   = re.sub(r"\s+", "-", query.strip().lower())
+    loc_len  = len(loc_slug)
+    kw_start = loc_len + 1
+    kw_end   = kw_start + len(q_slug)
+    url = (
+        f"https://www.glassdoor.co.in/Job/{loc_slug}-{q_slug}-jobs-"
+        f"SRCH_IL.0,{loc_len}_IN115_KO{kw_start},{kw_end}.htm"
+    )
+    sess = _make_session("glassdoor", {"Referer": "https://www.glassdoor.co.in/"})
     try:
-        resp = requests.get(url, headers=headers, timeout=15)
+        resp = sess.get(url, timeout=20)
         resp.raise_for_status()
     except Exception as e:
-        logger.warning(f"[Foundit] {e}")
+        logger.warning(f"[Glassdoor] {e}")
         return []
 
     soup = BeautifulSoup(resp.text, "html.parser")
+    cards = soup.find_all(attrs={"data-test": "jobListing"})
     jobs = []
 
-    for card in soup.find_all("div", class_=re.compile(r"cardContainer", re.I)):
-        title_el   = card.find(class_=re.compile(r"jobTitle", re.I))
-        company_el = card.find(class_=re.compile(r"companyName", re.I))
-        loc_el     = card.find(class_=re.compile(r"location|jobLocation", re.I))
-        exp_el     = card.find(class_=re.compile(r"experience|exp", re.I))
-        sal_el     = card.find(class_=re.compile(r"salary|sal", re.I))
-        link_el    = card.find("a", href=True)
+    for card in cards:
+        job_id_raw = card.get("data-jobid", "")
+        title_el   = card.find(attrs={"data-test": "job-title"})
+        company_el = card.find(class_=re.compile(r"EmployerProfile_compactEmployerName", re.I))
+        loc_el     = card.find(attrs={"data-test": "emp-location"})
+        sal_el     = card.find(attrs={"data-test": "detailSalary"})
+        link_el    = card.find("a", href=re.compile(r"/job-listing/", re.I))
 
         title = title_el.get_text(strip=True) if title_el else ""
         if not title:
@@ -449,27 +497,28 @@ def _fetch_foundit(query: str, location: str) -> list[dict]:
 
         link = link_el["href"] if link_el else ""
         if link and not link.startswith("http"):
-            link = "https://www.foundit.in" + link
-
-        job_id = "foundit_" + re.sub(r"[^a-z0-9]", "_", link.split("/")[-1] if link else title.lower())[:50]
+            link = "https://www.glassdoor.co.in" + link
 
         loc_text = loc_el.get_text(strip=True) if loc_el else location
         loc_m = re.search(
             r"(Bengaluru|Bangalore|Hyderabad|Mumbai|Pune|Chennai|Kolkata"
-            r"|Noida|Gurgaon|Gurugram|Delhi\s*NCR|Delhi|Remote)", loc_text, re.I)
+            r"|Noida|Gurgaon|Gurugram|Delhi\s*NCR|Delhi|Remote|India)", loc_text, re.I)
+
+        company = company_el.get_text(strip=True) if company_el else ""
+        sal_text = sal_el.get_text(strip=True) if sal_el else ""
 
         jobs.append(_job_base({
-            "id": job_id, "title": title,
-            "company": company_el.get_text(strip=True) if company_el else "",
+            "id": f"glassdoor_{job_id_raw or re.sub(r'[^a-z0-9]', '_', title.lower())[:40]}",
+            "title": title,
+            "company": company,
             "location": _normalise_loc(loc_m.group(1) if loc_m else "", location),
-            "experience": exp_el.get_text(strip=True) if exp_el else "",
-            "salary": sal_el.get_text(strip=True) if sal_el else "Not disclosed",
+            "salary": sal_text or "Not disclosed",
             "apply_link": link,
             "is_remote": "remote" in loc_text.lower(),
-            "source": "Foundit",
+            "source": "Glassdoor",
         }))
 
-    logger.info(f"  [Foundit] {len(jobs)} jobs — '{query}'")
+    logger.info(f"  [Glassdoor] {len(jobs)} jobs — '{query}'")
     return jobs
 
 
@@ -648,17 +697,21 @@ def _fetch_hnjobs(query: str) -> list[dict]:
 # ── Indeed India (best-effort) ─────────────────────────────────────────────
 
 def _fetch_indeed(query: str, location: str) -> list[dict]:
-    """Indeed India — JSON-LD extraction + HTML card fallback."""
+    """Indeed India — uses browser cookies when available, JSON-LD + HTML fallback."""
     loc_map = {"Delhi NCR": "Delhi", "Remote India": "India"}
-    loc = loc_map.get(location, location)
+    loc  = loc_map.get(location, location)
+    sess = _make_session("indeed", {
+        "Referer": "https://in.indeed.com/",
+        "sec-fetch-site": "same-origin",
+        "sec-fetch-mode": "navigate",
+    })
+    has_cookies = bool(_load_cookies("indeed"))
+    if not has_cookies:
+        logger.info("  [Indeed] No cookies found — requests may be blocked (403). "
+                    "Export cookies from in.indeed.com and save to output/cookies/indeed_cookies.json")
     params = {"q": query, "l": loc, "fromage": "3", "sort": "date"}
-    headers = {**_BASE_HEADERS,
-               "Referer": "https://in.indeed.com/",
-               "sec-fetch-site": "same-origin",
-               "sec-fetch-mode": "navigate"}
     try:
-        resp = requests.get("https://in.indeed.com/jobs", params=params,
-                            headers=headers, timeout=15)
+        resp = sess.get("https://in.indeed.com/jobs", params=params, timeout=15)
         resp.raise_for_status()
     except Exception as e:
         logger.warning(f"[Indeed] {e}")
@@ -667,52 +720,40 @@ def _fetch_indeed(query: str, location: str) -> list[dict]:
     soup = BeautifulSoup(resp.text, "html.parser")
     jobs = []
 
-    # 1) JSON-LD structured data (most reliable when present)
-    for script in soup.find_all("script", type="application/ld+json"):
-        try:
-            data = json.loads(script.string or "")
-            items = data if isinstance(data, list) else [data]
-            for item in items:
-                if item.get("@type") not in ("JobPosting",):
-                    continue
-                org   = item.get("hiringOrganization", {})
-                title = item.get("title", "")
-                co    = org.get("name", "")
-                if not title:
-                    continue
-                job_id = re.sub(r"[^a-z0-9]", "_", (title + co).lower())[:50]
-                iloc   = item.get("jobLocation", {})
-                addr   = iloc.get("address", {}) if isinstance(iloc, dict) else {}
-                city   = addr.get("addressLocality", loc) if isinstance(addr, dict) else loc
-                jobs.append(_job_base({
-                    "id": f"indeed_{job_id}", "title": title, "company": co,
-                    "location": city,
-                    "is_remote": item.get("jobLocationType", "") == "TELECOMMUTE",
-                    "apply_link": item.get("url", ""),
-                    "description": item.get("description", "")[:2000],
-                    "posted_at": item.get("datePosted", ""),
-                    "source": "Indeed",
-                }))
-        except Exception:
-            pass
+    # Each job card is <table class="mainContentTable ...">
+    # Title link: <a data-jk="...">  (inside the table)
+    # Company:    <span data-testid="company-name">
+    # Location:   <div  data-testid="text-location">
+    # Salary:     <div  data-testid="attribute_snippet_testid">
+    for card in soup.find_all("table", class_=re.compile(r"mainContentTable", re.I)):
+        jk_el  = card.find("a", attrs={"data-jk": True})
+        if not jk_el:
+            continue
+        job_id = jk_el.get("data-jk", "")
+        title  = jk_el.get_text(strip=True)
+        if not title or not job_id:
+            continue
 
-    # 2) HTML card fallback
-    if not jobs:
-        for card in soup.find_all(attrs={"data-jk": True}):
-            job_id   = card.get("data-jk", "")
-            title_el = card.find(class_=re.compile(r"jobTitle", re.I))
-            co_el    = card.find(class_=re.compile(r"companyName", re.I))
-            loc_el   = card.find(class_=re.compile(r"companyLocation", re.I))
-            title    = title_el.get_text(strip=True) if title_el else ""
-            if not title or not job_id:
-                continue
-            jobs.append(_job_base({
-                "id": f"indeed_{job_id}", "title": title,
-                "company": co_el.get_text(strip=True) if co_el else "",
-                "location": loc_el.get_text(strip=True) if loc_el else loc,
-                "apply_link": f"https://in.indeed.com/viewjob?jk={job_id}",
-                "source": "Indeed",
-            }))
+        co_el  = card.find("span", attrs={"data-testid": "company-name"}) or \
+                 card.find(class_=re.compile(r"companyName", re.I))
+        loc_el = card.find("div", attrs={"data-testid": "text-location"}) or \
+                 card.find(class_=re.compile(r"companyLocation", re.I))
+        sal_el = card.find(attrs={"data-testid": "attribute_snippet_testid"})
+
+        loc_text = loc_el.get_text(strip=True) if loc_el else loc
+        loc_m = re.search(
+            r"(Bengaluru|Bangalore|Hyderabad|Mumbai|Pune|Chennai|Kolkata"
+            r"|Noida|Gurgaon|Gurugram|Delhi\s*NCR|Delhi|Remote)", loc_text, re.I)
+
+        jobs.append(_job_base({
+            "id": f"indeed_{job_id}", "title": title,
+            "company": co_el.get_text(strip=True) if co_el else "",
+            "location": _normalise_loc(loc_m.group(1) if loc_m else "", loc_text or loc),
+            "salary": sal_el.get_text(strip=True) if sal_el else "Not disclosed",
+            "is_remote": "remote" in loc_text.lower(),
+            "apply_link": f"https://in.indeed.com/viewjob?jk={job_id}",
+            "source": "Indeed",
+        }))
 
     logger.info(f"  [Indeed] {len(jobs)} jobs — '{query}'")
     return jobs
@@ -795,9 +836,9 @@ def fetch_jobs(config: dict, limit: int | None = None) -> list[dict]:
             if "shine" in enabled:
                 for j in _fetch_shine(query, shine_loc): _add(j)
                 time.sleep(0.3)
-            if "foundit" in enabled:
-                for j in _fetch_foundit(query, shine_loc): _add(j)
-                time.sleep(0.4)
+            if "glassdoor" in enabled:
+                for j in _fetch_glassdoor(query, shine_loc): _add(j)
+                time.sleep(0.5)
             if "indeed" in enabled:
                 for j in _fetch_indeed(query, location): _add(j)
                 time.sleep(0.5)
