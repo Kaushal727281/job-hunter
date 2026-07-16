@@ -9,6 +9,7 @@ import email
 import os
 import logging
 import re
+from datetime import datetime
 from email.header import decode_header
 from dotenv import load_dotenv
 
@@ -85,6 +86,15 @@ def _get_body(msg) -> str:
     return ""
 
 
+def _imap_since(applied_at: str) -> str:
+    """Convert applied_at ISO string to IMAP SINCE date string (e.g. '16-Jul-2026')."""
+    try:
+        dt = datetime.fromisoformat(applied_at)
+        return dt.strftime("%d-%b-%Y")
+    except Exception:
+        return ""
+
+
 def _company_key(company: str) -> str:
     """First meaningful word of the company name for search."""
     stop = {"private", "limited", "pvt", "ltd", "inc", "corp", "technologies",
@@ -121,18 +131,24 @@ def check_responses(applied_jobs: list[dict]) -> dict:
         logger.info(f"Gmail IMAP connected — checking {len(applied_jobs)} applied jobs")
 
         for job in applied_jobs:
-            job_id  = job["id"]
-            company = job.get("company", "")
-            title   = job.get("title", "")
-            key     = _company_key(company)
+            job_id     = job["id"]
+            company    = job.get("company", "")
+            title      = job.get("title", "")
+            applied_at = job.get("applied_at", "")
+            key        = _company_key(company)
             if not key:
                 continue
+
+            # Only look for emails received on or after the apply date
+            since_date = _imap_since(applied_at)
+            since_clause = f'SINCE "{since_date}" ' if since_date else ""
+            logger.info(f"  Searching for '{company}' responses{f' since {since_date}' if since_date else ''}")
 
             seen_ids: set = set()
             responses = []
 
-            # Search by company name in FROM and SUBJECT
-            for criterion in [f'FROM "{key}"', f'SUBJECT "{key}"']:
+            # Search by company name in FROM and SUBJECT, filtered by apply date
+            for criterion in [f'{since_clause}FROM "{key}"', f'{since_clause}SUBJECT "{key}"']:
                 try:
                     status, data = mail.search(None, criterion)
                     if status != "OK" or not data[0]:
