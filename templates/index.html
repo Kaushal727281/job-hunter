@@ -337,7 +337,7 @@
       {% endif %}
       {% if job.apply_link %}
       <a href="{{ job.apply_link }}" target="_blank" rel="noopener">
-        <button class="btn-sm btn-apply" onclick="markApplied('{{ job.id }}', this)">Apply →</button>
+        <button class="btn-sm btn-apply">Apply →</button>
       </a>
       {% endif %}
       {% if job.applied_at %}
@@ -552,12 +552,18 @@ function applyFilters(btn, group){
       const terms = roleMap[activeFilters.role] || [activeFilters.role];
       if(!terms.some(t => title.includes(t))) show=false;
     }
-    // Experience
+    // Experience — only filter out if the job has explicit experience data AND it's outside range
+    // Jobs with no experience data (LinkedIn/Glassdoor/Indeed never return it) pass through
     if(show && activeFilters.exp !== 'all'){
-      const expMin = parseInt(c.dataset.expmin||'0');
-      if(activeFilters.exp === '0-5'  && (expMin < 0  || expMin >= 5))  show=false;
-      if(activeFilters.exp === '5-10' && (expMin < 5  || expMin >= 10)) show=false;
-      if(activeFilters.exp === '10+'  && expMin < 10) show=false;
+      const expRaw = c.dataset.expmin;
+      if(expRaw !== ''){
+        const expMin = parseInt(expRaw);
+        if(!isNaN(expMin)){
+          if(activeFilters.exp === '0-5'  && (expMin < 0  || expMin >= 5))  show=false;
+          if(activeFilters.exp === '5-10' && (expMin < 5  || expMin >= 10)) show=false;
+          if(activeFilters.exp === '10+'  && expMin < 10) show=false;
+        }
+      }
     }
     // Company type
     if(show && activeFilters.cotype !== 'all' && c.dataset.companytype !== activeFilters.cotype) show=false;
