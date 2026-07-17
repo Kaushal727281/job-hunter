@@ -292,6 +292,7 @@
   {% for job in jobs %}
   {% set tr = job.tailor_result %}
   {% set score = tr.match_score if tr else 0 %}
+  {% set fit = job.fit_score if job.fit_score else 0 %}
   <div class="card" id="card-{{ job.id }}"
        data-source="{{ job.source }}"
        data-tailored="{{ 'yes' if tr else 'no' }}"
@@ -301,7 +302,8 @@
        data-expmin="{{ job.experience.split('–')[0].strip() if job.experience and '–' in job.experience else '' }}"
        data-text="{{ (job.title + ' ' + job.company + ' ' + job.location)|lower }}"
        data-responses="{{ job.email_responses | tojson | forceescape if job.email_responses else '[]' }}"
-       data-companytype="{{ job.company_type or 'Unknown' }}">
+       data-companytype="{{ job.company_type or 'Unknown' }}"
+       data-fitscore="{{ score if score else fit }}">
 
     <div class="card-top-right">
       <span class="card-date">{{ job.fetched_date }}</span>
@@ -354,10 +356,22 @@
         {% if tr.cover_note %}
         <div class="cover-note">{{ tr.cover_note }}</div>
         {% endif %}
-      {% elif job.tags %}
+      {% else %}
+        {% if fit %}
+        <div class="score-row">
+          <div class="score-badge {% if fit >= 7 %}score-high{% elif fit >= 5 %}score-mid{% else %}score-low{% endif %}">
+            {{ fit }}
+          </div>
+          <div class="score-label">Fit score<br><strong>{{ fit }}/10</strong></div>
+        </div>
+        {% if job.fit_reason %}
+        <div class="cover-note" style="font-size:11.5px;color:#555">{{ job.fit_reason }}</div>
+        {% endif %}
+        {% elif job.tags %}
         <div class="tags">
           {% for t in job.tags[:6] %}<span class="tag">{{ t }}</span>{% endfor %}
         </div>
+        {% endif %}
         <div style="font-size:12px;color:#999;margin-top:8px">Resume not tailored yet</div>
       {% endif %}
     </div>

@@ -50,6 +50,19 @@ def _load_config():
 
 # ── Background workers ───────────────────────────────────────────────────────
 
+def _bg_score(job_ids: list[str]):
+    """Score newly fetched jobs with Ollama in the background."""
+    def _status(msg):
+        _fetch_status["message"] = msg
+    try:
+        from job_scorer import score_jobs
+        score_jobs(job_ids, status_cb=_status)
+        _fetch_status["message"] = f"Done — {len(job_ids)} new jobs scored"
+    except Exception as e:
+        logger.warning(f"Fit-scoring failed: {e}")
+        _fetch_status["message"] = f"Done — scoring skipped ({e})"
+
+
 def _bg_fetch():
     global _fetch_status
     _fetch_status = {"running": True, "message": "Fetching jobs…", "last_run": None}
@@ -57,10 +70,14 @@ def _bg_fetch():
         from job_fetcher import fetch_jobs
         config = _load_config()
         jobs = fetch_jobs(config)
-        added = job_store.upsert_jobs(jobs)
+        new_ids = job_store.upsert_jobs_return_ids(jobs)
+        added = len(new_ids)
         _save_last_fetch_date()
         _fetch_status = {"running": False, "message": f"Done — {added} new jobs added", "last_run": str(date.today())}
         logger.info(f"Fetch complete: {added} new jobs")
+        if new_ids:
+            t = threading.Thread(target=_bg_score, args=(new_ids,), daemon=True)
+            t.start()
     except Exception as e:
         logger.exception("Fetch failed")
         _fetch_status = {"running": False, "message": f"Error: {e}", "last_run": None}
@@ -180,6 +197,21 @@ def tailor_status(job_id):
     done  = bool(job and job.get("tailor_result"))
     error = job.get("tailor_error") if job else None
     return jsonify({"running": running, "done": done, "error": error})
+
+
+@app.route("/score/<job_id>", methods=["POST"])
+def score_job(job_id):
+    """Score a single job on demand."""
+    job = job_store.get_job(job_id)
+    if not job:
+        return jsonify({"ok": False, "message": "Job not found"})
+    try:
+        from job_scorer import score_job as _score_job, _candidate_profile
+        score, reason = _score_job(job, _candidate_profile())
+        job_store.update_job(job_id, fit_score=score, fit_reason=reason)
+        return jsonify({"ok": True, "fit_score": score, "fit_reason": reason})
+    except Exception as e:
+        return jsonify({"ok": False, "message": str(e)})
 
 
 @app.route("/job/<job_id>")

@@ -38,13 +38,18 @@ def get_job(job_id: str) -> Optional[dict]:
 
 
 def upsert_jobs(new_jobs: list[dict]):
-    """Add jobs that don't already exist (by id)."""
+    """Add jobs that don't already exist (by id). Returns count added."""
+    return len(upsert_jobs_return_ids(new_jobs))
+
+
+def upsert_jobs_return_ids(new_jobs: list[dict]) -> list[str]:
+    """Add jobs that don't already exist (by id). Returns list of new job IDs."""
     with _lock:
         existing = _read()
         existing_ids = {j["id"] for j in existing}
         added = [j for j in new_jobs if j["id"] not in existing_ids]
         _write(existing + added)
-        return len(added)
+        return [j["id"] for j in added]
 
 
 def update_job(job_id: str, **fields):
