@@ -3,15 +3,15 @@ llm_client.py
 Multi-key LLM client with automatic key rotation.
 
 Priority order:
-  1. GROQ_API_KEY, GROQ_API_KEY_2, GROQ_API_KEY_3 … (free 100K tokens/day each)
-  2. OLLAMA_MODEL  (local, no internet, no limits — install ollama.com then: ollama pull llama3.1:8b)
+  1. OLLAMA_MODEL  (local, no internet, no limits — primary provider)
+  2. GROQ_API_KEY, GROQ_API_KEY_2, GROQ_API_KEY_3 … (free 100K tokens/day each)
   3. DEEPSEEK_API_KEY   (free credits — platform.deepseek.com)
   4. MISTRAL_API_KEY    (free credits — console.mistral.ai)
   5. OPENROUTER_API_KEY (free models — openrouter.ai, works in India)
   6. GEMINI_API_KEY     (free 1M tokens/day — aistudio.google.com/apikey)
 
-Set OLLAMA_MODEL=llama3.1:8b in .env to use local Ollama (best for no-internet/no-limit use).
-When a Groq key hits its daily token limit the next provider is tried automatically.
+OLLAMA_MODEL=llama3.2 is set in .env — uses local llama3.2 as the primary LLM.
+Falls back to Groq/cloud providers if Ollama is unavailable.
 """
 
 import os
@@ -57,19 +57,26 @@ def _retry_wait(err_str: str) -> float:
 
 def _openai_compat(api_key: str, base_url: str, model: str,
                    prompt: str, max_tokens: int, temperature: float,
-                   extra_headers: dict = None) -> tuple[str, str]:
-    """Generic OpenAI-compatible call (used by DeepSeek, Mistral, OpenRouter)."""
+                   extra_headers: dict = None,
+                   json_mode: bool = False,
+                   num_ctx: int = None) -> tuple[str, str]:
+    """Generic OpenAI-compatible call (used by Ollama, DeepSeek, Mistral, OpenRouter)."""
     from openai import OpenAI
     kwargs = dict(api_key=api_key, base_url=base_url)
     if extra_headers:
         kwargs["default_headers"] = extra_headers
     client = OpenAI(**kwargs)
-    resp = client.chat.completions.create(
+    create_kwargs = dict(
         model=model,
         messages=[{"role": "user", "content": prompt}],
         max_tokens=max_tokens,
         temperature=temperature,
     )
+    if json_mode:
+        create_kwargs["response_format"] = {"type": "json_object"}
+    if num_ctx:
+        create_kwargs["extra_body"] = {"options": {"num_ctx": num_ctx}}
+    resp = client.chat.completions.create(**create_kwargs)
     return resp.choices[0].message.content.strip(), resp.choices[0].finish_reason
 
 
@@ -79,7 +86,18 @@ def chat_complete(prompt: str, max_tokens: int = 6000, temperature: float = 0.5)
     Returns (response_text, finish_reason).
     Raises EnvironmentError if all providers are exhausted.
     """
-    # ── 1. Groq (multiple keys) ───────────────────────────────────────────────
+    # ── 1. Ollama (local, free, no limits) ────────────────────────────────────
+    ollama_model = os.getenv("OLLAMA_MODEL", "").strip()
+    if ollama_model:
+        logger.info(f"  Using Ollama ({ollama_model})")
+        try:
+            return _openai_compat("ollama", OLLAMA_BASE_URL, ollama_model,
+                                  prompt, max_tokens, temperature,
+                                  json_mode=True, num_ctx=8192)
+        except Exception as e:
+            logger.warning(f"  Ollama failed: {e} — trying next provider…")
+
+    # ── 2. Groq (multiple keys) ───────────────────────────────────────────────
     for idx, api_key in enumerate(_groq_keys()):
         label = f"Groq key #{idx + 1}"
         try:
@@ -116,16 +134,6 @@ def chat_complete(prompt: str, max_tokens: int = 6000, temperature: float = 0.5)
                         continue
                     raise
             raise
-
-    # ── 2. Ollama (local, no internet, no limits) ─────────────────────────────
-    ollama_model = os.getenv("OLLAMA_MODEL", "").strip()
-    if ollama_model:
-        logger.info(f"  Groq exhausted — trying Ollama ({ollama_model})")
-        try:
-            return _openai_compat("ollama", OLLAMA_BASE_URL, ollama_model,
-                                  prompt, max_tokens, temperature)
-        except Exception as e:
-            logger.warning(f"  Ollama failed: {e} — trying next provider…")
 
     # ── 3. DeepSeek ───────────────────────────────────────────────────────────
     k = os.getenv("DEEPSEEK_API_KEY", "").strip()
