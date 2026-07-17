@@ -85,28 +85,10 @@ def _apply_sections(soup: BeautifulSoup, modified: dict) -> BeautifulSoup:
             summary_el.clear()
             summary_el.append(new_summary)
 
-    # New ATS keywords → add as a dedicated "JD Keywords" skill group in the sidebar
-    new_kw = modified.get("new_ats_keywords", [])
-    if new_kw:
-        sidebar = soup.find(class_="sidebar")
-        if sidebar:
-            # Don't add duplicates
-            existing = {t.get_text(strip=True).lower()
-                        for t in sidebar.find_all(class_="tag")}
-            fresh = [k for k in new_kw if k.lower() not in existing]
-            if fresh:
-                # Create a dedicated labeled skill-group so they're clearly visible
-                sg = soup.new_tag("div", **{"class": "skill-group"})
-                label = soup.new_tag("div", **{"class": "skill-group-label"})
-                label.string = "JD Keywords"
-                sg.append(label)
-                tags_div = soup.new_tag("div", **{"class": "skill-tags"})
-                for kw in fresh:
-                    span = soup.new_tag("span", **{"class": "tag tag-ats"})
-                    span.string = kw
-                    tags_div.append(span)
-                sg.append(tags_div)
-                sidebar.append(sg)
+    # New ATS keywords — do NOT inject as a visible sidebar section.
+    # Showing aspirational keywords (AWS, Kubernetes, etc.) that the candidate
+    # doesn't actually have experience with looks dishonest to human reviewers.
+    # Instead they are only used for ATS bolding in the text body (bold_keywords).
 
     # Old .skills-text fallback
     new_skills = modified.get("skills", "")
@@ -192,6 +174,86 @@ def _bold_keywords(soup: BeautifulSoup, keywords: list) -> BeautifulSoup:
     return soup
 
 
+def _detect_domain(job: dict) -> tuple[str, str]:
+    """
+    Detect the target company's industry domain.
+    Returns (domain_label, emphasis_hint) to inject into the prompt.
+    """
+    company = (job.get("company") or "").lower()
+    desc    = (job.get("description") or "").lower()[:1500]
+    combined = company + " " + desc
+
+    _INSURANCE = ("insurance", "insurer", "underwriting", "claims", "actuarial",
+                  "allianz", "axa", "zurich", "prudential", "aviva", "aig", "cigna",
+                  "metlife", "manulife", "liberty mutual", "chubb", "berkshire",
+                  "policy", "premium", "reinsurance", "lloyds")
+    _BANKING   = ("bank", "banking", "jpmorgan", "goldman", "barclays", "bnp",
+                  "hsbc", "citi", "wells fargo", "morgan stanley", "deutsche",
+                  "credit suisse", "nomura", "ubs", "fidelity", "blackrock",
+                  "payments", "ach", "wire transfer", "swift", "clearing", "settlement",
+                  "visa", "mastercard", "fintech", "neobank", "remittance")
+    _HEALTHCARE= ("health", "healthcare", "hospital", "pharma", "pharmaceutical",
+                  "clinical", "medical", "ehr", "fhir", "hl7", "optum", "epic",
+                  "patient", "doctor", "diagnosis", "lab", "imaging")
+    _ECOMMERCE = ("ecommerce", "e-commerce", "retail", "marketplace", "shopify",
+                  "amazon", "flipkart", "meesho", "logistics", "supply chain",
+                  "inventory", "warehouse", "fulfilment", "catalog", "cart")
+    _TELECOM   = ("telecom", "telco", "telecomm", "network", "5g", "vodafone",
+                  "airtel", "jio", "att", "verizon", "t-mobile", "ericsson", "nokia")
+    _FAANG     = ("google", "meta", "apple", "microsoft", "netflix", "uber",
+                  "airbnb", "stripe", "atlassian", "salesforce", "twilio", "datadog",
+                  "snowflake", "confluent", "hashicorp", "gitlab")
+
+    if any(k in combined for k in _INSURANCE):
+        return (
+            "Insurance",
+            "IMPORTANT: This is an INSURANCE company. The candidate's FICO platform "
+            "is used by global insurers for underwriting automation, claims processing, "
+            "and risk scoring. Emphasize these insurance use-cases in the summary and bullets. "
+            "Use terms like 'underwriting', 'claims', 'risk decisioning', 'insurance automation'."
+        )
+    if any(k in combined for k in _BANKING):
+        return (
+            "Banking / Fintech",
+            "IMPORTANT: This is a BANKING or FINTECH company. Emphasize the candidate's "
+            "FICO platform serving banks for ACH origination, credit scoring, fraud detection, "
+            "and loan decisioning. Use terms like 'payments', 'financial decisioning', "
+            "'transaction processing', 'regulatory compliance'."
+        )
+    if any(k in combined for k in _HEALTHCARE):
+        return (
+            "Healthcare",
+            "IMPORTANT: This is a HEALTHCARE company. Emphasize the candidate's experience "
+            "with high-volume, high-reliability enterprise systems, data security (Spring Security), "
+            "and rules-driven automated workflows — paralleling clinical decision support."
+        )
+    if any(k in combined for k in _ECOMMERCE):
+        return (
+            "E-commerce / Retail",
+            "IMPORTANT: This is an E-COMMERCE or RETAIL company. Emphasize high-throughput "
+            "API design, scalability, event-driven architecture (Kafka), and the TiffinLane "
+            "marketplace project as direct e-commerce experience."
+        )
+    if any(k in combined for k in _TELECOM):
+        return (
+            "Telecom",
+            "IMPORTANT: This is a TELECOM company. Emphasize high-availability distributed "
+            "systems, event-driven Kafka pipelines, REST APIs at scale, and microservices architecture."
+        )
+    if any(k in combined for k in _FAANG):
+        return (
+            "Tech Product (FAANG-style)",
+            "IMPORTANT: This is a top-tier TECH PRODUCT company. Emphasize engineering depth: "
+            "system design, performance tuning, scalable architecture, the Job Hunter AI project, "
+            "and clean engineering practices. Avoid domain-specific jargon."
+        )
+    return (
+        "Tech / Enterprise",
+        "Emphasize enterprise-grade Java engineering, scalability, technical leadership, "
+        "and cross-domain applicability of the FICO platform."
+    )
+
+
 def tailor_resume(job: dict) -> dict:
     """
     Tailors the base resume for the given job.
@@ -227,6 +289,8 @@ def tailor_resume(job: dict) -> dict:
         resume_text += "\n"
 
     candidate_name = _candidate_name()
+    domain_label, domain_hint = _detect_domain(job)
+    logger.info(f"  Detected domain: {domain_label}")
 
     prompt = f"""You are an expert ATS resume optimizer helping {candidate_name} tailor their resume for a specific job. Your TWO goals:
 1. Maximize ATS keyword match score by weaving JD keywords naturally into the resume.
@@ -234,8 +298,11 @@ def tailor_resume(job: dict) -> dict:
 
 ## Target Job
 Title: {job['title']}
-Company: {job['company']}
+Company: {job['company']} [{domain_label}]
 Location: {job['location']} {'(Remote)' if job.get('is_remote') else ''}
+
+## Company Domain Context
+{domain_hint}
 
 ## Job Description
 {job.get('description', '')[:2500]}
