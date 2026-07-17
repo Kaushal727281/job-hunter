@@ -381,6 +381,9 @@ def _render_layout(job: dict, layout: str) -> str:
         })
 
     # ── Projects (.project) ───────────────────────────────────────────────
+    # Skip the FICO Authoring Module project — it was removed from Key Projects
+    # in all layouts to keep the resume to one page.
+    _SKIP_PROJECTS = {"fico decision management platform"}
     projects = []
     for p_div in soup.find_all(class_="project"):
         pname   = _txt(p_div.find(class_="project-name"))
@@ -388,6 +391,11 @@ def _render_layout(job: dict, layout: str) -> str:
         stack   = [_txt(t) for t in p_div.find_all(class_="tag") if _txt(t)]
         desc_el = p_div.find("p")
         desc    = _txt(desc_el)
+        if any(s in pname.lower() for s in _SKIP_PROJECTS):
+            continue
+        # Truncate long descriptions to keep layout to one page
+        if desc and len(desc) > 220:
+            desc = desc[:220].rsplit(" ", 1)[0] + "…"
         projects.append({"name": pname, "role": prole, "stack": stack, "description": desc})
 
     # ── Education (.edu-block, .edu-degree, .edu-school, .edu-year/.edu-date) ─
