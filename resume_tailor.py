@@ -107,11 +107,22 @@ def _apply_sections(soup: BeautifulSoup, modified: dict) -> BeautifulSoup:
         new_bullets = mod_jobs[i].get("bullets", [])
         ul = job_div.find("ul")
         if ul and new_bullets:
+            # Collect original bullets before clearing, so we can restore any the model dropped
+            orig_bullets = [li.get_text(" ", strip=True) for li in ul.find_all("li")]
             ul.clear()
+            written = set()
             for b in new_bullets:
                 li = soup.new_tag("li")
                 li.string = b
                 ul.append(li)
+                written.add(b.strip().lower()[:60])
+            # Re-append any original bullets the model silently dropped
+            for orig in orig_bullets:
+                key = orig.strip().lower()[:60]
+                if key and key not in written:
+                    li = soup.new_tag("li")
+                    li.string = orig
+                    ul.append(li)
 
     return soup
 
@@ -355,9 +366,11 @@ as plain tips.
    Return as a JSON array of short plain strings.
 
 4. **JOBS – bullets**: For each role rewrite bullets to:
-   - Put the most JD-relevant bullets first
+   - **KEEP ALL EXISTING BULLETS** — do NOT drop any. Return every bullet from the original resume.
+   - Reorder so the most JD-relevant bullets appear first
    - Weave in JD terminology naturally (e.g. replace "REST services" with "RESTful microservices" if JD uses that phrase)
    - Never add technologies or responsibilities not actually present
+   - If there are N bullets in the original, your response must have at least N bullets
 
 5. **COVER_LETTER**: Write a full professional cover letter (~200 words, 4 paragraphs):
    - Para 1: Enthusiastic opening — name the specific role + company, hook with a key strength.
