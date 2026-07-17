@@ -409,6 +409,19 @@ def _render_layout(job: dict, layout: str) -> str:
                 soft_skills = [s.get_text(strip=True) for s in tags_el.find_all("span") if s.get_text(strip=True)]
             break
 
+    # ── Certifications ─────────────────────────────────────────────────────
+    certifications = []
+    for title_el in soup.find_all(class_="section-title"):
+        if "cert" in _txt(title_el).lower():
+            sib = title_el.find_next_sibling()
+            while sib and "section-title" not in (sib.get("class") or []):
+                for item in sib.find_all(class_="cert-item"):
+                    t = _txt(item)
+                    if t:
+                        certifications.append(t)
+                sib = sib.find_next_sibling()
+            break
+
     return render_template(
         f"layouts/{layout}.html",
         name=name, role=role,
@@ -417,6 +430,7 @@ def _render_layout(job: dict, layout: str) -> str:
         skill_groups=skill_groups, skills=skills_flat,
         jobs=jobs, projects=projects,
         education=education, soft_skills=soft_skills,
+        certifications=certifications,
     )
 
 

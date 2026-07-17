@@ -3,140 +3,232 @@
 <head>
   <meta charset="UTF-8"/>
   <title>{{ name }} – Resume</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@600;700&family=Roboto:wght@400;500&display=swap" rel="stylesheet"/>
   <style>
     @page { margin: 0; size: A4; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', Arial, sans-serif; display: table;
-           width: 100%; font-size: 10.5pt; color: #1a1a1a; background: #fff; }
+    body {
+      font-family: 'Roboto', 'Segoe UI', Arial, sans-serif;
+      font-size: 10.5pt;
+      color: #0F172A;
+      background: #FFFFFF;
+      display: table;
+      width: 100%;
+      height: 100%;
+    }
 
-    /* ── Sidebar ── */
-    .sidebar { display: table-cell; width: 235px; background: #1E293B;
-               color: #E2E8F0; padding: 28px 16px 28px 18px; vertical-align: top; }
-    .sidebar-name { font-size: 15pt; font-weight: 700; color: #FFFFFF;
-                    line-height: 1.2; margin-bottom: 3px; word-break: break-word; }
-    .sidebar-role { font-size: 8.5pt; color: rgba(255,255,255,0.65); margin-bottom: 0; font-style: italic; }
-    .sidebar-section { margin-top: 18px; }
-    .sidebar-section-title { font-size: 7.5pt; font-weight: 700; text-transform: uppercase;
-                              letter-spacing: 1.5px; color: #60A5FA;
-                              border-bottom: 1px solid rgba(255,255,255,0.15); padding-bottom: 4px; margin-bottom: 8px; }
-    .contact-item { font-size: 9pt; color: rgba(255,255,255,0.75); margin-bottom: 5px;
-                    line-height: 1.5; word-break: break-all; }
-    .contact-item a { color: rgba(255,255,255,0.90); text-decoration: none; }
-    /* Skill groups in sidebar */
-    .sg-label { font-size: 8pt; font-weight: 700; color: #93C5FD; margin: 7px 0 3px; }
-    .sg-tags { display: flex; flex-wrap: wrap; gap: 3px; }
-    .sg-tag { font-size: 7.5pt; color: #E2E8F0; background: rgba(255,255,255,0.08);
-              border: 1px solid rgba(255,255,255,0.18); border-radius: 3px; padding: 2px 5px; }
-    .soft-item { font-size: 8.5pt; color: rgba(255,255,255,0.75); margin-bottom: 4px; }
-    .edu-degree { font-size: 9.5pt; font-weight: 600; color: #fff; }
-    .edu-school  { font-size: 8.5pt; color: rgba(255,255,255,0.70); margin-top: 2px; }
-    .edu-date    { font-size: 8pt;   color: rgba(255,255,255,0.50); margin-top: 3px; }
+    /* ── Header strip across full width ── */
+    .header {
+      display: table-caption;
+      background: #0F172A;
+      padding: 22px 28px 18px;
+      color: #fff;
+    }
+    .header h1 {
+      font-family: 'Inter', 'Segoe UI', sans-serif;
+      font-size: 26pt; font-weight: 700;
+      color: #FFFFFF; letter-spacing: -0.3px;
+    }
+    .header .role {
+      font-size: 12pt; font-weight: 400;
+      color: rgba(255,255,255,0.75); margin-top: 3px;
+    }
+    .contact {
+      display: flex; flex-wrap: wrap; gap: 4px 20px;
+      font-size: 9.5pt; color: rgba(255,255,255,0.75); margin-top: 8px;
+    }
+    .contact a { color: rgba(255,255,255,0.90); text-decoration: none; }
 
-    /* ── Main ── */
-    .main { display: table-cell; background: #fff; padding: 28px 26px 28px 24px; vertical-align: top; }
-    .section-title { font-size: 9.5pt; font-weight: 700; text-transform: uppercase;
-                     letter-spacing: 1.2px; color: #2563EB;
-                     border-bottom: 2px solid #BFDBFE; padding-bottom: 3px; margin: 18px 0 9px; }
-    .section-title:first-child { margin-top: 0; }
-    .summary-text { font-size: 10pt; line-height: 1.8; color: #4B5563; }
+    /* ── Two-column body ── */
+    .col-left {
+      display: table-cell;
+      width: 70%;
+      padding: 24px 22px 28px 26px;
+      vertical-align: top;
+    }
+    .col-right {
+      display: table-cell;
+      width: 30%;
+      background: #F8FAFC;
+      padding: 24px 18px 28px 20px;
+      vertical-align: top;
+      border-left: 1px solid #E2E8F0;
+    }
+
+    /* ── Section titles ── */
+    .section-title {
+      font-family: 'Inter', 'Segoe UI', sans-serif;
+      font-size: 11pt; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.8px;
+      color: #2563EB;
+      border-bottom: 1.5px solid #BFDBFE;
+      padding-bottom: 3px; margin-bottom: 10px;
+    }
+    .section { margin-bottom: 20px; }
+    .section:last-child { margin-bottom: 0; }
+
+    /* ── Sidebar section titles ── */
+    .sidebar-title {
+      font-family: 'Inter', 'Segoe UI', sans-serif;
+      font-size: 9pt; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 1.2px;
+      color: #2563EB;
+      border-bottom: 1px solid #BFDBFE;
+      padding-bottom: 3px; margin-bottom: 8px; margin-top: 18px;
+    }
+    .sidebar-title:first-child { margin-top: 0; }
+
+    /* ── Summary (right sidebar) ── */
+    .summary-text { font-size: 9.5pt; line-height: 1.6; color: #334155; }
+
+    /* ── Skill chips ── */
+    .chip-group { margin-bottom: 8px; }
+    .chip-label { font-size: 8.5pt; font-weight: 600; color: #0F172A; margin-bottom: 4px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 3px; }
+    .chip {
+      font-size: 8pt; background: #EFF6FF; color: #1D4ED8;
+      border: 1px solid #BFDBFE; border-radius: 3px; padding: 2px 7px; font-weight: 500;
+    }
+
+    /* ── Experience (left) ── */
     .job { margin-bottom: 14px; }
-    .job-header { display: flex; justify-content: space-between; align-items: baseline;
-                  gap: 8px; margin-bottom: 2px; }
-    .job-title   { font-size: 10.5pt; font-weight: 700; color: #1a1a1a; }
-    .job-company { font-size: 9.5pt; color: #555; margin-top: 1px; }
-    .job-date    { font-size: 8.5pt; color: #888; white-space: nowrap; flex-shrink: 0; }
+    .job:last-child { margin-bottom: 0; }
+    .job-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 2px; }
+    .job-title { font-family: 'Inter', sans-serif; font-size: 11pt; font-weight: 700; color: #0F172A; }
+    .job-company { font-size: 10pt; color: #64748B; margin-top: 1px; }
+    .job-date { font-size: 9pt; color: #64748B; white-space: nowrap; flex-shrink: 0; }
     ul { margin: 5px 0 0 15px; padding: 0; }
-    li { font-size: 9pt; line-height: 1.75; margin-bottom: 4px; color: #4B5563; }
+    li { font-size: 10pt; line-height: 1.5; margin-bottom: 4px; color: #334155; }
     li::marker { color: #2563EB; }
-    /* Projects */
+
+    /* ── Projects (left) ── */
     .project { margin-bottom: 11px; }
-    .project-header { display: flex; justify-content: space-between; align-items: baseline; }
-    .project-name { font-size: 10pt; font-weight: 700; color: #1a1a1a; }
-    .project-role { font-size: 8.5pt; color: #888; }
-    .project-stack { font-size: 8.5pt; color: #2563EB; margin: 7px 0 3px; }
-    .project-desc { font-size: 9pt; line-height: 1.7; color: #4B5563; }
-    /* Bolded ATS keywords */
-    strong { font-weight: 800; }
-    strong.ats-kw { font-weight: 800; color: #1D4ED8; text-decoration: underline; text-decoration-color: #93C5FD; text-underline-offset: 2px; }
-    .tag.tag-ats { background: #EFF6FF; color: #1D4ED8; font-weight: 700; }
+    .project:last-child { margin-bottom: 0; }
+    .project-header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+    .project-name { font-family: 'Inter', sans-serif; font-size: 10.5pt; font-weight: 700; color: #0F172A; }
+    .project-role { font-size: 9pt; color: #64748B; white-space: nowrap; }
+    .project-stack { font-size: 8.5pt; color: #2563EB; margin: 7px 0 3px; font-weight: 500; }
+    .project-desc { font-size: 9.5pt; line-height: 1.5; color: #334155; }
+
+    /* ── Education (left) ── */
+    .edu-row { display: flex; justify-content: space-between; align-items: baseline; }
+    .edu-degree { font-size: 10.5pt; font-weight: 600; color: #0F172A; }
+    .edu-school { font-size: 10pt; color: #64748B; margin-top: 2px; }
+    .edu-date { font-size: 9pt; color: #64748B; white-space: nowrap; }
+
+    /* ── Soft skills (right) ── */
+    .soft-item { font-size: 9pt; color: #334155; margin-bottom: 4px; line-height: 1.4; }
+    .soft-item::before { content: "✓  "; color: #2563EB; font-weight: 700; }
+
+    /* ── Certifications (right) ── */
+    .cert-item { font-size: 9pt; color: #334155; margin-bottom: 5px; line-height: 1.4; }
+    .cert-item::before { content: "▸  "; color: #2563EB; }
+
+    /* ── ATS keywords ── */
+    strong { font-weight: 700; }
+    strong.ats-kw { color: #1D4ED8; font-weight: 700; }
+    .tag.tag-ats { background: #EFF6FF; color: #1D4ED8; font-weight: 600;
+                   border-radius: 2px; padding: 1px 5px; font-size: 8.5pt; }
   </style>
 </head>
 <body>
 
-<div class="sidebar">
-  <div class="sidebar-name">{{ name }}</div>
-  {% if role %}<div class="sidebar-role">{{ role }}</div>{% endif %}
-
-  <div class="sidebar-section">
-    <div class="sidebar-section-title">Contact</div>
-    {% if email %}<div class="contact-item">✉ <a href="mailto:{{ email }}">{{ email }}</a></div>{% endif %}
-    {% if phone %}<div class="contact-item">✆ {{ phone }}</div>{% endif %}
-    {% if linkedin %}<div class="contact-item">in <a href="{{ linkedin }}">LinkedIn</a></div>{% endif %}
-    {% if github %}<div class="contact-item">⌥ <a href="{{ github }}">GitHub</a></div>{% endif %}
+<div class="header">
+  <h1>{{ name }}</h1>
+  {% if role %}<div class="role">{{ role }}</div>{% endif %}
+  <div class="contact">
+    {% if email %}<a href="mailto:{{ email }}">{{ email }}</a>{% endif %}
+    {% if phone %}<span>{{ phone }}</span>{% endif %}
+    {% if linkedin %}<a href="{{ linkedin }}">LinkedIn</a>{% endif %}
+    {% if github %}<a href="{{ github }}">GitHub</a>{% endif %}
   </div>
+</div>
 
-  {% if skill_groups %}
-  <div class="sidebar-section">
-    <div class="sidebar-section-title">Skills</div>
-    {% for sg in skill_groups %}
-    <div class="sg-label">{{ sg.label }}</div>
-    <div class="sg-tags">{% for t in sg.tags %}<span class="sg-tag">{{ t }}</span>{% endfor %}</div>
+<!-- Left 70% -->
+<div class="col-left">
+
+  {% if jobs %}
+  <div class="section">
+    <div class="section-title">Experience</div>
+    {% for job in jobs %}
+    <div class="job">
+      <div class="job-header">
+        <div>
+          <div class="job-title">{{ job.title }}</div>
+          {% if job.company %}<div class="job-company">{{ job.company }}</div>{% endif %}
+        </div>
+        {% if job.date %}<div class="job-date">{{ job.date }}</div>{% endif %}
+      </div>
+      {% if job.bullets %}
+      <ul>{% for b in job.bullets %}<li>{{ b | safe }}</li>{% endfor %}</ul>
+      {% endif %}
+    </div>
     {% endfor %}
   </div>
   {% endif %}
 
-  {% if soft_skills %}
-  <div class="sidebar-section">
-    <div class="sidebar-section-title">Soft Skills</div>
-    {% for s in soft_skills %}<div class="soft-item">{{ s }}</div>{% endfor %}
+  {% if projects %}
+  <div class="section">
+    <div class="section-title">Projects</div>
+    {% for p in projects %}
+    <div class="project">
+      <div class="project-header">
+        <span class="project-name">{{ p.name }}</span>
+        {% if p.role %}<span class="project-role">{{ p.role }}</span>{% endif %}
+      </div>
+      {% if p.stack %}<div class="project-stack">{{ p.stack | join(' · ') }}</div>{% endif %}
+      {% if p.description %}<div class="project-desc">{{ p.description }}</div>{% endif %}
+    </div>
+    {% endfor %}
   </div>
   {% endif %}
 
   {% if education %}
-  <div class="sidebar-section">
-    <div class="sidebar-section-title">Education</div>
-    <div class="edu-degree">{{ education.degree }}</div>
-    <div class="edu-school">{{ education.school }}</div>
-    <div class="edu-date">{{ education.date }}</div>
+  <div class="section">
+    <div class="section-title">Education</div>
+    <div class="edu-row">
+      <div>
+        <div class="edu-degree">{{ education.degree }}</div>
+        {% if education.school %}<div class="edu-school">{{ education.school }}</div>{% endif %}
+      </div>
+      {% if education.date %}<div class="edu-date">{{ education.date }}</div>{% endif %}
+    </div>
   </div>
   {% endif %}
+
 </div>
 
-<div class="main">
+<!-- Right 30% -->
+<div class="col-right">
+
   {% if summary %}
-  <div class="section-title">Professional Summary</div>
+  <div class="sidebar-title">Profile</div>
   <div class="summary-text">{{ summary | safe }}</div>
   {% endif %}
 
-  {% if jobs %}
-  <div class="section-title">Professional Experience</div>
-  {% for job in jobs %}
-  <div class="job">
-    <div class="job-header">
-      <div>
-        <div class="job-title">{{ job.title }}</div>
-        {% if job.company %}<div class="job-company">{{ job.company }}</div>{% endif %}
-      </div>
-      <div class="job-date">{{ job.date }}</div>
+  {% if skill_groups %}
+  <div class="sidebar-title">Tech Stack</div>
+  {% for sg in skill_groups %}
+  <div class="chip-group">
+    {% if sg.label %}<div class="chip-label">{{ sg.label }}</div>{% endif %}
+    <div class="chips">
+      {% for tag in sg.tags %}<span class="chip">{{ tag }}</span>{% endfor %}
     </div>
-    {% if job.bullets %}<ul>{% for b in job.bullets %}<li>{{ b | safe }}</li>{% endfor %}</ul>{% endif %}
   </div>
   {% endfor %}
   {% endif %}
 
-  {% if projects %}
-  <div class="section-title">Key Projects</div>
-  {% for p in projects %}
-  <div class="project">
-    <div class="project-header">
-      <span class="project-name">{{ p.name }}</span>
-      {% if p.role %}<span class="project-role">{{ p.role }}</span>{% endif %}
-    </div>
-    {% if p.stack %}<div class="project-stack">{{ p.stack | join(' · ') }}</div>{% endif %}
-    {% if p.description %}<div class="project-desc">{{ p.description }}</div>{% endif %}
-  </div>
-  {% endfor %}
+  {% if soft_skills %}
+  <div class="sidebar-title">Soft Skills</div>
+  {% for s in soft_skills %}<div class="soft-item">{{ s | replace('✔ ', '') | replace('✔', '') }}</div>{% endfor %}
   {% endif %}
+
+  {% if certifications %}
+  <div class="sidebar-title">Certifications</div>
+  {% for c in certifications %}<div class="cert-item">{{ c }}</div>{% endfor %}
+  {% endif %}
+
 </div>
 
 </body>
