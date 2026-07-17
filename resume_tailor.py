@@ -139,6 +139,119 @@ def _apply_sections(soup: BeautifulSoup, modified: dict) -> BeautifulSoup:
     return soup
 
 
+def _kw_in_text(kw: str, text: str) -> bool:
+    """
+    Case-insensitive whole-word-ish check.
+    Also checks no-space variant so 'Spring Boot' matches 'springboot' and vice-versa.
+    """
+    if re.search(r'(?i)\b' + re.escape(kw) + r'\b', text):
+        return True
+    # Try removing internal spaces: "Spring Boot" → "SpringBoot" / "springboot"
+    nospace = kw.replace(" ", "")
+    if nospace != kw and re.search(r'(?i)\b' + re.escape(nospace) + r'\b', text):
+        return True
+    # Try inserting space before each internal capital: "SpringBoot" → "Spring Boot"
+    spaced = re.sub(r'([a-z])([A-Z])', r'\1 \2', kw)
+    if spaced != kw and re.search(r'(?i)\b' + re.escape(spaced) + r'\b', text):
+        return True
+    return False
+
+
+# Broad list of tech skills to scan for in any JD
+_TECH_TERMS = [
+    "Java", "Python", "JavaScript", "TypeScript", "Go", "Golang", "Rust", "Kotlin", "Scala",
+    "C++", "C#", "PHP", "Ruby", "Swift",
+    "Spring Boot", "Spring", "Hibernate", "JPA", "Quarkus", "Micronaut", "Vert.x",
+    "Kafka", "Apache Kafka", "RabbitMQ", "ActiveMQ", "Pulsar", "NATS",
+    "Redis", "Elasticsearch", "Solr", "OpenSearch",
+    "AWS", "Azure", "GCP", "Google Cloud",
+    "Docker", "Kubernetes", "Helm", "Terraform", "Ansible", "Puppet",
+    "REST", "REST APIs", "RESTful APIs", "GraphQL", "gRPC", "WebSocket",
+    "MySQL", "PostgreSQL", "MongoDB", "Oracle", "SQL", "NoSQL", "DynamoDB",
+    "Cassandra", "HBase", "Neo4j",
+    "Git", "GitHub", "GitLab", "Bitbucket", "CI/CD", "Jenkins", "GitHub Actions",
+    "Maven", "Gradle", "SBT",
+    "React", "Angular", "Vue", "Next.js", "Node.js", "Express",
+    "microservices", "distributed systems", "event-driven architecture",
+    "Agile", "Scrum", "Kanban", "TDD", "BDD", "JUnit", "Mockito", "TestNG",
+    "Linux", "Unix", "Bash", "Shell scripting",
+    "OpenAPI", "Swagger", "OAuth", "JWT", "SAML",
+    "machine learning", "ML", "AI", "GenAI", "LLM", "NLP",
+    "Prometheus", "Grafana", "Splunk", "Datadog", "ELK",
+    "Spark", "Hadoop", "Flink", "Airflow", "dbt",
+    "gRPC", "Protobuf", "Avro",
+    "Java 8", "Java 11", "Java 17", "Java 21",
+    "multithreading", "concurrency", "reactive programming",
+    "Apache Flink", "Apache Spark",
+    "rate limiting", "metering", "billing", "authorization", "authentication",
+    "pub/sub", "message queue", "event streaming",
+    "Design Patterns", "SOLID", "Clean Architecture", "DDD",
+    "Springboot", "springboot",
+]
+
+
+def _extract_jd_skill_terms(jd_text: str) -> list[str]:
+    """
+    Scan the job description for known tech skill terms.
+    Returns matched terms preserving the canonical casing from _TECH_TERMS.
+    """
+    found = []
+    seen_low: set[str] = set()
+    for term in _TECH_TERMS:
+        tl = term.lower()
+        if tl not in seen_low and _kw_in_text(term, jd_text):
+            found.append(term)
+            seen_low.add(tl)
+    return found
+
+
+def _verify_and_enrich_bold_keywords(
+    candidate_keywords: list[str],
+    jd_text: str,
+    resume_text: str,
+    min_count: int = 7,
+) -> tuple[list[str], list[str]]:
+    """
+    1. Keep only candidates that actually appear in the JD (eliminates AI hallucinations).
+    2. If verified count < min_count:
+       a. First add JD terms already in the resume (free matches the AI missed).
+       b. Then add JD terms NOT in the resume (inject into skills section).
+    Returns (verified_bold, new_injections) where new_injections should go into new_ats_keywords.
+    """
+    jd_terms = _extract_jd_skill_terms(jd_text)
+    jd_terms_low = {t.lower() for t in jd_terms}
+    candidate_low = {k.lower() for k in candidate_keywords}
+
+    # Step 1: filter candidates to only those present in JD
+    verified = [k for k in candidate_keywords if _kw_in_text(k, jd_text)]
+    verified_low = {k.lower() for k in verified}
+
+    new_injections: list[str] = []
+
+    if len(verified) < min_count:
+        # Step 2a: add JD terms already in the resume (no injection needed)
+        for term in jd_terms:
+            if len(verified) >= min_count:
+                break
+            tl = term.lower()
+            if tl not in verified_low and _kw_in_text(term, resume_text):
+                verified.append(term)
+                verified_low.add(tl)
+
+    if len(verified) < min_count:
+        # Step 2b: add JD terms NOT in resume — inject them into the skills section
+        for term in jd_terms:
+            if len(verified) >= min_count:
+                break
+            tl = term.lower()
+            if tl not in verified_low and not _kw_in_text(term, resume_text):
+                verified.append(term)
+                verified_low.add(tl)
+                new_injections.append(term)
+
+    return verified, new_injections
+
+
 def _bold_keywords(soup: BeautifulSoup, keywords: list) -> BeautifulSoup:
     """
     Wrap the FIRST occurrence of each keyword (case-insensitive) in a
@@ -543,16 +656,31 @@ Return ONLY valid JSON, no markdown fences, no extra text."""
     result["key_matches"]       = _strip_md(result.get("key_matches", []))
     result["improvement_tips"]  = _strip_md(result.get("improvement_tips", []))
 
-    # bold_keywords = explicit list from model, else fall back to key_matches
+    # Collect all LLM keyword candidates (bold_keywords + new_ats + key_matches)
     raw_bold = _strip_md(result.get("bold_keywords") or [])
-    # Also include new ATS keywords so freshly injected terms get highlighted
-    all_bold = list(dict.fromkeys(raw_bold + result["new_ats_keywords"] + result["key_matches"]))
-    result["bold_keywords"] = all_bold[:20]   # cap at 20 to avoid over-bolding
+    all_candidates = list(dict.fromkeys(raw_bold + result["new_ats_keywords"] + result["key_matches"]))
+
+    # Verify candidates against actual JD text and enrich to reach min 7 matches.
+    # This eliminates AI hallucinations (e.g. "RabbitMQ" bolded when not in JD).
+    jd_text = job.get("description", "")
+    resume_text_plain = soup.get_text(separator=" ")
+    verified_bold, extra_injections = _verify_and_enrich_bold_keywords(
+        all_candidates, jd_text, resume_text_plain, min_count=7
+    )
+
+    # Merge any newly found injection terms into new_ats_keywords
+    if extra_injections:
+        result["new_ats_keywords"] = list(dict.fromkeys(
+            result["new_ats_keywords"] + extra_injections
+        ))
+        logger.info(f"  Injecting {len(extra_injections)} JD skill(s) not in resume: {extra_injections}")
+
+    result["bold_keywords"] = verified_bold[:20]
 
     # 1. Inject modified text back into the full HTML
     soup = _apply_sections(soup, result)
 
-    # 2. Bold every keyword that appears in both JD and the tailored resume
+    # 2. Bold every verified keyword in the tailored resume
     soup = _bold_keywords(soup, result["bold_keywords"])
 
     result["resume_html"] = str(soup)
