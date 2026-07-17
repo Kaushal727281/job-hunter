@@ -134,11 +134,25 @@ def _bold_keywords(soup: BeautifulSoup, keywords: list) -> BeautifulSoup:
 
     # Sort longest first so multi-word phrases match before their sub-words
     kw_sorted = sorted(set(clean), key=len, reverse=True)
-    _SKIP = {"style", "script", "title", "strong", "b", "mark", "head", "a"}
+    _SKIP      = {"style", "script", "title", "strong", "b", "mark", "head", "a"}
+    # Only bold inside the main content column (.main), never in the header banner,
+    # sidebar (skills/contact), or any heading/label elements.
+    _SKIP_CSS  = {"banner", "contact-bar", "sidebar", "skill-group", "skill-tags",
+                  "tag", "section-title", "section-title-main", "edu-block",
+                  "edu-degree", "edu-school", "cert-item", "job-title",
+                  "job-company", "job-meta", "project-name", "project-role",
+                  "project-stack", "banner-text", "role", "score-badge"}
 
     for node in soup.find_all(string=True):
         parent = node.parent
         if any(p.name in _SKIP for p in [parent] + list(parent.parents)):
+            continue
+        # Skip nodes whose ancestor has a class in the restricted set
+        ancestor_classes = set()
+        for p in [parent] + list(parent.parents):
+            for c in (p.get("class") or []):
+                ancestor_classes.add(c)
+        if ancestor_classes & _SKIP_CSS:
             continue
 
         # Build pattern from keywords not yet bolded
