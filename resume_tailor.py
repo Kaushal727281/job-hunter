@@ -136,24 +136,29 @@ def _apply_sections(soup: BeautifulSoup, modified: dict) -> BeautifulSoup:
 
 def _bold_keywords(soup: BeautifulSoup, keywords: list) -> BeautifulSoup:
     """
-    Wrap every occurrence of each keyword (case-insensitive) in <strong> tags
-    inside text content areas only (skips style/script/title/existing strong).
+    Wrap every occurrence of each keyword (case-insensitive) in a
+    <strong class="ats-kw"> tag inside text content areas.
+    Skips style/script/title/existing strong/mark tags.
     """
     if not keywords:
         return soup
 
+    # Filter out empty / whitespace-only entries
+    clean = [k for k in keywords if k and k.strip()]
+    if not clean:
+        return soup
+
     # Sort longest first so multi-word phrases match before their sub-words
-    kw_sorted = sorted(set(keywords), key=len, reverse=True)
+    kw_sorted = sorted(set(clean), key=len, reverse=True)
     pattern   = re.compile(
         "(" + "|".join(re.escape(k) for k in kw_sorted) + ")",
         re.IGNORECASE,
     )
 
-    _SKIP = {"style", "script", "title", "strong", "b", "head", "a"}
+    _SKIP = {"style", "script", "title", "strong", "b", "mark", "head", "a"}
 
     for node in soup.find_all(string=True):
         parent = node.parent
-        # Skip if inside a tag we don't want to touch
         if any(p.name in _SKIP for p in [parent] + list(parent.parents)):
             continue
         text = str(node)
@@ -164,14 +169,13 @@ def _bold_keywords(soup: BeautifulSoup, keywords: list) -> BeautifulSoup:
         if len(parts) == 1:
             continue
 
-        # Replace the NavigableString with mixed text + <strong> nodes
         for part in parts:
             if not part:
                 continue
             if pattern.fullmatch(part):
-                strong = soup.new_tag("strong")
-                strong.string = part
-                node.insert_before(strong)
+                tag = soup.new_tag("strong", **{"class": "ats-kw"})
+                tag.string = part
+                node.insert_before(tag)
             else:
                 node.insert_before(NavigableString(part))
         node.extract()
@@ -239,20 +243,21 @@ Location: {job['location']} {'(Remote)' if job.get('is_remote') else ''}
    - BAD example: "...seeking a role as Full Stack Engineer at Deutsche Bank"
    - GOOD example: "...bringing 7 years of enterprise Java expertise and a proven record of delivering scalable solutions."
 
-2. **NEW_ATS_KEYWORDS**: List up to 15 keywords/phrases from the JD that are NOT already in the candidate's skills section. Be INCLUSIVE for ATS coverage — apply these rules:
-   - If the JD names a tool/framework in the same family as one the candidate uses, include it (e.g. JD says "IBM WebSphere MQ" → candidate has Kafka → include "IBM WebSphere MQ")
-   - If the JD names a methodology/concept the candidate would routinely apply (SDLC, Agile, CI/CD, unit testing, SQL), include it even if not spelled out in the resume
-   - If the JD names a testing framework (JUnit, SpecFlow, Karate, Mockito) and candidate does Java/backend development, include it
-   - Include domain terms (RESTful Web Services, NoSQL, Generative AI, microservices) that apply to the candidate's stack
-   - NEVER invent specialised products (e.g. a specific cloud product) the candidate has no exposure to
-   Return as a JSON array of short strings (tool names, frameworks, buzzwords — not full sentences).
+2. **BOLD_KEYWORDS** — skill/keyword matching (CRITICAL):
+   Step A — Compare the JD skills/technologies to the candidate's resume. List every skill word that appears in BOTH the JD and the resume (exact or close match, e.g. "REST APIs" matches "RESTful APIs").
+   Step B — Count the matches from Step A. If the count is LESS THAN 5, identify additional skill/technology words from the JD that are contextually aligned with what the candidate already does (e.g. JD mentions "Kafka" and candidate works on microservices → add "Kafka"; JD mentions "Agile" → add "Agile"). Add enough to reach at least 5 total.
+   Step C — Return all these words (Step A matches + Step B additions) as the "bold_keywords" array. These will be bolded in the PDF.
+   RULES: Return plain strings — NO asterisks, NO markdown, NO ** wrapping. Example: "Spring Boot" not "**Spring Boot**".
 
-3. **JOBS – bullets**: For each role rewrite bullets to:
+3. **NEW_ATS_KEYWORDS**: From the Step B additions above that are NOT already in the candidate's skills section, return them here too. These will be injected into the resume skills section.
+   - Only include terms contextually aligned with the candidate's background
+   - NEVER invent specific products the candidate has no exposure to
+   Return as a JSON array of short plain strings.
+
+4. **JOBS – bullets**: For each role rewrite bullets to:
    - Put the most JD-relevant bullets first
    - Weave in JD terminology naturally (e.g. replace "REST services" with "RESTful microservices" if JD uses that phrase)
    - Never add technologies or responsibilities not actually present
-
-4. **BOLD_KEYWORDS**: Return up to 15 keywords/short phrases that appear in BOTH the JD and the tailored resume — these will be bolded in the final PDF so recruiters see instant matches. Pick the most impactful technical terms and action phrases.
 
 5. **COVER_LETTER**: Write a full professional cover letter (~200 words, 4 paragraphs):
    - Para 1: Enthusiastic opening — name the specific role + company, hook with a key strength.
@@ -274,7 +279,7 @@ Return ONLY valid JSON with this exact structure:
   "cover_note": "<1-2 sentence teaser>",
   "match_score": <1-10>,
   "key_matches": ["skill1", "skill2", "skill3", "skill4", "skill5"],
-  "bold_keywords": ["Spring Boot", "microservices", "Java 8", "REST APIs"]
+  "bold_keywords": ["Spring Boot", "microservices", "Java 8", "REST APIs", "Kafka"]
 }}
 
 Return ONLY valid JSON, no markdown fences, no extra text."""
@@ -367,7 +372,19 @@ Return ONLY valid JSON, no markdown fences, no extra text."""
     result["summary"] = summary
 
     result.setdefault("new_ats_keywords", [])
-    result.setdefault("bold_keywords", result.get("key_matches", []))
+
+    # Strip markdown ** wrapping that local models (llama) sometimes add to keywords
+    def _strip_md(lst):
+        return [re.sub(r"^\*+|\*+$", "", k).strip() for k in lst if k]
+
+    result["new_ats_keywords"] = _strip_md(result["new_ats_keywords"])
+    result["key_matches"]      = _strip_md(result.get("key_matches", []))
+
+    # bold_keywords = explicit list from model, else fall back to key_matches
+    raw_bold = _strip_md(result.get("bold_keywords") or [])
+    # Also include new ATS keywords so freshly injected terms get highlighted
+    all_bold = list(dict.fromkeys(raw_bold + result["new_ats_keywords"] + result["key_matches"]))
+    result["bold_keywords"] = all_bold[:20]   # cap at 20 to avoid over-bolding
 
     # 1. Inject modified text back into the full HTML
     soup = _apply_sections(soup, result)
