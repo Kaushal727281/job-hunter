@@ -472,24 +472,24 @@ Return ONLY valid JSON, no markdown fences, no extra text."""
         cl = "\n".join(str(p) for p in cl)
         result["cover_letter"] = cl
     if cl:
+        # The cover_letter.html template adds its own "Dear Hiring Manager," salutation
+        # and "Sincerely, <name>" closing — strip ALL such lines from the body so they
+        # never appear twice regardless of how many the model included.
+        candidate_name = _candidate_name()
         lines = cl.splitlines()
-        seen_salutation = False
-        seen_signoff    = False
-        clean_lines     = []
+        clean_lines = []
         for ln in lines:
             stripped = ln.strip()
-            is_salutation = bool(re.match(r"dear\s+hiring\s+manager", stripped, re.I))
-            is_signoff    = bool(re.match(r"(sincerely|regards|best\s+regards)[,.]?\s*$", stripped, re.I))
-            if is_salutation:
-                if seen_salutation:
-                    continue   # drop duplicate salutation
-                seen_salutation = True
-            if is_signoff:
-                if seen_signoff:
-                    continue   # drop duplicate sign-off
-                seen_signoff = True
+            # Drop any greeting line
+            if re.match(r"dear\s+hiring\s+manager", stripped, re.I):
+                continue
+            # Drop sign-off words on their own line
+            if re.match(r"(sincerely|regards|best\s+regards|warm\s+regards)[,.]?\s*$", stripped, re.I):
+                continue
+            # Drop trailing name-only lines (candidate name alone on a line)
+            if candidate_name and stripped.lower() == candidate_name.lower():
+                continue
             clean_lines.append(ln)
-        # Also remove duplicate trailing name lines (same name appears twice at end)
         result["cover_letter"] = "\n".join(clean_lines).strip()
 
     # Post-process summary — strip "as a [title] at [company]" phrases the model keeps adding

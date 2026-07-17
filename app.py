@@ -541,11 +541,29 @@ def diff_view(job_id):
 
 
 def _get_cover_letter(tr: dict) -> str:
-    """Extract cover letter as a plain string, handling list or string storage."""
+    """Extract cover letter body — greeting and sign-off stripped (template owns those)."""
+    import re as _re
     raw = tr.get("cover_letter") or tr.get("cover_note", "")
     if isinstance(raw, list):
         raw = "\n\n".join(raw)
-    return raw or ""
+    if not raw:
+        return ""
+    clean = []
+    for ln in raw.splitlines():
+        s = ln.strip()
+        if _re.match(r"dear\s+hiring\s+manager", s, _re.I):
+            continue
+        if _re.match(r"(sincerely|regards|best\s+regards|warm\s+regards)[,.]?\s*$", s, _re.I):
+            continue
+        clean.append(ln)
+    # Also drop trailing blank lines followed by a lone name line
+    text = "\n".join(clean).strip()
+    # Remove trailing "Kaushal Kumar Jha" style sign-off if it ends the letter
+    config = _load_config()
+    name = config.get("candidate", {}).get("name", "")
+    if name:
+        text = _re.sub(r"\n+" + _re.escape(name) + r"\s*$", "", text, flags=_re.I).strip()
+    return text
 
 
 @app.route("/cover/<job_id>")
