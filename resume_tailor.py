@@ -116,10 +116,13 @@ def _apply_sections(soup: BeautifulSoup, modified: dict) -> BeautifulSoup:
                 li.string = b
                 ul.append(li)
                 written_texts.append(b.strip().lower())
-            # Re-append originals only when the model clearly dropped them (no similar bullet written)
-            # Uses difflib similarity so rewrites of the same bullet don't get duplicated
+            # Only restore originals the model clearly dropped AND only up to 6 bullets total
+            # (2-page rule: more than 6 bullets per role overflows the page)
             import difflib
+            MAX_BULLETS = 6
             for orig in orig_bullets:
+                if len(written_texts) >= MAX_BULLETS:
+                    break
                 orig_low = orig.strip().lower()
                 if not orig_low:
                     continue
@@ -356,6 +359,7 @@ Mark each addressed tip as implemented by noting it in the improvement_tips resp
 as plain tips.
 """ if prev_tips else ""}## Instructions
 1. **SUMMARY**: Rewrite as a candidate APPLYING for this role. STRICT RULES:
+   - **MAX 2 sentences, ~40 words total** — tight and punchy, no fluff
    - NEVER use the phrase "as a [job title] at [company]" — this implies already employed there
    - NEVER say "at [company]" or "for [company]" at the end of the sentence
    - DO start with: "[X]+ years of experience in [core skills]..."
@@ -374,12 +378,13 @@ as plain tips.
    - NEVER invent specific products the candidate has no exposure to
    Return as a JSON array of short plain strings.
 
-4. **JOBS – bullets**: For each role rewrite bullets to:
-   - **KEEP ALL EXISTING BULLETS** — do NOT drop any. Return every bullet from the original resume.
+4. **JOBS – bullets**: For each role rewrite bullets following these STRICT RULES:
+   - **MAX 6 bullets per role** — merge, trim, or drop the weakest; keep only the highest-impact ones
+   - **Each bullet max 20 words** — one crisp line: Action verb → what → result/impact. No sub-clauses, no lists within a bullet
    - Reorder so the most JD-relevant bullets appear first
    - Weave in JD terminology naturally (e.g. replace "REST services" with "RESTful microservices" if JD uses that phrase)
    - Never add technologies or responsibilities not actually present
-   - If there are N bullets in the original, your response must have at least N bullets
+   - **TARGET: entire resume fits in 2 pages** — be ruthless about brevity
 
 5. **COVER_LETTER**: Write a full professional cover letter (~200 words, 4 paragraphs):
    - Para 1: Enthusiastic opening — name the specific role + company, hook with a key strength.
