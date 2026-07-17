@@ -181,9 +181,11 @@ def check_responses(applied_jobs: list[dict]) -> dict:
             # BODY search is intentionally excluded — it causes false positives from emails
             # that merely mention the company name in their body (e.g. LinkedIn digest emails
             # listing "people from Microsoft/FICO searched for you").
-            for criterion in [
-                f'{since_clause}FROM "{key}"',
-                f'{since_clause}SUBJECT "{key}"',
+            # NOTE: Gmail IMAP ignores FROM/SUBJECT constraints and does full-text search,
+            # so we must post-validate that the key actually appears in the real header.
+            for search_type, criterion in [
+                ("from", f'{since_clause}FROM "{key}"'),
+                ("subject", f'{since_clause}SUBJECT "{key}"'),
             ]:
                 try:
                     status, data = mail.search(None, criterion)
@@ -205,6 +207,21 @@ def check_responses(applied_jobs: list[dict]) -> dict:
                         # Skip our own sent emails
                         if addr.lower() in from_addr.lower():
                             continue
+
+                        # Post-validate: Gmail IMAP does full-text search, not header-only.
+                        # Confirm the company key actually appears in the header it was
+                        # supposed to match, or in the subject (company may reply via
+                        # a 3rd-party ATS like myworkday.com that doesn't include the
+                        # company name in the From address).
+                        key_low = key.lower()
+                        if search_type == "from":
+                            if key_low not in from_addr.lower() and key_low not in subject.lower():
+                                logger.debug(f"  Skipping IMAP false-positive (FROM '{key}'): '{subject[:50]}'")
+                                continue
+                        else:  # subject
+                            if key_low not in subject.lower():
+                                logger.debug(f"  Skipping IMAP false-positive (SUBJECT '{key}'): '{subject[:50]}'")
+                                continue
 
                         # Skip social/notification emails that aren't job responses
                         _NOISE_SUBJECTS = (
@@ -235,15 +252,18 @@ def check_responses(applied_jobs: list[dict]) -> dict:
                             "verify your",
                             "confirm your",
                         )
-                        _NOISE_SENDERS_DOMAIN = (
+                        # Non-company generic sender domains — always noise
+                        _NOISE_SENDERS_DOMAIN_HARD = (
                             "accounts.google.com",
                             "google.com",
                             "googleplay.com",
                             "openrouter.ai",
-                            "noreply@",
-                            "no-reply@",
-                            "donotreply@",
                         )
+                        # noreply/donotreply senders: noise UNLESS the company key is in
+                        # their domain (e.g. donotreply@email.careers.microsoft.com is
+                        # legitimate for a Microsoft search key).
+                        _NOREPLY_PREFIXES = ("noreply@", "no-reply@", "donotreply@",
+                                             "do-not-reply@", "notifications-noreply@")
                         subj_low = subject.lower()
                         from_low = from_addr.lower()
                         if any(s in subj_low for s in _NOISE_SUBJECTS):
@@ -252,8 +272,13 @@ def check_responses(applied_jobs: list[dict]) -> dict:
                             continue
                         if any(s in subj_low for s in _NOISE_SUBJECTS_EXACT):
                             continue
-                        if any(s in from_low for s in _NOISE_SENDERS_DOMAIN):
+                        if any(s in from_low for s in _NOISE_SENDERS_DOMAIN_HARD):
                             continue
+                        # Reject noreply/donotreply only when the company key is NOT in domain
+                        if any(s in from_low for s in _NOREPLY_PREFIXES):
+                            if key_low not in from_low:
+                                logger.debug(f"  Skipping noreply from non-company domain: '{from_addr[:60]}'")
+                                continue
 
                         # Require the email to look job-related:
                         # subject or snippet must contain at least one job-related keyword
