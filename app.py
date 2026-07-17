@@ -363,6 +363,31 @@ def _render_layout(job: dict, layout: str) -> str:
             raw = skills_el.get_text(" ", strip=True).replace("&nbsp;", " ").replace("\u00a0", " ")
             skills_flat = [p.strip() for p in re.split(r"\s*·\s*|\s*,\s*", raw) if p.strip()]
 
+    def _dedupe_bullets(bullets: list) -> list:
+        """Remove near-duplicate bullets that share the same opening words (LLM artifact)."""
+        def _plain(html):
+            return re.sub(r'\s+', ' ', BeautifulSoup(html, "html.parser").get_text(' ', strip=True)).lower()
+        def _words(text):
+            return re.findall(r'\b\w+\b', text)
+        kept, plains = [], []
+        for b in bullets:
+            p = _plain(b)
+            pw = _words(p)
+            dup = False
+            for i, kp in enumerate(plains):
+                kw = _words(kp)
+                # Same bullet if first 6 meaningful words match
+                if len(pw) >= 6 and len(kw) >= 6 and pw[:6] == kw[:6]:
+                    if len(p) > len(kp):   # keep the more detailed version
+                        kept[i] = b
+                        plains[i] = p
+                    dup = True
+                    break
+            if not dup:
+                kept.append(b)
+                plains.append(p)
+        return kept
+
     # ── Jobs (.job → .job-title, .job-company, .duration, ul>li) ──────────
     jobs = []
     for job_div in soup.find_all(class_="job"):
@@ -372,7 +397,8 @@ def _render_layout(job: dict, layout: str) -> str:
         date_el    = (job_div.find(class_="duration") or
                       job_div.find(class_="job-date") or
                       job_div.find(class_="job-meta"))
-        bullets    = [li.decode_contents() for li in job_div.find_all("li")][:6]
+        raw_bullets = [li.decode_contents() for li in job_div.find_all("li")][:8]
+        bullets = _dedupe_bullets(raw_bullets)[:6]
         jobs.append({
             "title":   _txt(title_el),
             "company": _txt(company_el),
@@ -402,10 +428,14 @@ def _render_layout(job: dict, layout: str) -> str:
     education = None
     edu_el = soup.find(class_="edu-block") or soup.find(class_="edu-entry")
     if edu_el:
+        edu_date = _txt(edu_el.find(class_="edu-year") or edu_el.find(class_="edu-date"))
+        # Correct LLM-hallucinated graduation years — canonical date is 2016–2020
+        if edu_date and "2020" not in edu_date:
+            edu_date = "2016 – 2020"
         education = {
             "degree": _txt(edu_el.find(class_="edu-degree")),
             "school": _txt(edu_el.find(class_="edu-school")),
-            "date":   _txt(edu_el.find(class_="edu-year") or edu_el.find(class_="edu-date")),
+            "date":   edu_date,
         }
 
     # ── Soft skills (spans inside "Soft Skills" section) ──────────────────
