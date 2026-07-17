@@ -361,13 +361,33 @@
         <div class="cover-note">{{ tr.cover_note }}</div>
         {% endif %}
         {% if tr.improvement_tips %}
+        {% set done_tips = tr.improvement_tips | selectattr('startswith', 'callable') | list %}
+        {% set n_done = tr.improvement_tips | select('match', '^✓') | list | length %}
+        {% set n_todo = tr.improvement_tips | length - n_done %}
         <details class="tips-box" style="margin-top:8px">
-          <summary style="font-size:11.5px;font-weight:700;color:#e65100;cursor:pointer;user-select:none;list-style:none;display:flex;align-items:center;gap:5px">
-            <span>💡</span><span>{{ tr.improvement_tips|length }} improvement tip{{ 's' if tr.improvement_tips|length > 1 else '' }}</span>
+          <summary style="font-size:11.5px;font-weight:700;cursor:pointer;user-select:none;list-style:none;display:flex;align-items:center;gap:6px">
+            {% if n_todo == 0 %}
+              <span style="color:#2e7d32">✅ All tips implemented</span>
+            {% else %}
+              <span style="color:#e65100">💡</span>
+              <span style="color:#2e7d32">{{ n_done }} done</span>
+              <span style="color:#aaa">·</span>
+              <span style="color:#c62828">{{ n_todo }} to fix</span>
+            {% endif %}
           </summary>
-          <ul style="margin:6px 0 0 4px;padding-left:14px;font-size:11.5px;color:#555;line-height:1.7">
+          <ul style="margin:6px 0 0 4px;padding-left:0;list-style:none;font-size:11.5px;line-height:1.8">
             {% for tip in tr.improvement_tips %}
-            <li>{{ tip }}</li>
+              {% if tip.startswith('✓') %}
+              <li style="color:#2e7d32;display:flex;gap:6px;align-items:flex-start">
+                <span style="flex-shrink:0;font-size:13px">✅</span>
+                <span>{{ tip[1:].lstrip(' Implemented:').strip() }}</span>
+              </li>
+              {% else %}
+              <li style="color:#c62828;display:flex;gap:6px;align-items:flex-start">
+                <span style="flex-shrink:0;font-size:13px">❌</span>
+                <span style="color:#555">{{ tip }}</span>
+              </li>
+              {% endif %}
             {% endfor %}
           </ul>
         </details>
