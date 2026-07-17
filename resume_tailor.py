@@ -268,9 +268,11 @@ def _detect_domain(job: dict) -> tuple[str, str]:
     )
 
 
-def tailor_resume(job: dict) -> dict:
+def tailor_resume(job: dict, prev_tips: list[str] | None = None) -> dict:
     """
     Tailors the base resume for the given job.
+    prev_tips: improvement_tips from a previous attempt — injected as extra
+               instructions so the model addresses them on retry.
     Returns:
       {
         "resume_html":      str,   — full modified HTML with bolded keywords
@@ -279,6 +281,7 @@ def tailor_resume(job: dict) -> dict:
         "key_matches":      list   — top matching skills/keywords
         "bold_keywords":    list   — keywords bolded in the resume HTML
         "new_ats_keywords": list   — new keywords added from JD
+        "improvement_tips": list   — remaining gaps after tailoring
       }
     """
     base_html = BASE_RESUME_PATH.read_text(encoding="utf-8")
@@ -323,8 +326,15 @@ Location: {job['location']} {'(Remote)' if job.get('is_remote') else ''}
 
 ## Candidate's Current Resume
 {resume_text}
+{f"""## Previous Attempt — Improvements Required
+A previous tailoring attempt scored below 8/10. You MUST address ALL of the following gaps
+in this attempt by rewriting the relevant bullets to incorporate them naturally:
+{chr(10).join(f"  ✗ {tip}" for tip in prev_tips)}
 
-## Instructions
+Mark each addressed tip as implemented by noting it in the improvement_tips response
+(replace its text with "✓ Implemented: <what you did>"). Only list truly remaining gaps
+as plain tips.
+""" if prev_tips else ""}## Instructions
 1. **SUMMARY**: Rewrite as a candidate APPLYING for this role. STRICT RULES:
    - NEVER use the phrase "as a [job title] at [company]" — this implies already employed there
    - NEVER say "at [company]" or "for [company]" at the end of the sentence

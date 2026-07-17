@@ -133,11 +133,14 @@ def _bg_tailor(job_id: str, prev_result: dict = None, prev_pdf: str = None):
 
         from resume_tailor import tailor_resume
         result = None
+        prev_tips = None
         for attempt in range(1, MAX_ATTEMPTS + 1):
             if attempt > 1:
-                logger.info(f"  Retry {attempt}/{MAX_ATTEMPTS} — score was {result.get('match_score',0)}/10, targeting {TARGET_SCORE}+")
-                job_store.update_job(job_id, tailor_error=f"Score {result['match_score']}/10 — retrying (attempt {attempt}/{MAX_ATTEMPTS})…")
-            result = tailor_resume(job_with_desc)
+                score_prev = result.get("match_score", 0) or 0
+                prev_tips  = result.get("improvement_tips") or []
+                logger.info(f"  Retry {attempt}/{MAX_ATTEMPTS} — score was {score_prev}/10, passing {len(prev_tips)} tips")
+                job_store.update_job(job_id, tailor_error=f"Score {score_prev}/10 — retrying (attempt {attempt}/{MAX_ATTEMPTS})…")
+            result = tailor_resume(job_with_desc, prev_tips=prev_tips)
             score = result.get("match_score", 0) or 0
             logger.info(f"  Attempt {attempt}: match_score={score}/10")
             if score >= TARGET_SCORE:
