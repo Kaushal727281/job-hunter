@@ -217,11 +217,55 @@ def check_responses(applied_jobs: list[dict]) -> dict:
                             "notifications@linkedin.com",
                             "jobalerts@linkedin.com",
                         )
+                        # Skip clearly non-job emails: security alerts, community/society groups,
+                        # billing/subscription notices, promotional emails
+                        _NOISE_SUBJECTS_EXACT = (
+                            "security alert",
+                            "app password created",
+                            "new sign-in",
+                            "your trial",
+                            "subscription",
+                            "payment method",
+                            "google one",
+                            "google play",
+                            "one api key",
+                            "welcome to",
+                            "verify your",
+                            "confirm your",
+                        )
+                        _NOISE_SENDERS_DOMAIN = (
+                            "accounts.google.com",
+                            "google.com",
+                            "googleplay.com",
+                            "openrouter.ai",
+                            "noreply@",
+                            "no-reply@",
+                            "donotreply@",
+                        )
                         subj_low = subject.lower()
                         from_low = from_addr.lower()
                         if any(s in subj_low for s in _NOISE_SUBJECTS):
                             continue
                         if any(s in from_low for s in _NOISE_SENDERS):
+                            continue
+                        if any(s in subj_low for s in _NOISE_SUBJECTS_EXACT):
+                            continue
+                        if any(s in from_low for s in _NOISE_SENDERS_DOMAIN):
+                            continue
+
+                        # Require the email to look job-related:
+                        # subject or snippet must contain at least one job-related keyword
+                        _JOB_KEYWORDS = (
+                            "application", "applicant", "position", "role", "job",
+                            "interview", "opportunity", "hiring", "recruit", "candidate",
+                            "resume", "cv", "offer", "shortlist", "assessment", "screening",
+                            "talent", "career", "engineer", "developer", "software",
+                            "hr ", "human resources", "your profile", "we reviewed",
+                            "thank you for applying", "thank you for your interest",
+                        )
+                        combined_text = (subj_low + " " + snippet.lower())
+                        if not any(kw in combined_text for kw in _JOB_KEYWORDS):
+                            logger.debug(f"  Skipping non-job email: '{subject[:60]}'")
                             continue
 
                         # Skip emails received before the job was applied for

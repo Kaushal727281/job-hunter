@@ -346,6 +346,7 @@
       <div class="skill-group">
         <div class="skill-group-label">Integrations</div>
         <div class="skill-tags">
+          <span class="tag">Kafka</span>
           <span class="tag">Dapr</span>
           <span class="tag">Lucene</span>
           <span class="tag">Pusher</span>
@@ -381,13 +382,13 @@
         <p class="summary-text">
           Lead Software Engineer with <strong>6+ years</strong> of experience building
           enterprise-grade Java back-end systems and modern Angular / JavaScript front-ends.
-          At <strong>FICO</strong>, I lead full-stack development on an
+          At <strong>FICO</strong>, I lead development on an
           <strong>enterprise Decision Management &amp; Business Rules platform</strong> —
-          used by Fortune 500 companies in banking, insurance, and retail to automate
-          high-volume decisions at scale. I have hands-on experience across the entire stack: from
-          rule-engine internals and Spring Boot microservices to Angular SPA development and
-          multi-module CI/CD pipelines. Equally comfortable leading large enterprise codebases
-          and building greenfield full-stack products from scratch.
+          used by Fortune 500 banks, insurers, and lenders to automate <strong>high-volume financial decisions</strong>
+          (credit scoring, ACH origination, fraud detection) at scale. Hands-on across the full backend stack:
+          Java/Spring Boot microservices, Kafka event-driven pipelines, resilient REST APIs with circuit breakers
+          and retry patterns, CI/CD automation, and cloud-native deployments via Dapr.
+          Equally comfortable leading large enterprise codebases and building greenfield products from scratch.
         </p>
       </div>
 
@@ -407,12 +408,13 @@
             </div>
           </div>
           <ul>
-            <li>Lead engineer on FICO's <strong>enterprise Decision Management platform</strong> — a Business Rules engine powering automated decisioning for global financial, insurance, and retail clients.</li>
-            <li>Designed and delivered the <strong>Authoring Module</strong> — a standalone Spring Boot 2.7 WAR with Spring Security 5.8 authentication, JPA/Hibernate multi-database support, and a clean REST API layer over the legacy rules engine.</li>
+            <li>Lead engineer on FICO's <strong>enterprise Decision Management platform</strong> — a Business Rules engine powering <strong>high-volume automated decisioning for global banks, insurers, and retail lenders</strong> (ACH origination, credit scoring, fraud detection, loan underwriting) at Fortune 500 scale.</li>
+            <li>Designed and delivered the <strong>Authoring Module</strong> — a standalone Spring Boot 2.7 WAR with Spring Security 5.8 authentication, JPA/Hibernate multi-database support, Spring Actuator health/readiness endpoints, and a clean REST API layer over the legacy rules engine.</li>
+            <li>Architected event-driven rule-trigger pipelines using <strong>Kafka</strong> for asynchronous decision-request intake; implemented retry policies, <strong>circuit breakers</strong>, and backpressure handling to ensure payments-grade operational stability.</li>
             <li>Owned the <strong>RMA Angular front-end</strong> (Grunt/Gulp build pipeline): built decision-table editors, decision-tree editors, FSML rule metaphors, DaaS export wizards, and audit-log reporting UIs.</li>
             <li>Engineered <strong>Jersey (JAX-RS) REST endpoints</strong> in the server layer and established the <code>NdAbstractActionHandler</code> handler pattern now adopted across all feature teams.</li>
-            <li>Integrated <strong>Lucene 9.12</strong> for full-text search, <strong>Togglz</strong> for feature flagging, and <strong>Dapr</strong> for cloud/microservice deployments.</li>
-            <li>Managed multi-module <strong>Ant/Ivy builds</strong> and <strong>Nexus/JFrog Artifactory</strong> dependency pipelines; reduced build failures by establishing consistent dependency versioning.</li>
+            <li>Integrated <strong>Lucene 9.12</strong> for full-text search, <strong>Togglz</strong> for safe feature-flag rollouts, and <strong>Dapr</strong> for cloud-native microservice deployments across multi-region environments.</li>
+            <li>Managed multi-module <strong>CI/CD pipelines</strong> (Ant/Ivy + Maven, Nexus/JFrog Artifactory); established consistent dependency versioning and automated build gates that reduced release failures.</li>
             <li>Authored and maintained <strong>TestNG + Selenium</strong> regression suites and E2E test harnesses, significantly improving release confidence.</li>
             <li>Mentored junior and mid-level engineers through code reviews, design discussions, and pair-programming sessions.</li>
           </ul>
@@ -440,9 +442,11 @@
           </div>
           <p>
             Standalone Spring Boot WAR extending the core Business Rules engine with a secure,
-            modern REST API, multi-tenant JPA/Hibernate database support, and conditional
-            standalone-RMA deployment mode. Used in production by Fortune 500 clients for
-            automated credit decisioning, fraud detection, and insurance underwriting.
+            modern REST API (Jersey/JAX-RS), multi-tenant JPA/Hibernate database support, Spring Actuator
+            health/readiness probes, and CI/CD-ready conditional standalone-RMA deployment mode.
+            Kafka-backed event-driven intake pipeline with circuit-breaker and retry patterns for
+            payments-grade reliability. Used in production by Fortune 500 banks and insurers for
+            automated credit decisioning, ACH origination, fraud detection, and insurance underwriting.
           </p>
         </div>
 
