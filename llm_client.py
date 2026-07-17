@@ -4,34 +4,31 @@ Multi-key LLM client with automatic key rotation.
 
 Priority order:
   1. GROQ_API_KEY, GROQ_API_KEY_2, GROQ_API_KEY_3 … (free 100K tokens/day each)
-  2. DEEPSEEK_API_KEY   (free credits on signup — platform.deepseek.com)
-  3. MISTRAL_API_KEY    (free credits — console.mistral.ai, works in India)
-  4. OPENROUTER_API_KEY (FREE models, no credits needed — openrouter.ai, works in India)
-  5. GEMINI_API_KEY     (free 1M tokens/day — aistudio.google.com/apikey)
+  2. OLLAMA_MODEL  (local, no internet, no limits — install ollama.com then: ollama pull llama3.1:8b)
+  3. DEEPSEEK_API_KEY   (free credits — platform.deepseek.com)
+  4. MISTRAL_API_KEY    (free credits — console.mistral.ai)
+  5. OPENROUTER_API_KEY (free models — openrouter.ai, works in India)
+  6. GEMINI_API_KEY     (free 1M tokens/day — aistudio.google.com/apikey)
 
-When a Groq key hits its daily token limit the next key is tried automatically.
-Per-minute 429s are retried once with a short sleep on the same key.
-
-Getting free keys (all work in India):
-  Groq:        https://console.groq.com           100K tokens/day free
-  Mistral:     https://console.mistral.ai          free credits on signup
-  OpenRouter:  https://openrouter.ai/settings/keys free models available (no credits needed)
-  DeepSeek:    https://platform.deepseek.com       free credits on signup
-  Gemini:      https://aistudio.google.com/apikey  may need VPN in India
+Set OLLAMA_MODEL=llama3.1:8b in .env to use local Ollama (best for no-internet/no-limit use).
+When a Groq key hits its daily token limit the next provider is tried automatically.
 """
 
 import os
 import re
 import time
 import logging
+import truststore
 
+truststore.inject_into_ssl()
 logger = logging.getLogger(__name__)
 
 GROQ_MODEL       = "llama-3.3-70b-versatile"
 DEEPSEEK_MODEL   = "deepseek-chat"
 MISTRAL_MODEL    = "mistral-small-latest"
-OPENROUTER_MODEL = "meta-llama/llama-3.3-70b-instruct:free"   # permanently free
+OPENROUTER_MODEL = "meta-llama/llama-3.3-70b-instruct:free"
 GEMINI_MODEL     = "gemini-1.5-flash"
+OLLAMA_BASE_URL  = "http://localhost:11434/v1"
 
 
 def _groq_keys() -> list[str]:
@@ -120,7 +117,17 @@ def chat_complete(prompt: str, max_tokens: int = 6000, temperature: float = 0.5)
                     raise
             raise
 
-    # ── 2. DeepSeek ───────────────────────────────────────────────────────────
+    # ── 2. Ollama (local, no internet, no limits) ─────────────────────────────
+    ollama_model = os.getenv("OLLAMA_MODEL", "").strip()
+    if ollama_model:
+        logger.info(f"  Groq exhausted — trying Ollama ({ollama_model})")
+        try:
+            return _openai_compat("ollama", OLLAMA_BASE_URL, ollama_model,
+                                  prompt, max_tokens, temperature)
+        except Exception as e:
+            logger.warning(f"  Ollama failed: {e} — trying next provider…")
+
+    # ── 3. DeepSeek ───────────────────────────────────────────────────────────
     k = os.getenv("DEEPSEEK_API_KEY", "").strip()
     if k:
         logger.info("  Groq exhausted — trying DeepSeek")
@@ -138,12 +145,22 @@ def chat_complete(prompt: str, max_tokens: int = 6000, temperature: float = 0.5)
     k = os.getenv("OPENROUTER_API_KEY", "").strip()
     if k:
         logger.info("  Trying OpenRouter (free model)")
-        return _openai_compat(
-            k, "https://openrouter.ai/api/v1", OPENROUTER_MODEL,
-            prompt, max_tokens, temperature,
-            extra_headers={"HTTP-Referer": "https://github.com/job-hunter",
-                           "X-Title": "Job Hunter"},
-        )
+        headers = {"HTTP-Referer": "https://github.com/job-hunter", "X-Title": "Job Hunter"}
+        # OpenRouter free models sometimes get upstream throttled — retry up to 3x
+        for attempt in range(3):
+            try:
+                return _openai_compat(k, "https://openrouter.ai/api/v1", OPENROUTER_MODEL,
+                                      prompt, max_tokens, temperature, extra_headers=headers)
+            except Exception as e:
+                err = str(e)
+                if "429" in err and attempt < 2:
+                    # Extract retry_after from metadata if present, else default 30s
+                    m = re.search(r"retry_after_seconds['\"]:\s*([\d.]+)", err)
+                    wait = min(float(m.group(1)) if m else 30.0, 60.0)
+                    logger.warning(f"  OpenRouter upstream throttle, retrying in {wait:.0f}s…")
+                    time.sleep(wait)
+                else:
+                    raise
 
     # ── 5. Gemini ─────────────────────────────────────────────────────────────
     k = os.getenv("GEMINI_API_KEY", "").strip()
@@ -152,12 +169,13 @@ def chat_complete(prompt: str, max_tokens: int = 6000, temperature: float = 0.5)
         return _gemini_complete(prompt, k, max_tokens, temperature)
 
     raise EnvironmentError(
-        "All LLM keys exhausted or not set. Add one of these to .env:\n"
-        "  GROQ_API_KEY_2=...      console.groq.com        (100K/day free)\n"
-        "  MISTRAL_API_KEY=...     console.mistral.ai      (free credits, works in India)\n"
-        "  OPENROUTER_API_KEY=...  openrouter.ai           (free models, works in India)\n"
-        "  DEEPSEEK_API_KEY=...    platform.deepseek.com   (free credits)\n"
-        "  GEMINI_API_KEY=...      aistudio.google.com     (1M/day free)"
+        "All LLM providers exhausted or not configured. Add one of these to .env:\n"
+        "  OLLAMA_MODEL=llama3.1:8b   local, free, no limits (install from ollama.com)\n"
+        "  GROQ_API_KEY_2=...         console.groq.com        (100K/day free)\n"
+        "  MISTRAL_API_KEY=...        console.mistral.ai      (free credits)\n"
+        "  OPENROUTER_API_KEY=...     openrouter.ai           (free models)\n"
+        "  DEEPSEEK_API_KEY=...       platform.deepseek.com   (free credits)\n"
+        "  GEMINI_API_KEY=...         aistudio.google.com     (1M/day free)"
     )
 
 
