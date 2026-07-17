@@ -294,6 +294,8 @@
         <div class="skill-tags">
           <span class="tag">Spring Boot</span>
           <span class="tag">Spring Security</span>
+          <span class="tag">OAuth2 / JWT</span>
+          <span class="tag">Spring Batch</span>
           <span class="tag">Hibernate / JPA</span>
           <span class="tag">Jersey (JAX-RS)</span>
           <span class="tag">REST APIs</span>
@@ -314,7 +316,9 @@
         <div class="skill-group-label">Databases</div>
         <div class="skill-tags">
           <span class="tag">PostgreSQL</span>
-          <span class="tag">Oracle</span>
+          <span class="tag">Oracle SQL</span>
+          <span class="tag">MySQL</span>
+          <span class="tag">AWS RDS</span>
           <span class="tag">HSQL</span>
           <span class="tag">Prisma ORM</span>
         </div>
@@ -323,10 +327,11 @@
       <div class="skill-group">
         <div class="skill-group-label">Cloud</div>
         <div class="skill-tags">
-          <span class="tag">AWS (EC2, S3, Lambda)</span>
+          <span class="tag">AWS (EC2, S3, Lambda, RDS)</span>
           <span class="tag">Azure (AKS, App Service)</span>
           <span class="tag">Kubernetes</span>
           <span class="tag">Docker</span>
+          <span class="tag">Terraform</span>
           <span class="tag">Dapr</span>
         </div>
       </div>
@@ -334,12 +339,26 @@
       <div class="skill-group">
         <div class="skill-group-label">Build & DevOps</div>
         <div class="skill-tags">
+          <span class="tag">Jenkins</span>
+          <span class="tag">GitHub Actions</span>
+          <span class="tag">GitLab CI</span>
           <span class="tag">Maven</span>
           <span class="tag">Ant / Ivy</span>
           <span class="tag">npm</span>
           <span class="tag">Git</span>
+          <span class="tag">Jira</span>
           <span class="tag">Nexus</span>
           <span class="tag">JFrog</span>
+        </div>
+      </div>
+
+      <div class="skill-group">
+        <div class="skill-group-label">Observability</div>
+        <div class="skill-tags">
+          <span class="tag">Prometheus</span>
+          <span class="tag">Grafana</span>
+          <span class="tag">ELK Stack</span>
+          <span class="tag">Spring Actuator</span>
         </div>
       </div>
 
@@ -372,8 +391,10 @@
           <span class="tag">LLM Integration</span>
           <span class="tag">Prompt Engineering</span>
           <span class="tag">RAG</span>
+          <span class="tag">Pinecone / Vector DB</span>
           <span class="tag">Ollama</span>
-          <span class="tag">LangChain concepts</span>
+          <span class="tag">LangChain</span>
+          <span class="tag">GitHub Copilot</span>
         </div>
       </div>
 
@@ -402,14 +423,16 @@
       <div class="section">
         <div class="section-title-main">Professional Summary</div>
         <p class="summary-text">
-          Lead Software Engineer with <strong>6+ years</strong> of experience building
+          Lead Software Engineer with <strong>7+ years</strong> of experience building
           enterprise-grade Java back-end systems and modern Angular / JavaScript front-ends.
           At <strong>FICO</strong>, I lead development on an
           <strong>enterprise Decision Management &amp; Business Rules platform</strong> —
           used by Fortune 500 banks, insurers, and lenders to automate <strong>high-volume financial decisions</strong>
-          (credit scoring, ACH origination, fraud detection) at scale. Hands-on across the full backend stack:
-          Java/Spring Boot microservices, Kafka event-driven pipelines, resilient REST APIs with circuit breakers
-          and retry patterns, CI/CD automation, and cloud-native deployments via Dapr.
+          (ACH origination, credit scoring, fraud detection, underwriting) at scale. Hands-on across the full stack:
+          Java/Spring Boot microservices with <strong>OAuth2/JWT</strong> security, Kafka + RabbitMQ event-driven pipelines,
+          circuit breakers and retry patterns, <strong>Jenkins/GitHub Actions CI/CD</strong>, <strong>Terraform</strong>-managed
+          cloud infrastructure (AWS/Azure/Kubernetes), and <strong>Prometheus/Grafana</strong> observability.
+          Proven legacy modernization track record — migrated monolithic RMA platform to cloud-ready Spring Boot microservices.
           Equally comfortable leading large enterprise codebases and building greenfield products from scratch.
         </p>
       </div>
@@ -431,18 +454,19 @@
           </div>
           <ul>
             <li>Lead engineer on FICO's <strong>enterprise Decision Management &amp; Business Rules platform</strong> — powering <strong>automated decisioning for Fortune 500 banks, global insurers, and retail lenders</strong>: ACH origination, credit scoring, fraud detection, insurance underwriting automation, loan origination, and claims processing at enterprise scale.</li>
-            <li>Designed and delivered the <strong>Authoring Module</strong> — a standalone Spring Boot 2.7 WAR with Spring Security 5.8 authentication, JPA/Hibernate multi-database support, Spring Actuator health/readiness endpoints, and a clean REST API layer over the legacy rules engine.</li>
+            <li>Designed and delivered the <strong>Authoring Module</strong> — a standalone Spring Boot 2.7 WAR with <strong>Spring Security 5.8 + OAuth2/JWT</strong> authentication, JPA/Hibernate multi-database support (Oracle SQL, PostgreSQL), Spring Actuator health/readiness endpoints, and a clean REST API layer over the legacy rules engine; this was a full <strong>legacy modernization</strong> of the monolithic RMA system into a cloud-ready microservice.</li>
             <li>Architected event-driven rule-trigger pipelines using <strong>Kafka</strong> for asynchronous decision-request intake; implemented retry policies, <strong>circuit breakers</strong>, and backpressure handling to ensure payments-grade operational stability.</li>
             <li>Owned the <strong>RMA Angular front-end</strong> (Grunt/Gulp build pipeline): built decision-table editors, decision-tree editors, FSML rule metaphors, DaaS export wizards, and audit-log reporting UIs.</li>
             <li>Engineered <strong>Jersey (JAX-RS) REST endpoints</strong> in the server layer and established the <code>NdAbstractActionHandler</code> handler pattern now adopted across all feature teams.</li>
             <li>Produced <strong>HLD and LLD</strong> for the Authoring Module and server-layer refactoring — covering service decomposition, API contracts, data-flow diagrams, and failure-mode analysis; designs were adopted as the team's architectural baseline.</li>
             <li>Designed and implemented <strong>event-driven architectures</strong> using <strong>Kafka</strong> and <strong>RabbitMQ</strong> for asynchronous rule-trigger intake and inter-service messaging; applied dead-letter queues, retry policies, and circuit breakers for resilient processing.</li>
             <li>Deployed and operated services on <strong>AWS</strong> (EC2, S3, Lambda) and <strong>Azure</strong> (AKS, App Service) using <strong>Kubernetes</strong> and Dapr; implemented multi-region deployment patterns for high availability.</li>
-            <li>Integrated <strong>Lucene 9.12</strong> for full-text search, <strong>Togglz</strong> for safe feature-flag rollouts, and <strong>Dapr</strong> for cloud-native microservice deployments across multi-region environments.</li>
-            <li>Managed multi-module <strong>CI/CD pipelines</strong> (Ant/Ivy + Maven, Nexus/JFrog Artifactory); established consistent dependency versioning and automated build gates that reduced release failures.</li>
+            <li>Integrated <strong>Lucene 9.12</strong> for full-text search, <strong>Togglz</strong> for safe feature-flag rollouts, and <strong>Dapr</strong> for cloud-native microservice deployments; set up <strong>Prometheus + Grafana</strong> dashboards and <strong>ELK Stack</strong> log aggregation for production observability across multi-region environments.</li>
+            <li>Managed multi-module <strong>CI/CD pipelines</strong> using <strong>Jenkins</strong>, <strong>GitHub Actions</strong>, and <strong>GitLab CI</strong> (Ant/Ivy + Maven, Nexus/JFrog Artifactory); automated build gates, dependency versioning, and Terraform-managed infrastructure provisioning that reduced release failures and environment drift.</li>
             <li>Authored and maintained <strong>TestNG + Selenium</strong> regression suites and E2E test harnesses, significantly improving release confidence.</li>
             <li>Designed and optimised <strong>multithreaded, concurrent request-handling</strong> pipelines in the rule-engine server layer (thread pools, synchronised caches, connection pooling), sustaining high throughput for Fortune 500 enterprise workloads.</li>
-            <li>Mentored junior and mid-level engineers through code reviews, design discussions, and pair-programming sessions.</li>
+            <li>Built <strong>Spring Batch</strong> jobs for scheduled rule-set exports, bulk JD data migrations, and nightly audit-log archival; implemented <strong>on-call incident response</strong> runbooks and post-mortem processes that reduced MTTR for production P1 issues.</li>
+            <li>Mentored junior and mid-level engineers through code reviews, design discussions, and pair-programming sessions; drove <strong>Agile/Scrum</strong> ceremonies (sprint planning, retrospectives) using <strong>Jira</strong> for backlog management and velocity tracking.</li>
           </ul>
         </div>
 
@@ -459,11 +483,15 @@
           </div>
           <div class="project-stack">
             <span class="tag">Spring Boot 2.7</span>
-            <span class="tag">Spring Security 5.8</span>
+            <span class="tag">Spring Security 5.8 / OAuth2 / JWT</span>
             <span class="tag">Hibernate 5.6</span>
+            <span class="tag">Spring Batch</span>
             <span class="tag">Jersey</span>
             <span class="tag">Angular</span>
             <span class="tag">Lucene</span>
+            <span class="tag">Kafka</span>
+            <span class="tag">Prometheus / Grafana</span>
+            <span class="tag">Terraform</span>
             <span class="tag">Dapr</span>
           </div>
           <p>
