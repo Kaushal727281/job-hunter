@@ -129,7 +129,7 @@
     }
 
     /* Experience */
-    .job { margin-bottom: 20px; }
+    .job { margin-bottom: 20px; break-inside: avoid; page-break-inside: avoid; }
     .job:last-child { margin-bottom: 0; }
     .job-top {
       display: flex;
@@ -185,9 +185,9 @@
     }
 
     /* Projects */
-    .project { margin-bottom: 16px; }
+    .project { margin-bottom: 16px; break-inside: avoid; page-break-inside: avoid; }
     .project:last-child { margin-bottom: 0; }
-    .project-header { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+    .project-header { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; break-after: avoid; page-break-after: avoid; }
     .project-name { font-weight: 700; font-size: 13.5px; color: #1a1a1a; }
     .project-role { font-size: 12px; color: #666; }
     .project-stack {
