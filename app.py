@@ -372,7 +372,7 @@ def _render_layout(job: dict, layout: str) -> str:
         date_el    = (job_div.find(class_="duration") or
                       job_div.find(class_="job-date") or
                       job_div.find(class_="job-meta"))
-        bullets    = [li.decode_contents() for li in job_div.find_all("li")]
+        bullets    = [li.decode_contents() for li in job_div.find_all("li")][:6]
         jobs.append({
             "title":   _txt(title_el),
             "company": _txt(company_el),
