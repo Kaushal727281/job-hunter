@@ -927,6 +927,31 @@ def fetch_jobs(config: dict, limit: int | None = None) -> list[dict]:
     seen_keys: set  = set()
     all_jobs: list  = []
 
+    # Build location allow-list from config: accept jobs that match any of the
+    # configured locations (Delhi NCR / Bengaluru / Remote) or are flagged remote.
+    _loc_keywords: list[str] = []
+    for loc in search_cfg.get("locations", []):
+        loc_l = loc.lower()
+        if "remote" in loc_l:
+            pass  # handled by is_remote flag below
+        elif "delhi" in loc_l or "ncr" in loc_l:
+            _loc_keywords += ["delhi", "ncr", "noida", "gurgaon", "gurugram", "faridabad", "new delhi"]
+        elif "bengaluru" in loc_l or "bangalore" in loc_l:
+            _loc_keywords += ["bengaluru", "bangalore"]
+        else:
+            # Generic: add first word of location
+            _loc_keywords.append(loc_l.split()[0])
+    _loc_keywords = list(dict.fromkeys(_loc_keywords))  # deduplicate
+
+    def _location_allowed(job: dict) -> bool:
+        """Return True if the job location matches configured locations or is remote."""
+        if job.get("is_remote"):
+            return True
+        loc = (job.get("location") or "").lower()
+        if not loc:
+            return True  # unknown location — don't filter out
+        return any(kw in loc for kw in _loc_keywords)
+
     _li_map = {
         "Delhi NCR":    "Delhi, India",
         "Remote India": "India",
@@ -942,6 +967,9 @@ def fetch_jobs(config: dict, limit: int | None = None) -> list[dict]:
         nk = _norm_key(job["title"], job["company"])
         if nk and nk in seen_keys:
             seen.add(job["id"])
+            return False
+        if not _location_allowed(job):
+            logger.debug(f"  Location filter: skipping '{job['title']}' @ {job.get('location','?')}")
             return False
         text = (job["title"] + " " + job.get("description", "")[:300]).lower()
         if any(kw in text for kw in exclude):
