@@ -85,28 +85,28 @@ def _apply_sections(soup: BeautifulSoup, modified: dict) -> BeautifulSoup:
             summary_el.clear()
             summary_el.append(new_summary)
 
-    # New ATS keywords → silently append into the last existing .skill-group's .skill-tags
+    # New ATS keywords → add as a dedicated "JD Keywords" skill group in the sidebar
     new_kw = modified.get("new_ats_keywords", [])
     if new_kw:
         sidebar = soup.find(class_="sidebar")
         if sidebar:
-            # Don't add duplicates — filter out keywords already in any .tag
+            # Don't add duplicates
             existing = {t.get_text(strip=True).lower()
                         for t in sidebar.find_all(class_="tag")}
             fresh = [k for k in new_kw if k.lower() not in existing]
             if fresh:
-                # Find the last .skill-group and append to its .skill-tags
-                skill_groups = sidebar.find_all(class_="skill-group")
-                if skill_groups:
-                    last_sg = skill_groups[-1]
-                    tags_div = last_sg.find(class_="skill-tags")
-                    if not tags_div:
-                        tags_div = soup.new_tag("div", **{"class": "skill-tags"})
-                        last_sg.append(tags_div)
-                    for kw in fresh:
-                        span = soup.new_tag("span", **{"class": "tag"})
-                        span.string = kw
-                        tags_div.append(span)
+                # Create a dedicated labeled skill-group so they're clearly visible
+                sg = soup.new_tag("div", **{"class": "skill-group"})
+                label = soup.new_tag("div", **{"class": "skill-group-label"})
+                label.string = "JD Keywords"
+                sg.append(label)
+                tags_div = soup.new_tag("div", **{"class": "skill-tags"})
+                for kw in fresh:
+                    span = soup.new_tag("span", **{"class": "tag tag-ats"})
+                    span.string = kw
+                    tags_div.append(span)
+                sg.append(tags_div)
+                sidebar.append(sg)
 
     # Old .skills-text fallback
     new_skills = modified.get("skills", "")
@@ -136,31 +136,39 @@ def _apply_sections(soup: BeautifulSoup, modified: dict) -> BeautifulSoup:
 
 def _bold_keywords(soup: BeautifulSoup, keywords: list) -> BeautifulSoup:
     """
-    Wrap every occurrence of each keyword (case-insensitive) in a
-    <strong class="ats-kw"> tag inside text content areas.
-    Skips style/script/title/existing strong/mark tags.
+    Wrap the FIRST occurrence of each keyword (case-insensitive) in a
+    <strong class="ats-kw"> tag. Each keyword is bolded exactly once.
+    Skips style/script/title/existing strong/mark/head/a tags.
     """
     if not keywords:
         return soup
 
-    # Filter out empty / whitespace-only entries
     clean = [k for k in keywords if k and k.strip()]
     if not clean:
         return soup
 
+    # Track which keywords have already been bolded (normalised to lowercase)
+    bolded: set[str] = set()
+
     # Sort longest first so multi-word phrases match before their sub-words
     kw_sorted = sorted(set(clean), key=len, reverse=True)
-    pattern   = re.compile(
-        "(" + "|".join(re.escape(k) for k in kw_sorted) + ")",
-        re.IGNORECASE,
-    )
-
     _SKIP = {"style", "script", "title", "strong", "b", "mark", "head", "a"}
 
     for node in soup.find_all(string=True):
         parent = node.parent
         if any(p.name in _SKIP for p in [parent] + list(parent.parents)):
             continue
+
+        # Build pattern from keywords not yet bolded
+        remaining = [k for k in kw_sorted if k.lower() not in bolded]
+        if not remaining:
+            break
+
+        pattern = re.compile(
+            "(" + "|".join(re.escape(k) for k in remaining) + ")",
+            re.IGNORECASE,
+        )
+
         text = str(node)
         if not pattern.search(text):
             continue
@@ -172,10 +180,11 @@ def _bold_keywords(soup: BeautifulSoup, keywords: list) -> BeautifulSoup:
         for part in parts:
             if not part:
                 continue
-            if pattern.fullmatch(part):
+            if pattern.fullmatch(part) and part.lower() not in bolded:
                 tag = soup.new_tag("strong", **{"class": "ats-kw"})
                 tag.string = part
                 node.insert_before(tag)
+                bolded.add(part.lower())   # mark as done — no more bolding for this keyword
             else:
                 node.insert_before(NavigableString(part))
         node.extract()
@@ -335,6 +344,29 @@ Return ONLY valid JSON, no markdown fences, no extra text."""
             raise ValueError(f"Groq response missing key: {key}")
     result.setdefault("cover_letter", result.get("cover_note", ""))
     result.setdefault("cover_note", "")
+
+    # Post-process cover letter — remove duplicate salutation / sign-off lines
+    cl = result.get("cover_letter", "")
+    if cl:
+        lines = cl.splitlines()
+        seen_salutation = False
+        seen_signoff    = False
+        clean_lines     = []
+        for ln in lines:
+            stripped = ln.strip()
+            is_salutation = bool(re.match(r"dear\s+hiring\s+manager", stripped, re.I))
+            is_signoff    = bool(re.match(r"(sincerely|regards|best\s+regards)[,.]?\s*$", stripped, re.I))
+            if is_salutation:
+                if seen_salutation:
+                    continue   # drop duplicate salutation
+                seen_salutation = True
+            if is_signoff:
+                if seen_signoff:
+                    continue   # drop duplicate sign-off
+                seen_signoff = True
+            clean_lines.append(ln)
+        # Also remove duplicate trailing name lines (same name appears twice at end)
+        result["cover_letter"] = "\n".join(clean_lines).strip()
 
     # Post-process summary — strip "as a [title] at [company]" phrases the model keeps adding
     company_raw = job.get("company", "").strip()
