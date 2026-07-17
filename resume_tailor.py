@@ -1,30 +1,26 @@
 """
 resume_tailor.py
-Uses Groq API (Llama 3.3 70B) to tailor the base resume for a specific job.
+Uses LLM (Groq → Gemini fallback) to tailor the base resume for a specific job.
 
-Approach: extract only the text sections that need rewriting (summary + bullet points),
-send those to Groq (~2KB), then inject the changes back into the full HTML.
-This keeps tokens well under Groq's free-tier limit (12K TPM).
+Key rotation: set GROQ_API_KEY, GROQ_API_KEY_2, GROQ_API_KEY_3 … in .env.
+When a key hits its daily limit the next one is used automatically.
+Set GEMINI_API_KEY for a final fallback (1M tokens/day free).
 """
 
-import os
 import re
 import json
-import time
 import logging
 import truststore
 from pathlib import Path
 from bs4 import BeautifulSoup, NavigableString
-from groq import Groq
 from dotenv import load_dotenv
 
 truststore.inject_into_ssl()
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-BASE_RESUME_PATH  = Path(__file__).parent / "base_resume.html"
-CONFIG_FILE       = Path(__file__).parent / "config.json"
-MODEL = "llama-3.3-70b-versatile"
+BASE_RESUME_PATH = Path(__file__).parent / "base_resume.html"
+CONFIG_FILE      = Path(__file__).parent / "config.json"
 
 
 def _candidate_name() -> str:
@@ -32,13 +28,6 @@ def _candidate_name() -> str:
         return json.loads(CONFIG_FILE.read_text(encoding="utf-8")).get("candidate", {}).get("name", "The candidate")
     except Exception:
         return "The candidate"
-
-
-def _get_client() -> Groq:
-    api_key = os.getenv("GROQ_API_KEY")
-    if not api_key:
-        raise EnvironmentError("GROQ_API_KEY not set in .env")
-    return Groq(api_key=api_key)
 
 
 def _extract_sections(soup: BeautifulSoup) -> dict:
@@ -224,7 +213,6 @@ def tailor_resume(job: dict) -> dict:
             resume_text += f"  • {b}\n"
         resume_text += "\n"
 
-    client = _get_client()
     candidate_name = _candidate_name()
 
     prompt = f"""You are an expert ATS resume optimizer helping {candidate_name} tailor their resume for a specific job. Your TWO goals:
@@ -294,35 +282,9 @@ Return ONLY valid JSON, no markdown fences, no extra text."""
     logger.info(f"Tailoring resume for: {job['title']} at {job['company']} "
                 f"(prompt ~{len(prompt)//4} tokens)")
 
-    # Retry up to 2 times on transient 429 rate-limit (short wait only; daily limit won't recover)
-    last_exc = None
-    for attempt in range(3):
-        try:
-            response = client.chat.completions.create(
-                model=MODEL,
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=6000,
-                temperature=0.5,
-            )
-            break
-        except Exception as e:
-            last_exc = e
-            err_str = str(e)
-            # If daily token limit exceeded, no point retrying
-            if "tokens per day" in err_str or "TPD" in err_str:
-                raise
-            if "429" in err_str and attempt < 2:
-                wait = 5 * (attempt + 1)
-                logger.warning(f"Groq 429 on attempt {attempt+1}, retrying in {wait}s…")
-                time.sleep(wait)
-            else:
-                raise
-    else:
-        raise last_exc  # all retries exhausted
-
-    raw = response.choices[0].message.content.strip()
-    logger.info(f"  Groq raw response length: {len(raw)} chars, "
-                f"finish_reason: {response.choices[0].finish_reason}")
+    from llm_client import chat_complete
+    raw, finish_reason = chat_complete(prompt, max_tokens=6000, temperature=0.5)
+    logger.info(f"  LLM response length: {len(raw)} chars, finish_reason: {finish_reason}")
 
     # Strip markdown fences if Groq adds them despite instructions
     if raw.startswith("```"):
