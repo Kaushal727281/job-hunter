@@ -177,11 +177,13 @@ def check_responses(applied_jobs: list[dict]) -> dict:
             seen_ids: set = set()
             responses = []
 
-            # Search by company name in FROM, SUBJECT, and BODY (catches links like workatoptum.com)
+            # Search by company name in FROM and SUBJECT only.
+            # BODY search is intentionally excluded — it causes false positives from emails
+            # that merely mention the company name in their body (e.g. LinkedIn digest emails
+            # listing "people from Microsoft/FICO searched for you").
             for criterion in [
                 f'{since_clause}FROM "{key}"',
                 f'{since_clause}SUBJECT "{key}"',
-                f'{since_clause}BODY "{key}"',
             ]:
                 try:
                     status, data = mail.search(None, criterion)

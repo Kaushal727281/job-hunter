@@ -342,11 +342,19 @@ Return ONLY valid JSON, no markdown fences, no extra text."""
     for key in ("summary", "jobs", "match_score", "key_matches"):
         if key not in result:
             raise ValueError(f"Groq response missing key: {key}")
+    # Normalise any fields that llama may return as lists instead of strings
+    for _f in ("summary", "cover_letter", "cover_note"):
+        if isinstance(result.get(_f), list):
+            result[_f] = "\n".join(str(p) for p in result[_f])
     result.setdefault("cover_letter", result.get("cover_note", ""))
     result.setdefault("cover_note", "")
 
     # Post-process cover letter — remove duplicate salutation / sign-off lines
     cl = result.get("cover_letter", "")
+    # llama models sometimes return cover_letter as a list of paragraphs — normalise to str
+    if isinstance(cl, list):
+        cl = "\n".join(str(p) for p in cl)
+        result["cover_letter"] = cl
     if cl:
         lines = cl.splitlines()
         seen_salutation = False

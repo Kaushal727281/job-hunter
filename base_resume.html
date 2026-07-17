@@ -355,6 +355,17 @@
         </div>
       </div>
 
+      <div class="skill-group">
+        <div class="skill-group-label">AI / GenAI</div>
+        <div class="skill-tags">
+          <span class="tag">LLM Integration</span>
+          <span class="tag">Prompt Engineering</span>
+          <span class="tag">RAG</span>
+          <span class="tag">Ollama</span>
+          <span class="tag">LangChain concepts</span>
+        </div>
+      </div>
+
       <div class="section-title">Education</div>
       <div class="edu-block">
         <div class="edu-degree">B.Tech – Computer Science</div>
@@ -416,6 +427,7 @@
             <li>Integrated <strong>Lucene 9.12</strong> for full-text search, <strong>Togglz</strong> for safe feature-flag rollouts, and <strong>Dapr</strong> for cloud-native microservice deployments across multi-region environments.</li>
             <li>Managed multi-module <strong>CI/CD pipelines</strong> (Ant/Ivy + Maven, Nexus/JFrog Artifactory); established consistent dependency versioning and automated build gates that reduced release failures.</li>
             <li>Authored and maintained <strong>TestNG + Selenium</strong> regression suites and E2E test harnesses, significantly improving release confidence.</li>
+            <li>Designed and optimised <strong>multithreaded, concurrent request-handling</strong> pipelines in the rule-engine server layer (thread pools, synchronised caches, connection pooling), sustaining high throughput for Fortune 500 enterprise workloads.</li>
             <li>Mentored junior and mid-level engineers through code reviews, design discussions, and pair-programming sessions.</li>
           </ul>
         </div>
@@ -447,6 +459,28 @@
             Kafka-backed event-driven intake pipeline with circuit-breaker and retry patterns for
             payments-grade reliability. Used in production by Fortune 500 banks and insurers for
             automated credit decisioning, ACH origination, fraud detection, and insurance underwriting.
+          </p>
+        </div>
+
+        <div class="project">
+          <div class="project-header">
+            <span class="project-name">Job Hunter — AI-Powered Resume Tailoring Tool</span>
+            <span class="project-role">Solo Build</span>
+          </div>
+          <div class="project-stack">
+            <span class="tag">Python / Flask</span>
+            <span class="tag">Ollama (LLM)</span>
+            <span class="tag">Prompt Engineering</span>
+            <span class="tag">RAG</span>
+            <span class="tag">BeautifulSoup</span>
+            <span class="tag">IMAP / Gmail API</span>
+          </div>
+          <p>
+            End-to-end AI job application assistant: scrapes LinkedIn/Indeed/Glassdoor/Shine,
+            uses a local LLM (llama3.1:8b via Ollama) with RAG-style prompt engineering to tailor
+            resumes and generate cover letters against each JD, scores candidate fit (1–10),
+            bolds ATS keywords in the HTML resume, and monitors Gmail for recruiter responses.
+            Demonstrates practical LLM integration, structured JSON output, and prompt design at production scale.
           </p>
         </div>
 
