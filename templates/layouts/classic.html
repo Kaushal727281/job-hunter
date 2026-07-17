@@ -6,73 +6,73 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <style>
-    @page { margin: 0.55in 0.65in; size: A4; }
+    @page { margin: 0.38in 0.55in; size: A4; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: 'Inter', Calibri, Arial, sans-serif;
-      font-size: 10.5pt;
+      font-size: 10pt;
       color: #111827;
       background: #FFFFFF;
       line-height: 1.15;
     }
 
     /* ── Header ── */
-    .header { padding-bottom: 10px; border-bottom: 1.5px solid #D1D5DB; margin-bottom: 16px; }
-    .header h1 { font-size: 26pt; font-weight: 700; color: #111827; letter-spacing: -0.4px; }
-    .header .role { font-size: 13pt; font-weight: 400; color: #374151; margin-top: 4px; }
+    .header { padding-bottom: 7px; border-bottom: 1.5px solid #D1D5DB; margin-bottom: 11px; }
+    .header h1 { font-size: 24pt; font-weight: 700; color: #111827; letter-spacing: -0.4px; }
+    .header .role { font-size: 12pt; font-weight: 400; color: #374151; margin-top: 3px; }
     .contact {
       display: flex; flex-wrap: wrap; gap: 3px 18px;
-      font-size: 9.5pt; color: #4B5563; margin-top: 7px;
+      font-size: 9pt; color: #4B5563; margin-top: 6px;
     }
     .contact a { color: #1D4ED8; text-decoration: none; }
 
     /* ── Section ── */
-    .section { margin-bottom: 18px; }
+    .section { margin-bottom: 9px; }
     .section-title {
-      font-size: 11pt; font-weight: 700;
+      font-size: 10.5pt; font-weight: 700;
       text-transform: uppercase; letter-spacing: 0.9px;
       color: #1D4ED8;
       border-bottom: 1.5px solid #D1D5DB;
-      padding-bottom: 3px; margin-bottom: 9px;
+      padding-bottom: 3px; margin-bottom: 7px;
     }
 
     /* ── Summary ── */
-    .summary-text { font-size: 10.5pt; line-height: 1.5; color: #374151; }
+    .summary-text { font-size: 10pt; line-height: 1.45; color: #374151; }
 
     /* ── Technical Skills ── */
-    .skill-groups { display: flex; flex-direction: column; gap: 5px; }
-    .skill-row { font-size: 10pt; line-height: 1.4; }
+    .skill-groups { display: flex; flex-direction: column; gap: 4px; }
+    .skill-row { font-size: 9.5pt; line-height: 1.35; }
     .skill-label { font-weight: 600; color: #111827; }
     .skill-value { color: #374151; }
 
     /* ── Experience ── */
-    .job { margin-bottom: 13px; }
+    .job { margin-bottom: 9px; }
     .job:last-child { margin-bottom: 0; }
     .job-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
-    .job-title { font-size: 11pt; font-weight: 700; color: #111827; }
-    .job-company { font-size: 10pt; color: #374151; margin-top: 1px; }
-    .job-date { font-size: 9.5pt; color: #6B7280; white-space: nowrap; flex-shrink: 0; padding-top: 1px; }
-    ul { margin: 5px 0 0 16px; padding: 0; }
-    li { font-size: 10pt; line-height: 1.45; margin-bottom: 4px; color: #374151; }
+    .job-title { font-size: 10.5pt; font-weight: 700; color: #111827; }
+    .job-company { font-size: 9.5pt; color: #374151; margin-top: 1px; }
+    .job-date { font-size: 9pt; color: #6B7280; white-space: nowrap; flex-shrink: 0; padding-top: 1px; }
+    ul { margin: 4px 0 0 15px; padding: 0; }
+    li { font-size: 9.5pt; line-height: 1.4; margin-bottom: 3px; color: #374151; }
     li::marker { color: #1D4ED8; }
 
     /* ── Projects ── */
-    .project { margin-bottom: 11px; }
+    .project { margin-bottom: 7px; }
     .project:last-child { margin-bottom: 0; }
     .project-header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-    .project-name { font-size: 10.5pt; font-weight: 700; color: #111827; }
-    .project-role { font-size: 9.5pt; color: #6B7280; white-space: nowrap; }
-    .project-stack { font-size: 9pt; color: #1D4ED8; margin: 7px 0 3px; font-weight: 500; }
-    .project-desc { font-size: 10pt; line-height: 1.45; color: #374151; }
+    .project-name { font-size: 10pt; font-weight: 700; color: #111827; }
+    .project-role { font-size: 9pt; color: #6B7280; white-space: nowrap; }
+    .project-stack { font-size: 8.5pt; color: #1D4ED8; margin: 4px 0 2px; font-weight: 500; }
+    .project-desc { font-size: 9.5pt; line-height: 1.4; color: #374151; }
 
     /* ── Education ── */
     .edu-row { display: flex; justify-content: space-between; align-items: baseline; }
-    .edu-degree { font-size: 10.5pt; font-weight: 600; color: #111827; }
-    .edu-school { font-size: 10pt; color: #374151; margin-top: 2px; }
-    .edu-date { font-size: 9.5pt; color: #6B7280; white-space: nowrap; }
+    .edu-degree { font-size: 10pt; font-weight: 600; color: #111827; }
+    .edu-school { font-size: 9.5pt; color: #374151; margin-top: 2px; }
+    .edu-date { font-size: 9pt; color: #6B7280; white-space: nowrap; }
 
     /* ── Certifications ── */
-    .cert-item { font-size: 10pt; color: #374151; margin-bottom: 4px; line-height: 1.4; }
+    .cert-item { font-size: 9.5pt; color: #374151; margin-bottom: 3px; line-height: 1.4; }
     .cert-item::before { content: "✓  "; color: #1D4ED8; font-weight: 700; }
 
     /* ── ATS keywords ── */
