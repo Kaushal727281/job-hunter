@@ -361,16 +361,16 @@
         <div class="cover-note">{{ tr.cover_note }}</div>
         {% endif %}
         {% if tr.improvement_tips %}
-        {% set done_tips = tr.improvement_tips | selectattr('startswith', 'callable') | list %}
-        {% set n_done = tr.improvement_tips | select('match', '^✓') | list | length %}
-        {% set n_todo = tr.improvement_tips | length - n_done %}
+        {% set n_done = namespace(v=0) %}
+        {% for tip in tr.improvement_tips %}{% if tip[:1] == '✓' %}{% set n_done.v = n_done.v + 1 %}{% endif %}{% endfor %}
+        {% set n_todo = tr.improvement_tips | length - n_done.v %}
         <details class="tips-box" style="margin-top:8px">
           <summary style="font-size:11.5px;font-weight:700;cursor:pointer;user-select:none;list-style:none;display:flex;align-items:center;gap:6px">
             {% if n_todo == 0 %}
               <span style="color:#2e7d32">✅ All tips implemented</span>
             {% else %}
               <span style="color:#e65100">💡</span>
-              <span style="color:#2e7d32">{{ n_done }} done</span>
+              <span style="color:#2e7d32">{{ n_done.v }} done</span>
               <span style="color:#aaa">·</span>
               <span style="color:#c62828">{{ n_todo }} to fix</span>
             {% endif %}

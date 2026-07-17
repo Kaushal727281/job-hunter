@@ -110,19 +110,28 @@ def _apply_sections(soup: BeautifulSoup, modified: dict) -> BeautifulSoup:
             # Collect original bullets before clearing, so we can restore any the model dropped
             orig_bullets = [li.get_text(" ", strip=True) for li in ul.find_all("li")]
             ul.clear()
-            written = set()
+            written_texts: list[str] = []
             for b in new_bullets:
                 li = soup.new_tag("li")
                 li.string = b
                 ul.append(li)
-                written.add(b.strip().lower()[:60])
-            # Re-append any original bullets the model silently dropped
+                written_texts.append(b.strip().lower())
+            # Re-append originals only when the model clearly dropped them (no similar bullet written)
+            # Uses difflib similarity so rewrites of the same bullet don't get duplicated
+            import difflib
             for orig in orig_bullets:
-                key = orig.strip().lower()[:60]
-                if key and key not in written:
+                orig_low = orig.strip().lower()
+                if not orig_low:
+                    continue
+                already_covered = any(
+                    difflib.SequenceMatcher(None, orig_low, w).ratio() > 0.5
+                    for w in written_texts
+                )
+                if not already_covered:
                     li = soup.new_tag("li")
                     li.string = orig
                     ul.append(li)
+                    written_texts.append(orig_low)
 
     return soup
 
@@ -381,7 +390,7 @@ as plain tips.
 
 6. **COVER_NOTE**: 1-2 sentence teaser (for dashboard preview) summarising why this is a strong match.
 
-7. **IMPROVEMENT_TIPS**: Identify 3-5 specific, actionable gaps between the JD requirements and this candidate's resume. Each tip should be a short, direct suggestion (1 sentence max) that would increase the candidate's chances — e.g. "Add hands-on RabbitMQ experience to a bullet", "Mention AWS deployment explicitly", "Include HLD/LLD design experience". Be honest and specific; do not repeat things already present.
+7. **IMPROVEMENT_TIPS**: Identify 3-5 specific, actionable gaps between the JD requirements and the TAILORED resume you just wrote (the bullets[] you returned above). Each tip must be a short, direct suggestion (1 sentence max). IMPORTANT: Do NOT suggest adding something that is already present in the bullets you returned. For example, if a bullet you wrote mentions "AWS", do not suggest "Mention AWS explicitly". Only list genuine remaining gaps — things the JD asks for that are NOT covered anywhere in the bullets[] you returned.
 
 Return ONLY valid JSON with this exact structure:
 {{
