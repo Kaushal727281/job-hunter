@@ -251,7 +251,13 @@ Location: {job['location']} {'(Remote)' if job.get('is_remote') else ''}
    - BAD example: "...seeking a role as Full Stack Engineer at Deutsche Bank"
    - GOOD example: "...bringing 7 years of enterprise Java expertise and a proven record of delivering scalable solutions."
 
-2. **NEW_ATS_KEYWORDS**: List up to 8 keywords/phrases from the JD that are NOT yet in the candidate's skills but the candidate genuinely has based on their experience (e.g. if JD says "Agile" and resume shows sprint/scrum work, include it). Return as a JSON array of short strings.
+2. **NEW_ATS_KEYWORDS**: List up to 15 keywords/phrases from the JD that are NOT already in the candidate's skills section. Be INCLUSIVE for ATS coverage — apply these rules:
+   - If the JD names a tool/framework in the same family as one the candidate uses, include it (e.g. JD says "IBM WebSphere MQ" → candidate has Kafka → include "IBM WebSphere MQ")
+   - If the JD names a methodology/concept the candidate would routinely apply (SDLC, Agile, CI/CD, unit testing, SQL), include it even if not spelled out in the resume
+   - If the JD names a testing framework (JUnit, SpecFlow, Karate, Mockito) and candidate does Java/backend development, include it
+   - Include domain terms (RESTful Web Services, NoSQL, Generative AI, microservices) that apply to the candidate's stack
+   - NEVER invent specialised products (e.g. a specific cloud product) the candidate has no exposure to
+   Return as a JSON array of short strings (tool names, frameworks, buzzwords — not full sentences).
 
 3. **JOBS – bullets**: For each role rewrite bullets to:
    - Put the most JD-relevant bullets first
