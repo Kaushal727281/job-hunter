@@ -6,35 +6,35 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <style>
-    @page { margin: 0.55in 0.65in; size: A4; }
+    @page { margin: 0.38in 0.55in; size: A4; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: 'Source Sans 3', 'Source Sans Pro', 'Segoe UI', Arial, sans-serif;
-      font-size: 11pt;
+      font-size: 10pt;
       color: #1E293B;
       background: #FFFFFF;
-      line-height: 1.2;
+      line-height: 1.15;
     }
 
     /* ── Header ── */
-    .header { margin-bottom: 18px; padding-bottom: 14px; border-bottom: 2px solid #0EA5E9; }
+    .header { margin-bottom: 11px; padding-bottom: 8px; border-bottom: 2px solid #0EA5E9; }
     .header h1 {
       font-family: 'Merriweather', Georgia, serif;
-      font-size: 32pt; font-weight: 700;
+      font-size: 26pt; font-weight: 700;
       color: #1E293B; letter-spacing: -0.5px; line-height: 1.1;
     }
     .header .role {
       font-family: 'Merriweather', Georgia, serif;
-      font-size: 13pt; font-weight: 400;
-      color: #0EA5E9; margin-top: 5px; font-style: italic;
+      font-size: 11pt; font-weight: 400;
+      color: #0EA5E9; margin-top: 3px; font-style: italic;
     }
     .header .tagline {
-      font-size: 10.5pt; color: #64748B;
-      margin-top: 6px; line-height: 1.5;
+      font-size: 9.5pt; color: #64748B;
+      margin-top: 4px; line-height: 1.4;
     }
     .contact {
-      display: flex; flex-wrap: wrap; gap: 4px 20px;
-      font-size: 10pt; color: #64748B; margin-top: 9px;
+      display: flex; flex-wrap: wrap; gap: 3px 18px;
+      font-size: 9pt; color: #64748B; margin-top: 5px;
     }
     .contact a { color: #0EA5E9; text-decoration: none; }
 
@@ -42,68 +42,68 @@
     .expertise-bar {
       background: #F1F5F9;
       border-left: 4px solid #0EA5E9;
-      padding: 8px 14px; margin-bottom: 20px;
-      font-size: 10.5pt; color: #1E293B;
-      display: flex; flex-wrap: wrap; gap: 4px 0;
+      padding: 5px 10px; margin-bottom: 10px;
+      font-size: 9.5pt; color: #1E293B;
+      display: flex; flex-wrap: wrap; gap: 3px 0;
     }
-    .expertise-item { padding: 0 12px; border-right: 1px solid #CBD5E1; }
+    .expertise-item { padding: 0 10px; border-right: 1px solid #CBD5E1; }
     .expertise-item:first-child { padding-left: 0; }
     .expertise-item:last-child { border-right: none; }
 
     /* ── Section ── */
-    .section { margin-bottom: 20px; }
+    .section { margin-bottom: 10px; }
     .section:last-child { margin-bottom: 0; }
     .section-title {
       font-family: 'Merriweather', Georgia, serif;
-      font-size: 13pt; font-weight: 700;
+      font-size: 11pt; font-weight: 700;
       color: #1E293B;
       border-bottom: 1.5px solid #0EA5E9;
-      padding-bottom: 4px; margin-bottom: 11px;
+      padding-bottom: 3px; margin-bottom: 7px;
     }
 
     /* ── Summary ── */
-    .summary-text { font-size: 11pt; line-height: 1.65; color: #475569; }
+    .summary-text { font-size: 10pt; line-height: 1.45; color: #475569; }
 
     /* ── Technical Skills ── */
-    .skill-groups { display: flex; flex-direction: column; gap: 5px; }
-    .skill-row { font-size: 10.5pt; line-height: 1.4; }
+    .skill-groups { display: flex; flex-direction: column; gap: 4px; }
+    .skill-row { font-size: 9.5pt; line-height: 1.35; }
     .skill-label { font-weight: 700; color: #1E293B; }
     .skill-value { color: #475569; }
 
     /* ── Experience ── */
-    .job { margin-bottom: 15px; }
+    .job { margin-bottom: 9px; }
     .job:last-child { margin-bottom: 0; }
-    .job-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+    .job-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
     .job-title {
       font-family: 'Merriweather', Georgia, serif;
-      font-size: 12pt; font-weight: 700; color: #1E293B;
+      font-size: 10.5pt; font-weight: 700; color: #1E293B;
     }
-    .job-company { font-size: 10.5pt; color: #0EA5E9; margin-top: 2px; font-weight: 500; }
-    .job-date { font-size: 10pt; color: #64748B; white-space: nowrap; flex-shrink: 0; padding-top: 2px; }
-    ul { margin: 6px 0 0 18px; padding: 0; }
-    li { font-size: 10.5pt; line-height: 1.55; margin-bottom: 5px; color: #475569; }
+    .job-company { font-size: 9.5pt; color: #0EA5E9; margin-top: 1px; font-weight: 500; }
+    .job-date { font-size: 9pt; color: #64748B; white-space: nowrap; flex-shrink: 0; padding-top: 1px; }
+    ul { margin: 4px 0 0 15px; padding: 0; }
+    li { font-size: 9.5pt; line-height: 1.4; margin-bottom: 3px; color: #475569; }
     li::marker { color: #0EA5E9; }
 
     /* ── Projects ── */
-    .project { margin-bottom: 12px; }
+    .project { margin-bottom: 7px; }
     .project:last-child { margin-bottom: 0; }
     .project-header { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
     .project-name {
       font-family: 'Merriweather', Georgia, serif;
-      font-size: 11pt; font-weight: 700; color: #1E293B;
+      font-size: 10pt; font-weight: 700; color: #1E293B;
     }
-    .project-role { font-size: 10pt; color: #64748B; white-space: nowrap; font-style: italic; }
-    .project-stack { font-size: 9.5pt; color: #0EA5E9; margin: 7px 0 3px; font-weight: 500; }
-    .project-desc { font-size: 10.5pt; line-height: 1.55; color: #475569; }
+    .project-role { font-size: 9pt; color: #64748B; white-space: nowrap; font-style: italic; }
+    .project-stack { font-size: 9pt; color: #0EA5E9; margin: 4px 0 2px; font-weight: 500; }
+    .project-desc { font-size: 9.5pt; line-height: 1.4; color: #475569; }
 
     /* ── Education ── */
     .edu-row { display: flex; justify-content: space-between; align-items: baseline; }
-    .edu-degree { font-size: 11pt; font-weight: 600; color: #1E293B; }
-    .edu-school { font-size: 10.5pt; color: #64748B; margin-top: 2px; font-style: italic; }
-    .edu-date { font-size: 10pt; color: #64748B; white-space: nowrap; }
+    .edu-degree { font-size: 10pt; font-weight: 600; color: #1E293B; }
+    .edu-school { font-size: 9.5pt; color: #64748B; margin-top: 2px; font-style: italic; }
+    .edu-date { font-size: 9pt; color: #64748B; white-space: nowrap; }
 
     /* ── Certifications ── */
-    .cert-item { font-size: 10.5pt; color: #475569; margin-bottom: 5px; line-height: 1.4; }
+    .cert-item { font-size: 9.5pt; color: #475569; margin-bottom: 3px; line-height: 1.4; }
     .cert-item::before { content: "✓  "; color: #0EA5E9; font-weight: 700; }
 
     /* ── ATS keywords ── */

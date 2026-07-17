@@ -6,90 +6,90 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"/>
   <style>
-    @page { margin: 0.5in 0.6in; size: A4; }
+    @page { margin: 0.38in 0.55in; size: A4; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: 'IBM Plex Sans', 'Segoe UI', Arial, sans-serif;
-      font-size: 10.5pt;
+      font-size: 10pt;
       color: #111827;
       background: #FFFFFF;
-      line-height: 1.2;
+      line-height: 1.15;
     }
 
     /* ── Header ── */
-    .header { margin-bottom: 18px; }
+    .header { margin-bottom: 11px; }
     .header h1 {
       font-size: 24pt; font-weight: 700; color: #111827; letter-spacing: -0.3px;
     }
-    .header .role { font-size: 12pt; color: #6B7280; margin-top: 3px; font-weight: 400; }
+    .header .role { font-size: 11pt; color: #6B7280; margin-top: 2px; font-weight: 400; }
     .header .tagline {
       font-family: 'IBM Plex Mono', monospace;
-      font-size: 10pt; color: #22C55E;
-      margin-top: 6px; letter-spacing: 0.2px;
+      font-size: 9pt; color: #22C55E;
+      margin-top: 4px; letter-spacing: 0.2px;
     }
     .contact {
       display: flex; flex-wrap: wrap; gap: 3px 16px;
-      font-size: 9.5pt; color: #6B7280; margin-top: 8px;
-      border-top: 1px solid #E5E7EB; padding-top: 7px;
+      font-size: 9pt; color: #6B7280; margin-top: 6px;
+      border-top: 1px solid #E5E7EB; padding-top: 5px;
     }
     .contact a { color: #111827; text-decoration: none; border-bottom: 1px solid #22C55E; }
 
     /* ── Section ── */
-    .section { margin-bottom: 18px; }
+    .section { margin-bottom: 9px; }
     .section-title {
-      font-size: 10.5pt; font-weight: 700;
+      font-size: 10pt; font-weight: 700;
       text-transform: uppercase; letter-spacing: 1.2px;
       color: #22C55E;
       border-bottom: 1.5px solid #22C55E;
-      padding-bottom: 3px; margin-bottom: 9px;
+      padding-bottom: 3px; margin-bottom: 7px;
     }
 
     /* ── Summary ── */
-    .summary-text { font-size: 10.5pt; line-height: 1.55; color: #374151; }
+    .summary-text { font-size: 10pt; line-height: 1.45; color: #374151; }
 
     /* ── Technical Skills – category style ── */
-    .skill-groups { display: flex; flex-direction: column; gap: 5px; }
-    .skill-row { font-size: 10pt; line-height: 1.4; }
+    .skill-groups { display: flex; flex-direction: column; gap: 4px; }
+    .skill-row { font-size: 9.5pt; line-height: 1.35; }
     .skill-label {
       font-family: 'IBM Plex Mono', monospace;
-      font-weight: 500; font-size: 9.5pt;
+      font-weight: 500; font-size: 9pt;
       color: #22C55E; margin-right: 4px;
     }
     .skill-value { color: #374151; }
 
     /* ── Experience ── */
-    .job { margin-bottom: 13px; }
+    .job { margin-bottom: 9px; }
     .job:last-child { margin-bottom: 0; }
     .job-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
-    .job-title { font-size: 11pt; font-weight: 700; color: #111827; }
-    .job-meta { font-size: 10pt; color: #6B7280; margin-top: 1px; }
-    .job-date { font-size: 9.5pt; color: #6B7280; white-space: nowrap; flex-shrink: 0; }
-    ul { margin: 5px 0 0 16px; padding: 0; }
-    li { font-size: 10pt; line-height: 1.5; margin-bottom: 4px; color: #374151; }
+    .job-title { font-size: 10.5pt; font-weight: 700; color: #111827; }
+    .job-meta { font-size: 9.5pt; color: #6B7280; margin-top: 1px; }
+    .job-date { font-size: 9pt; color: #6B7280; white-space: nowrap; flex-shrink: 0; }
+    ul { margin: 4px 0 0 15px; padding: 0; }
+    li { font-size: 9.5pt; line-height: 1.4; margin-bottom: 3px; color: #374151; }
     li::marker { color: #22C55E; }
 
     /* ── Projects ── */
-    .project { margin-bottom: 11px; }
+    .project { margin-bottom: 7px; }
     .project:last-child { margin-bottom: 0; }
     .project-header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-    .project-name { font-size: 10.5pt; font-weight: 700; color: #111827; }
-    .project-role { font-size: 9.5pt; color: #6B7280; white-space: nowrap; }
+    .project-name { font-size: 10pt; font-weight: 700; color: #111827; }
+    .project-role { font-size: 9pt; color: #6B7280; white-space: nowrap; }
     .project-stack {
       font-family: 'IBM Plex Mono', monospace;
       font-size: 8.5pt; color: #22C55E;
-      margin: 7px 0 3px; font-weight: 500;
+      margin: 4px 0 2px; font-weight: 500;
     }
-    .project-desc { font-size: 10pt; line-height: 1.5; color: #374151; }
+    .project-desc { font-size: 9.5pt; line-height: 1.4; color: #374151; }
 
     /* ── Education ── */
     .edu-row { display: flex; justify-content: space-between; align-items: baseline; }
-    .edu-degree { font-size: 10.5pt; font-weight: 600; color: #111827; }
-    .edu-school { font-size: 10pt; color: #6B7280; margin-top: 2px; }
-    .edu-date { font-size: 9.5pt; color: #6B7280; }
+    .edu-degree { font-size: 10pt; font-weight: 600; color: #111827; }
+    .edu-school { font-size: 9.5pt; color: #6B7280; margin-top: 2px; }
+    .edu-date { font-size: 9pt; color: #6B7280; }
 
     /* ── Certifications ── */
     .cert-item {
-      font-size: 10pt; color: #374151; margin-bottom: 4px;
+      font-size: 9.5pt; color: #374151; margin-bottom: 3px;
       line-height: 1.4; padding-left: 14px; position: relative;
     }
     .cert-item::before { content: "▸"; color: #22C55E; position: absolute; left: 0; font-weight: 700; }
