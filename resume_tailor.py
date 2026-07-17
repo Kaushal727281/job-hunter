@@ -277,6 +277,8 @@ Location: {job['location']} {'(Remote)' if job.get('is_remote') else ''}
 
 6. **COVER_NOTE**: 1-2 sentence teaser (for dashboard preview) summarising why this is a strong match.
 
+7. **IMPROVEMENT_TIPS**: Identify 3-5 specific, actionable gaps between the JD requirements and this candidate's resume. Each tip should be a short, direct suggestion (1 sentence max) that would increase the candidate's chances — e.g. "Add hands-on RabbitMQ experience to a bullet", "Mention AWS deployment explicitly", "Include HLD/LLD design experience". Be honest and specific; do not repeat things already present.
+
 Return ONLY valid JSON with this exact structure:
 {{
   "summary": "<new summary>",
@@ -288,7 +290,8 @@ Return ONLY valid JSON with this exact structure:
   "cover_note": "<1-2 sentence teaser>",
   "match_score": <1-10>,
   "key_matches": ["skill1", "skill2", "skill3", "skill4", "skill5"],
-  "bold_keywords": ["Spring Boot", "microservices", "Java 8", "REST APIs", "Kafka"]
+  "bold_keywords": ["Spring Boot", "microservices", "Java 8", "REST APIs", "Kafka"],
+  "improvement_tips": ["tip1", "tip2", "tip3"]
 }}
 
 Return ONLY valid JSON, no markdown fences, no extra text."""
@@ -412,13 +415,15 @@ Return ONLY valid JSON, no markdown fences, no extra text."""
     result["summary"] = summary
 
     result.setdefault("new_ats_keywords", [])
+    result.setdefault("improvement_tips", [])
 
     # Strip markdown ** wrapping that local models (llama) sometimes add to keywords
     def _strip_md(lst):
         return [re.sub(r"^\*+|\*+$", "", k).strip() for k in lst if k]
 
-    result["new_ats_keywords"] = _strip_md(result["new_ats_keywords"])
-    result["key_matches"]      = _strip_md(result.get("key_matches", []))
+    result["new_ats_keywords"]  = _strip_md(result["new_ats_keywords"])
+    result["key_matches"]       = _strip_md(result.get("key_matches", []))
+    result["improvement_tips"]  = _strip_md(result.get("improvement_tips", []))
 
     # bold_keywords = explicit list from model, else fall back to key_matches
     raw_bold = _strip_md(result.get("bold_keywords") or [])

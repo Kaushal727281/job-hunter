@@ -83,22 +83,70 @@ def _bg_fetch():
         _fetch_status = {"running": False, "message": f"Error: {e}", "last_run": None}
 
 
+def _suggest_layout(job: dict) -> tuple[str, str]:
+    """
+    Return (layout_name, reason) — the best PDF layout for this job/company.
+    Rule-based: no extra LLM call needed.
+    """
+    company   = (job.get("company") or "").lower()
+    title     = (job.get("title")   or "").lower()
+    desc      = (job.get("description") or "").lower()
+    cotype    = (job.get("company_type") or "").lower()
+    combined  = company + " " + title + " " + desc[:500]
+
+    _BANKS    = ("jpmorgan","goldman","barclays","bnp","hsbc","morgan stanley","wells fargo",
+                 "citibank","deutsche bank","bank of america","credit suisse","ubs","nomura",
+                 "macquarie","rbc","td bank","visa","mastercard","american express","fidelity")
+    _FAANG    = ("google","amazon","meta","apple","microsoft","netflix","uber","airbnb","stripe",
+                 "shopify","atlassian","salesforce","twilio","datadog","snowflake","mongodb",
+                 "confluent","elastic","hashicorp","gitlab","github","dropbox","figma","notion")
+    _STARTUPS = ("startup","series a","series b","seed","y combinator","ycombinator","techstars")
+
+    if any(k in combined for k in _BANKS):
+        return ("classic", "Finance/banking roles — ATS-safe Classic B&W preferred by bank HR systems")
+    if any(k in combined for k in _FAANG):
+        return ("tech", "FAANG/tech product company — minimal Tech layout preferred by engineering teams")
+    if any(k in combined for k in _STARTUPS):
+        return ("modern", "Startup — Modern Sidebar stands out with visual hierarchy")
+    if cotype == "service":
+        return ("compact", "Consulting/service firm — Compact 2-column fits more detail per page")
+    # Default for product companies
+    return ("modern", "Product company — Modern Sidebar balances visual appeal with structure")
+
+
 def _bg_tailor(job_id: str, prev_result: dict = None, prev_pdf: str = None):
     """
-    Run tailor in background. prev_result/prev_pdf are the values cleared before
-    starting so we can restore them if something goes wrong.
+    Run tailor in background. Retries up to 3× until match_score >= 8.
+    prev_result/prev_pdf are the values cleared before starting so we can restore if something goes wrong.
     """
+    MAX_ATTEMPTS = 3
+    TARGET_SCORE = 8
+
     try:
         job = job_store.get_job(job_id)
         if not job:
             return
-        # Get full JD first
+        # Get full JD once
         from job_fetcher import fetch_full_jd
         full_desc = fetch_full_jd(job)
         job_with_desc = {**job, "description": full_desc}
 
         from resume_tailor import tailor_resume
-        result = tailor_resume(job_with_desc)
+        result = None
+        for attempt in range(1, MAX_ATTEMPTS + 1):
+            if attempt > 1:
+                logger.info(f"  Retry {attempt}/{MAX_ATTEMPTS} — score was {result.get('match_score',0)}/10, targeting {TARGET_SCORE}+")
+                job_store.update_job(job_id, tailor_error=f"Score {result['match_score']}/10 — retrying (attempt {attempt}/{MAX_ATTEMPTS})…")
+            result = tailor_resume(job_with_desc)
+            score = result.get("match_score", 0) or 0
+            logger.info(f"  Attempt {attempt}: match_score={score}/10")
+            if score >= TARGET_SCORE:
+                break
+
+        # Attach layout suggestion
+        layout, layout_reason = _suggest_layout(job)
+        result["layout_suggestion"] = layout
+        result["layout_reason"]     = layout_reason
 
         # Save tailored resume HTML + cover note
         from pdf_generator import save_and_convert
@@ -113,7 +161,7 @@ def _bg_tailor(job_id: str, prev_result: dict = None, prev_pdf: str = None):
             description=full_desc,
             tailor_error=None,
         )
-        logger.info(f"Tailored: {job['title']} @ {job['company']} — score {result.get('match_score')}/10")
+        logger.info(f"Tailored: {job['title']} @ {job['company']} — score {result.get('match_score')}/10 | layout: {layout}")
 
     except Exception as e:
         logger.exception(f"Tailor failed for {job_id}")
@@ -196,7 +244,9 @@ def tailor_status(job_id):
     job = job_store.get_job(job_id)
     done  = bool(job and job.get("tailor_result"))
     error = job.get("tailor_error") if job else None
-    return jsonify({"running": running, "done": done, "error": error})
+    # Surface retry message during polling (tailor_error is set to retry notice mid-run)
+    msg = error if (running and error and "retrying" in (error or "")) else None
+    return jsonify({"running": running, "done": done, "error": None if done else error, "message": msg})
 
 
 @app.route("/score/<job_id>", methods=["POST"])

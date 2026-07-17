@@ -346,7 +346,11 @@
           <div class="score-badge {% if score >= 7 %}score-high{% elif score >= 5 %}score-mid{% else %}score-low{% endif %}">
             {{ score }}
           </div>
-          <div class="score-label">Match score<br><strong>{{ score }}/10</strong></div>
+          <div class="score-label">Match score<br><strong>{{ score }}/10</strong>
+            {% if tr.layout_suggestion %}
+            <br><span style="font-size:10px;color:#888">Suggested layout: <strong style="color:#0d47a1">{{ tr.layout_suggestion|title }}</strong></span>
+            {% endif %}
+          </div>
         </div>
         {% if tr.key_matches %}
         <div class="tags">
@@ -355,6 +359,18 @@
         {% endif %}
         {% if tr.cover_note %}
         <div class="cover-note">{{ tr.cover_note }}</div>
+        {% endif %}
+        {% if tr.improvement_tips %}
+        <details class="tips-box" style="margin-top:8px">
+          <summary style="font-size:11.5px;font-weight:700;color:#e65100;cursor:pointer;user-select:none;list-style:none;display:flex;align-items:center;gap:5px">
+            <span>💡</span><span>{{ tr.improvement_tips|length }} improvement tip{{ 's' if tr.improvement_tips|length > 1 else '' }}</span>
+          </summary>
+          <ul style="margin:6px 0 0 4px;padding-left:14px;font-size:11.5px;color:#555;line-height:1.7">
+            {% for tip in tr.improvement_tips %}
+            <li>{{ tip }}</li>
+            {% endfor %}
+          </ul>
+        </details>
         {% endif %}
       {% else %}
         {% if fit %}
@@ -382,15 +398,16 @@
         <a href="/diff/{{ job.id }}" target="_blank" class="btn-sm btn-secondary">🔍 Diff</a>
         <a href="/cover/{{ job.id }}" target="_blank" class="btn-sm" style="background:#e8f5e9;color:#1b5e20;border:1.5px solid #a5d6a7">📝 Cover Letter</a>
         {% if job.pdf_path %}
+        {% set suggested = tr.layout_suggestion or 'modern' %}
         <div class="pdf-split" id="pdf-split-{{ job.id }}">
           <button class="btn-sm btn-secondary" onclick="togglePdfDropdown('{{ job.id }}')">⬇ PDF ▾</button>
           <div class="pdf-dropdown">
             <a href="/pdf/{{ job.id }}" target="_blank" style="font-weight:700;color:#0d47a1">⭐ Original (as previewed)</a>
-            <a href="/pdf/{{ job.id }}/classic"   target="_blank">Classic B&amp;W</a>
-            <a href="/pdf/{{ job.id }}/modern"    target="_blank">Modern Sidebar</a>
-            <a href="/pdf/{{ job.id }}/tech"      target="_blank">Tech / FAANG</a>
-            <a href="/pdf/{{ job.id }}/executive" target="_blank">Executive</a>
-            <a href="/pdf/{{ job.id }}/compact"   target="_blank">Compact</a>
+            <a href="/pdf/{{ job.id }}/classic"   target="_blank" {% if suggested=='classic'   %}style="font-weight:700;color:#2e7d32;background:#e8f5e9"{% endif %}>Classic B&amp;W{% if suggested=='classic'   %} ★ Recommended{% endif %}</a>
+            <a href="/pdf/{{ job.id }}/modern"    target="_blank" {% if suggested=='modern'    %}style="font-weight:700;color:#2e7d32;background:#e8f5e9"{% endif %}>Modern Sidebar{% if suggested=='modern'    %} ★ Recommended{% endif %}</a>
+            <a href="/pdf/{{ job.id }}/tech"      target="_blank" {% if suggested=='tech'      %}style="font-weight:700;color:#2e7d32;background:#e8f5e9"{% endif %}>Tech / FAANG{% if suggested=='tech'      %} ★ Recommended{% endif %}</a>
+            <a href="/pdf/{{ job.id }}/executive" target="_blank" {% if suggested=='executive' %}style="font-weight:700;color:#2e7d32;background:#e8f5e9"{% endif %}>Executive{% if suggested=='executive' %} ★ Recommended{% endif %}</a>
+            <a href="/pdf/{{ job.id }}/compact"   target="_blank" {% if suggested=='compact'   %}style="font-weight:700;color:#2e7d32;background:#e8f5e9"{% endif %}>Compact{% if suggested=='compact'   %} ★ Recommended{% endif %}</a>
           </div>
         </div>
         {% endif %}
@@ -427,7 +444,7 @@
     <div class="ov-spinner"></div>
     <div class="ov-success">✅</div>
     <h3 id="ov-title">Tailoring Resume…</h3>
-    <p id="ov-msg">AI is analysing the job description and rewriting your resume.<br>This usually takes 20–40 seconds. Please wait.</p>
+    <p id="ov-msg">AI is analysing the job description and rewriting your resume.<br>This usually takes 20–60 seconds. Retrying if score &lt; 8.</p>
   </div>
 </div>
 
@@ -528,14 +545,15 @@ function pollFetch(){
   }, 2000);
 }
 
-function _showTailorOverlay(title, company){
+function _showTailorOverlay(title, company, extraMsg){
   const box = document.getElementById('tailor-overlay-box');
   box.classList.remove('done');
   document.getElementById('ov-title').textContent = 'Tailoring Resume…';
   document.getElementById('ov-msg').innerHTML =
     `<strong>${title}</strong> @ <strong>${company}</strong><br><br>`+
     `AI is analysing the job description and rewriting your resume.<br>`+
-    `This usually takes 20–40 seconds — please wait.`;
+    `Retries up to 3× until score ≥ 8. This takes 20–90 seconds.`+
+    (extraMsg ? `<br><br><span style="color:#e65100;font-weight:600">${extraMsg}</span>` : '');
   document.getElementById('tailor-overlay').classList.add('active');
 }
 
@@ -571,6 +589,10 @@ function pollTailor(jobId, title, company){
   company = company || '';
   const timer = setInterval(()=>{
     fetch('/tailor-status/'+jobId).then(r=>r.json()).then(d=>{
+      // Show retry notice mid-run (server sets message field during retries)
+      if(d.running && d.message && d.message.includes('retrying')){
+        _showTailorOverlay(title, company, '🔄 '+d.message);
+      }
       if(d.done){
         clearInterval(timer);
         _showTailorSuccess(title, company);
