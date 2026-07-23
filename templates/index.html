@@ -181,6 +181,43 @@
     .current-resume-info{background:#f0f4ff;border-radius:8px;padding:12px 15px;font-size:13px}
     .current-resume-info strong{color:#0d47a1}
 
+    /* ── Outreach Modal ── */
+    #outreach-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1100;
+                      align-items:center;justify-content:center}
+    #outreach-overlay.open{display:flex}
+    #outreach-modal{background:#fff;border-radius:12px;width:min(600px,95vw);max-height:88vh;
+                    overflow:hidden;box-shadow:0 12px 48px rgba(0,0,0,.28);
+                    display:flex;flex-direction:column}
+    #outreach-modal-head{padding:14px 20px;border-bottom:1px solid #eee;display:flex;
+                         align-items:center;justify-content:space-between;flex-shrink:0}
+    #outreach-modal-head h3{font-size:15px;font-weight:700;color:#0d47a1}
+    #outreach-modal-close{border:none;background:none;font-size:20px;cursor:pointer;color:#999}
+    .outreach-tabs{display:flex;border-bottom:1.5px solid #e8edf5;flex-shrink:0}
+    .outreach-tab{flex:1;padding:10px 6px;font-size:12.5px;font-weight:600;border:none;
+                  background:none;cursor:pointer;color:#888;border-bottom:2.5px solid transparent;
+                  transition:.15s;margin-bottom:-1.5px}
+    .outreach-tab.active{color:#0d47a1;border-bottom-color:#0d47a1}
+    .outreach-panel{display:none;padding:16px 20px;overflow-y:auto;flex:1}
+    .outreach-panel.active{display:flex;flex-direction:column;gap:10px}
+    .outreach-label{font-size:11px;font-weight:700;text-transform:uppercase;
+                    letter-spacing:.7px;color:#999;margin-bottom:4px}
+    .outreach-box{background:#f8fafd;border:1.5px solid #dde6f3;border-radius:8px;
+                  padding:12px 14px;font-size:13px;color:#1e1e1e;white-space:pre-wrap;
+                  line-height:1.6;max-height:220px;overflow-y:auto;word-break:break-word}
+    .outreach-char-count{font-size:11px;color:#aaa;text-align:right;margin-top:3px}
+    .outreach-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:2px}
+    .btn-copy{padding:6px 14px;font-size:12px;font-weight:600;border-radius:6px;
+              background:#e8f0fb;color:#0d47a1;border:1.5px solid #c7d5e8;cursor:pointer}
+    .btn-copy:hover{background:#c7d5e8}
+    .btn-copy.copied{background:#e8f5e9;color:#1b5e20;border-color:#a5d6a7}
+    .btn-mailto{padding:6px 14px;font-size:12px;font-weight:600;border-radius:6px;
+                background:#0d47a1;color:#fff;border:none;cursor:pointer;text-decoration:none;display:inline-block}
+    .btn-mailto:hover{background:#1565c0}
+    .hr-email-row{display:flex;align-items:center;justify-content:space-between;gap:8px;
+                  background:#f8fafd;border:1.5px solid #dde6f3;border-radius:7px;padding:9px 13px}
+    .hr-email-addr{font-size:13px;color:#1e1e1e;font-family:monospace}
+    .hr-email-note{font-size:11.5px;color:#aaa;margin-top:8px;line-height:1.5}
+
     /* ── Response Modal ── */
     #resp-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;
                          align-items:center;justify-content:center}
@@ -417,6 +454,7 @@
         <button class="btn-sm btn-primary" onclick="window.location='/job/{{ job.id }}'">📄 View Resume</button>
         <a href="/diff/{{ job.id }}" target="_blank" class="btn-sm btn-secondary">🔍 Diff</a>
         <a href="/cover/{{ job.id }}" target="_blank" class="btn-sm" style="background:#e8f5e9;color:#1b5e20;border:1.5px solid #a5d6a7">📝 Cover Letter</a>
+        <button class="btn-sm" style="background:#fce4ec;color:#880e4f;border:1.5px solid #f48fb1" onclick="openOutreach('{{ job.id }}')">📨 Outreach</button>
         {% if job.pdf_path %}
         {% set suggested = tr.layout_suggestion or 'modern' %}
         <div class="pdf-split" id="pdf-split-{{ job.id }}">
@@ -457,6 +495,56 @@
 {% endif %}
 
 <div id="toast"></div>
+
+<!-- Outreach Modal -->
+<div id="outreach-overlay" onclick="closeOutreach(event)">
+  <div id="outreach-modal">
+    <div id="outreach-modal-head">
+      <h3 id="outreach-modal-title">📨 Outreach</h3>
+      <button id="outreach-modal-close" onclick="closeOutreach()">✕</button>
+    </div>
+    <div class="outreach-tabs">
+      <button class="outreach-tab active" onclick="switchOutreachTab(0,this)">📣 LinkedIn InMail</button>
+      <button class="outreach-tab" onclick="switchOutreachTab(1,this)">📧 Cold Email</button>
+      <button class="outreach-tab" onclick="switchOutreachTab(2,this)">🏢 HR Emails</button>
+    </div>
+    <!-- Tab 0: LinkedIn InMail -->
+    <div class="outreach-panel active" id="outreach-panel-0">
+      <div>
+        <div class="outreach-label">Connection Request Note</div>
+        <div class="outreach-box" id="or-inmail"></div>
+        <div class="outreach-char-count" id="or-inmail-chars"></div>
+      </div>
+      <div class="outreach-actions">
+        <button class="btn-copy" onclick="copyOutreach('or-inmail',this)">📋 Copy</button>
+      </div>
+      <p style="font-size:11.5px;color:#aaa;line-height:1.5">
+        Paste this into the LinkedIn connection request note (300 char limit). Keep it brief — longer notes are ignored.
+      </p>
+    </div>
+    <!-- Tab 1: Cold Email -->
+    <div class="outreach-panel" id="outreach-panel-1">
+      <div>
+        <div class="outreach-label">Subject</div>
+        <div class="outreach-box" id="or-subject" style="max-height:50px;padding:8px 14px"></div>
+      </div>
+      <div>
+        <div class="outreach-label">Body</div>
+        <div class="outreach-box" id="or-body"></div>
+      </div>
+      <div class="outreach-actions">
+        <button class="btn-copy" onclick="copyOutreach('or-body',this)">📋 Copy Body</button>
+        <button class="btn-copy" id="or-copy-all" onclick="copyOutreachEmail(this)">📋 Copy All</button>
+        <a class="btn-mailto" id="or-mailto" href="#" target="_blank">✉️ Open in Mail App</a>
+      </div>
+    </div>
+    <!-- Tab 2: HR Emails -->
+    <div class="outreach-panel" id="outreach-panel-2">
+      <div id="or-hr-list"></div>
+      <div class="hr-email-note" id="or-hr-note"></div>
+    </div>
+  </div>
+</div>
 
 <!-- Tailor Overlay -->
 <div id="tailor-overlay">
@@ -637,6 +725,11 @@ function pollTailor(jobId, title, company){
             coverBtn.className='btn-sm';
             coverBtn.style.cssText='background:#e8f5e9;color:#1b5e20;border:1.5px solid #a5d6a7';
             coverBtn.textContent='📝 Cover Letter';
+            const outreachBtn = document.createElement('button');
+            outreachBtn.className='btn-sm';
+            outreachBtn.style.cssText='background:#fce4ec;color:#880e4f;border:1.5px solid #f48fb1';
+            outreachBtn.textContent='📨 Outreach';
+            outreachBtn.onclick=()=>openOutreach(jobId);
             const pdfSplit = document.createElement('div');
             pdfSplit.className='pdf-split'; pdfSplit.id='pdf-split-'+jobId;
             pdfSplit.style.marginLeft='4px';
@@ -650,7 +743,7 @@ function pollTailor(jobId, title, company){
               `<a href="/pdf/${jobId}/executive" target="_blank">Executive</a>`+
               `<a href="/pdf/${jobId}/compact"   target="_blank">Compact</a>`+
               `</div>`;
-            wrap.prepend(pdfSplit); wrap.prepend(coverBtn); wrap.prepend(diffBtn); wrap.prepend(viewBtn);
+            wrap.prepend(pdfSplit); wrap.prepend(outreachBtn); wrap.prepend(coverBtn); wrap.prepend(diffBtn); wrap.prepend(viewBtn);
           }
           const card = document.getElementById('card-'+jobId);
           if(card) card.dataset.tailored='yes';
@@ -888,6 +981,82 @@ function saveSettings(){
       toast('Save failed');
     }
   });
+}
+
+// ── Outreach Modal ─────────────────────────────────────────────────────────
+let _outreachData = null;
+
+function openOutreach(jobId){
+  fetch('/outreach/'+jobId).then(r=>r.json()).then(d=>{
+    if(d.error){ toast('⚠️ '+d.error); return; }
+    _outreachData = d;
+
+    document.getElementById('outreach-modal-title').textContent =
+      `📨 Outreach — ${d.title} @ ${d.company}`;
+
+    // Tab 0: LinkedIn InMail
+    document.getElementById('or-inmail').textContent = d.linkedin_inmail;
+    document.getElementById('or-inmail-chars').textContent =
+      `${d.linkedin_inmail.length} / 300 characters`;
+
+    // Tab 1: Cold Email
+    document.getElementById('or-subject').textContent = d.cold_email_subject;
+    document.getElementById('or-body').textContent    = d.cold_email_body;
+    const mailtoEl = document.getElementById('or-mailto');
+    if(d.mailto){ mailtoEl.href=d.mailto; mailtoEl.style.display=''; }
+    else { mailtoEl.style.display='none'; }
+
+    // Tab 2: HR Emails
+    const list = document.getElementById('or-hr-list');
+    if(d.hr_emails && d.hr_emails.length){
+      list.innerHTML = d.hr_emails.map(em=>`
+        <div class="hr-email-row">
+          <span class="hr-email-addr">${escHtml(em)}</span>
+          <button class="btn-copy" onclick="copyText('${escHtml(em)}',this)">📋 Copy</button>
+        </div>`).join('');
+      document.getElementById('or-hr-note').innerHTML =
+        '⚠️ These are <strong>guessed</strong> addresses based on the company domain. '
+        +'Verify on the company\'s official careers page before sending.';
+    } else {
+      list.innerHTML = '<p style="color:#aaa;font-size:13px">Could not determine company domain — find the HR email on the company\'s careers page.</p>';
+      document.getElementById('or-hr-note').textContent = '';
+    }
+
+    // Reset to tab 0
+    switchOutreachTab(0, document.querySelector('.outreach-tab'));
+
+    document.getElementById('outreach-overlay').classList.add('open');
+  }).catch(()=>toast('Failed to load outreach data'));
+}
+
+function closeOutreach(evt){
+  if(evt && evt.target !== document.getElementById('outreach-overlay') &&
+     evt.target !== document.getElementById('outreach-modal-close')) return;
+  document.getElementById('outreach-overlay').classList.remove('open');
+}
+
+function switchOutreachTab(idx, btn){
+  document.querySelectorAll('.outreach-tab').forEach((t,i)=>t.classList.toggle('active',i===idx));
+  document.querySelectorAll('.outreach-panel').forEach((p,i)=>p.classList.toggle('active',i===idx));
+}
+
+function copyOutreach(elemId, btn){
+  const text = document.getElementById(elemId).textContent;
+  copyText(text, btn);
+}
+
+function copyOutreachEmail(btn){
+  if(!_outreachData) return;
+  const text = `Subject: ${_outreachData.cold_email_subject}\n\n${_outreachData.cold_email_body}`;
+  copyText(text, btn);
+}
+
+function copyText(text, btn){
+  navigator.clipboard.writeText(text).then(()=>{
+    const orig = btn.textContent;
+    btn.textContent='✅ Copied!'; btn.classList.add('copied');
+    setTimeout(()=>{ btn.textContent=orig; btn.classList.remove('copied'); }, 2000);
+  }).catch(()=>toast('Copy failed — select text manually'));
 }
 
 function uploadResume(input){

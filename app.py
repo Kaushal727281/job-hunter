@@ -671,6 +671,99 @@ def cover_letter_pdf(job_id):
     )
 
 
+@app.route("/outreach/<job_id>")
+def outreach(job_id):
+    """Return outreach materials for a tailored job: LinkedIn InMail, cold email, HR email guesses."""
+    job = job_store.get_job(job_id)
+    if not job or not job.get("tailor_result"):
+        return jsonify({"error": "Job not tailored yet"}), 400
+
+    tr             = job["tailor_result"]
+    company        = job.get("company", "Unknown Company")
+    title          = job.get("title", "Software Engineer")
+    key_matches    = tr.get("key_matches", [])
+    cover_letter   = (tr.get("cover_letter") or "").strip()
+    match_score    = tr.get("match_score", 0)
+
+    cfg            = _load_config()
+    candidate      = cfg.get("candidate", {})
+    cand_name      = candidate.get("name", "")
+    cand_email     = candidate.get("email", "")
+    exp_years      = candidate.get("total_experience_years", 0)
+
+    # ── Guess HR email addresses from apply_link domain ────────────────────
+    _job_boards = {
+        "linkedin.com", "glassdoor.com", "naukri.com", "shine.com",
+        "indeed.com", "remoteok.com", "workatastartup.com", "instahyre.com",
+        "hirist.com", "foundit.in", "monster.com", "wellfound.com",
+    }
+    domain = ""
+    apply_link = job.get("apply_link", "")
+    try:
+        from urllib.parse import urlparse
+        netloc = urlparse(apply_link).netloc.lower()
+        for prefix in ("www.", "in.", "jobs."):
+            netloc = netloc.removeprefix(prefix)
+        if netloc and not any(jb in netloc for jb in _job_boards):
+            domain = netloc
+    except Exception:
+        pass
+    # Fallback: slug from first word of company name
+    if not domain and company:
+        slug = re.sub(r"[^a-z0-9]", "", company.lower().split()[0])
+        domain = f"{slug}.com" if slug else ""
+
+    hr_emails = (
+        [f"careers@{domain}", f"hr@{domain}", f"talent@{domain}",
+         f"recruiting@{domain}", f"jobs@{domain}"]
+        if domain else []
+    )
+
+    # ── LinkedIn InMail (connection request note ≤ 300 chars) ──────────────
+    skills_str = ", ".join(key_matches[:3]) if key_matches else "Java & backend technologies"
+    inmail = (
+        f"Hi! I'm a {exp_years}+ yrs Java engineer specialising in {skills_str}. "
+        f"Very interested in the {title} role at {company} — my profile is a strong "
+        f"{match_score}/10 match. Would love to connect!"
+    )
+    if len(inmail) > 295:
+        inmail = inmail[:292] + "…"
+
+    # ── Cold email ─────────────────────────────────────────────────────────
+    subject = f"Application for {title} – {company}"
+    if cover_letter:
+        body = cover_letter
+        sig = f"\n\nBest regards,\n{cand_name}" + (f"\n{cand_email}" if cand_email else "")
+        if cand_name and cand_name.lower() not in body.lower()[-80:]:
+            body += sig
+    else:
+        body = (
+            f"Dear Hiring Manager,\n\n"
+            f"I am writing to express my strong interest in the {title} position at {company}.\n\n"
+            f"With {exp_years}+ years of experience and expertise in "
+            f"{', '.join(key_matches[:4]) or 'software engineering'}, I believe I am a "
+            f"strong fit for this role.\n\n"
+            f"I would welcome the opportunity to discuss how my background aligns with your needs.\n\n"
+            f"Best regards,\n{cand_name}" + (f"\n{cand_email}" if cand_email else "")
+        )
+
+    from urllib.parse import quote as _q
+    mailto = (
+        f"mailto:{hr_emails[0]}?subject={_q(subject)}&body={_q(body)}"
+        if hr_emails else ""
+    )
+
+    return jsonify({
+        "company":            company,
+        "title":              title,
+        "linkedin_inmail":    inmail,
+        "cold_email_subject": subject,
+        "cold_email_body":    body,
+        "hr_emails":          hr_emails,
+        "mailto":             mailto,
+    })
+
+
 @app.route("/apply/<job_id>", methods=["POST"])
 def mark_applied(job_id):
     data = request.get_json(silent=True) or {}
