@@ -150,8 +150,7 @@
       <a href="/cover/{{ job.id }}" target="_blank"><button class="btn btn-outline">📝 Cover Letter</button></a>
       <a href="/diff/{{ job.id }}" target="_blank"><button class="btn btn-outline">🔍 What Changed?</button></a>
       <button class="btn btn-outline" onclick="openOutreach('{{ job.id }}')">📨 Outreach</button>
-      <button class="btn btn-outline" id="retailor-btn" onclick="tailorJob()">Re-tailor</button>
-      <button class="btn btn-outline" onclick="toggleInstructionsBar()" id="custom-bar-toggle" title="Custom instructions / improvement tips">✨ ▾</button>
+      <button class="btn btn-outline" onclick="toggleInstructionsBar()" id="custom-bar-toggle">✨ Re-tailor ▾</button>
     {% else %}
       <button class="btn btn-white" id="tailor-btn" onclick="tailorJob()">✨ Tailor Resume</button>
     {% endif %}
@@ -437,7 +436,7 @@ function toggleInstructionsBar(){
   if(!bar) return;
   const open = bar.style.display !== 'none';
   bar.style.display = open ? 'none' : 'block';
-  if(btn) btn.textContent = open ? '✨ ▾' : '✨ ▴';
+  if(btn) btn.textContent = open ? '✨ Re-tailor ▾' : '✨ Re-tailor ▴';
   if(!open) document.getElementById('custom-instructions').focus();
 }
 function addTipToInstructions(btn){
