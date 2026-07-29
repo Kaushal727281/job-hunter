@@ -114,7 +114,58 @@ def _suggest_layout(job: dict) -> tuple[str, str]:
     return ("modern", "Product company — Modern Sidebar balances visual appeal with structure")
 
 
-def _bg_tailor(job_id: str, prev_result: dict = None, prev_pdf: str = None):
+def _verify_tips(tips: list[str], resume_html: str) -> list[str]:
+    """
+    Auto-verify each improvement tip against the actual tailored resume HTML.
+    If the key tech/action terms from the tip are found in the resume text,
+    mark it as ✓ Implemented regardless of what the LLM self-reported.
+    Tips already starting with ✓ are left unchanged.
+    """
+    import re as _re
+    from bs4 import BeautifulSoup as _BS
+    resume_text = _BS(resume_html, "html.parser").get_text(" ").lower()
+
+    verified = []
+    for tip in tips:
+        if tip.startswith("✓"):
+            verified.append(tip)
+            continue
+
+        # Extract quoted phrases first, then CamelCase/ALL-CAPS tokens, then slash-separated terms
+        candidates = _re.findall(r'"([^"]+)"', tip)
+        candidates += _re.findall(r'[A-Z][a-zA-Z0-9]*(?:[A-Z][a-zA-Z0-9]+)+', tip)   # CamelCase
+        candidates += _re.findall(r'[A-Z]{2,}(?:/[A-Z]{2,})+', tip)                   # AWS/GCP/Azure style
+        candidates += _re.findall(r'\b[A-Z]{2,}\b', tip)                               # acronyms
+
+        # Also extract key lowercase phrases after "with", "in", "for", "and"
+        phrase_matches = _re.findall(r'(?:with|in|for|and)\s+([\w\s\-/]{3,30}?)(?:,|\.|\s+and|\s+or|$)', tip, _re.I)
+        candidates += [p.strip() for p in phrase_matches if len(p.strip()) > 3]
+
+        # Deduplicate, filter noise words
+        _STOP = {"the", "and", "for", "with", "that", "this", "your", "you", "are", "has",
+                 "have", "been", "more", "than", "from", "its", "can", "such", "any"}
+        seen_terms = []
+        for c in candidates:
+            cl = c.strip().lower()
+            if cl and cl not in _STOP and len(cl) > 2:
+                seen_terms.append(cl)
+
+        if not seen_terms:
+            verified.append(tip)
+            continue
+
+        # A tip is considered addressed if ANY key term appears in the resume
+        found = [t for t in seen_terms if t in resume_text]
+        if found:
+            verified.append(f"✓ Implemented: {tip}")
+            logger.debug(f"  Tip auto-verified (found: {found[:3]}): {tip[:60]}")
+        else:
+            verified.append(tip)
+
+    return verified
+
+
+def _bg_tailor(job_id: str, prev_result: dict = None, prev_pdf: str = None, custom_instructions: str = None):
     """
     Run tailor in background. Retries up to 3× until match_score >= 8.
     prev_result/prev_pdf are the values cleared before starting so we can restore if something goes wrong.
@@ -142,11 +193,17 @@ def _bg_tailor(job_id: str, prev_result: dict = None, prev_pdf: str = None):
                 prev_tips  = result.get("improvement_tips") or []
                 logger.info(f"  Retry {attempt}/{MAX_ATTEMPTS} — score was {score_prev}/10, passing {len(prev_tips)} tips")
                 job_store.update_job(job_id, tailor_error=f"Score {score_prev}/10 — retrying (attempt {attempt}/{MAX_ATTEMPTS})…")
-            result = tailor_resume(job_with_desc, prev_tips=prev_tips)
+            result = tailor_resume(job_with_desc, prev_tips=prev_tips, custom_instructions=custom_instructions)
             score = result.get("match_score", 0) or 0
             logger.info(f"  Attempt {attempt}: match_score={score}/10")
             if score >= TARGET_SCORE:
                 break
+
+        # Auto-verify improvement tips against the actual tailored resume HTML
+        if result.get("improvement_tips") and result.get("resume_html"):
+            result["improvement_tips"] = _verify_tips(
+                result["improvement_tips"], result["resume_html"]
+            )
 
         # Attach layout suggestion
         layout, layout_reason = _suggest_layout(job)
@@ -233,12 +290,15 @@ def tailor(job_id):
     if not job:
         return jsonify({"ok": False, "message": "Job not found"})
     _tailor_running.add(job_id)
+    # Read optional custom instructions from request body
+    data = request.get_json(silent=True) or {}
+    custom_instructions = (data.get("custom_instructions") or "").strip() or None
     # Snapshot existing result so we can restore it if the tailor fails
     prev_result = job.get("tailor_result")
     prev_pdf    = job.get("pdf_path")
     # Clear now so polling returns done=False until fresh output arrives
     job_store.update_job(job_id, tailor_result=None, pdf_path=None, tailor_error=None)
-    t = threading.Thread(target=_bg_tailor, args=(job_id, prev_result, prev_pdf), daemon=True)
+    t = threading.Thread(target=_bg_tailor, args=(job_id, prev_result, prev_pdf, custom_instructions), daemon=True)
     t.start()
     return jsonify({"ok": True, "message": "Tailoring started"})
 
@@ -693,33 +753,63 @@ def outreach(job_id):
     cand_email     = candidate.get("email", "")
     exp_years      = candidate.get("total_experience_years", 0)
 
-    # ── Guess HR email addresses from apply_link domain ────────────────────
+    # ── Resolve company domain ───────────────────────────────────────────────
     _job_boards = {
         "linkedin.com", "glassdoor.com", "naukri.com", "shine.com",
         "indeed.com", "remoteok.com", "workatastartup.com", "instahyre.com",
         "hirist.com", "foundit.in", "monster.com", "wellfound.com",
+        "myworkday.com", "greenhouse.io", "lever.co", "workable.com",
+        "smartrecruiters.com", "icims.com", "taleo.net", "successfactors.com",
     }
     domain = ""
     apply_link = job.get("apply_link", "")
     try:
         from urllib.parse import urlparse
         netloc = urlparse(apply_link).netloc.lower()
-        for prefix in ("www.", "in.", "jobs."):
+        for prefix in ("www.", "in.", "jobs.", "careers."):
             netloc = netloc.removeprefix(prefix)
         if netloc and not any(jb in netloc for jb in _job_boards):
             domain = netloc
     except Exception:
         pass
-    # Fallback: slug from first word of company name
+    # Fallback: slug company name → domain guess
     if not domain and company:
         slug = re.sub(r"[^a-z0-9]", "", company.lower().split()[0])
         domain = f"{slug}.com" if slug else ""
 
-    hr_emails = (
-        [f"careers@{domain}", f"hr@{domain}", f"talent@{domain}",
-         f"recruiting@{domain}", f"jobs@{domain}"]
-        if domain else []
-    )
+    # ── Hunter.io domain search (real verified emails) ──────────────────────
+    hunter_key = os.getenv("HUNTER_API_KEY", "")
+    hr_emails: list[str] = []
+
+    if hunter_key and domain:
+        try:
+            import urllib.request as _ur
+            hunter_url = (
+                f"https://api.hunter.io/v2/domain-search"
+                f"?domain={domain}&type=personal&limit=10&api_key={hunter_key}"
+            )
+            with _ur.urlopen(hunter_url, timeout=6) as resp:
+                hunter_data = json.loads(resp.read().decode())
+            emails_found = hunter_data.get("data", {}).get("emails", [])
+            # Prefer HR / talent / recruiting / careers roles
+            _HR_ROLES = {"hr", "human resources", "talent", "recruit", "hiring",
+                         "career", "people", "workforce", "staffing"}
+            hr_hits   = [e["value"] for e in emails_found
+                         if any(r in (e.get("department") or "").lower() or
+                                r in (e.get("position") or "").lower() or
+                                r in e["value"].split("@")[0].lower()
+                                for r in _HR_ROLES)]
+            other     = [e["value"] for e in emails_found if e["value"] not in hr_hits]
+            hr_emails = (hr_hits + other)[:6]
+            if hr_emails:
+                logger.info(f"  Hunter.io found {len(hr_emails)} email(s) for {domain}")
+        except Exception as e:
+            logger.debug(f"  Hunter.io lookup failed ({e}) — falling back to guesses")
+
+    # Fallback: common HR address patterns (clearly labelled as guesses in UI)
+    if not hr_emails and domain:
+        hr_emails = [f"careers@{domain}", f"hr@{domain}", f"talent@{domain}",
+                     f"recruiting@{domain}", f"jobs@{domain}"]
 
     # ── LinkedIn InMail (connection request note ≤ 300 chars) ──────────────
     skills_str = ", ".join(key_matches[:3]) if key_matches else "Java & backend technologies"
@@ -750,8 +840,11 @@ def outreach(job_id):
         )
 
     from urllib.parse import quote as _q
+    # Gmail compose URL — encode each email separately, comma separator must NOT be encoded
+    # or Gmail treats the whole string as one address
+    to_param = ",".join(_q(e) for e in hr_emails)
     mailto = (
-        f"mailto:{hr_emails[0]}?subject={_q(subject)}&body={_q(body)}"
+        f"https://mail.google.com/mail/?view=cm&to={to_param}&su={_q(subject)}&body={_q(body)}"
         if hr_emails else ""
     )
 
@@ -762,6 +855,7 @@ def outreach(job_id):
         "cold_email_subject": subject,
         "cold_email_body":    body,
         "hr_emails":          hr_emails,
+        "hr_verified":        bool(hunter_key and hr_emails and not hr_emails[0].startswith("careers@")),
         "mailto":             mailto,
     })
 

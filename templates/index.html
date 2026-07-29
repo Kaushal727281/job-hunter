@@ -537,7 +537,7 @@
       <div class="outreach-actions">
         <button class="btn-copy" onclick="copyOutreach('or-body',this)">📋 Copy Body</button>
         <button class="btn-copy" id="or-copy-all" onclick="copyOutreachEmail(this)">📋 Copy All</button>
-        <a class="btn-mailto" id="or-mailto" href="#" target="_blank">✉️ Open in Mail App</a>
+        <a class="btn-mailto" id="or-mailto" href="#" target="_blank">✉️ Open in Gmail</a>
       </div>
     </div>
     <!-- Tab 2: HR Emails -->
@@ -878,6 +878,7 @@ function setJobStatus(jobId, newStatus, sel){
         sel.dataset.val = 'applied';
         _updateBadges(card, 'applied');
         toast('✓ Marked as Applied');
+        applyFilters();
       });
     return;
   }
@@ -1024,7 +1025,20 @@ function saveSettings(){
 // ── Outreach Modal ─────────────────────────────────────────────────────────
 let _outreachData = null;
 
+let _outreachJobId = '';
+function openGmailWithResume(evt){
+  // Open Gmail compose in a new tab (default link behaviour via target=_blank)
+  // Also open the resume PDF in another new tab so user can drag-attach it
+  const jobId = evt.currentTarget.dataset.jobid;
+  if(jobId){
+    window.open('/pdf/' + jobId, '_blank');
+    toast('📎 Resume opened in a new tab — drag it into the Gmail compose window');
+  }
+  // Let the <a> tag navigate to Gmail normally (target=_blank)
+}
+
 function openOutreach(jobId){
+  _outreachJobId = jobId;
   fetch('/outreach/'+jobId).then(r=>r.json()).then(d=>{
     if(d.error){ toast('⚠️ '+d.error); return; }
     _outreachData = d;
@@ -1041,7 +1055,7 @@ function openOutreach(jobId){
     document.getElementById('or-subject').textContent = d.cold_email_subject;
     document.getElementById('or-body').textContent    = d.cold_email_body;
     const mailtoEl = document.getElementById('or-mailto');
-    if(d.mailto){ mailtoEl.href=d.mailto; mailtoEl.style.display=''; }
+    if(d.mailto){ mailtoEl.href=d.mailto; mailtoEl.dataset.jobid=_outreachJobId; mailtoEl.style.display=''; }
     else { mailtoEl.style.display='none'; }
 
     // Tab 2: HR Emails
@@ -1052,9 +1066,9 @@ function openOutreach(jobId){
           <span class="hr-email-addr">${escHtml(em)}</span>
           <button class="btn-copy" onclick="copyText('${escHtml(em)}',this)">📋 Copy</button>
         </div>`).join('');
-      document.getElementById('or-hr-note').innerHTML =
-        '⚠️ These are <strong>guessed</strong> addresses based on the company domain. '
-        +'Verify on the company\'s official careers page before sending.';
+      document.getElementById('or-hr-note').innerHTML = d.hr_verified
+        ? '✅ Emails found via <strong>Hunter.io</strong> — real addresses from this company domain.'
+        : '⚠️ These are <strong>guessed</strong> addresses. Add a free <strong>HUNTER_API_KEY</strong> in .env for real emails.';
     } else {
       list.innerHTML = '<p style="color:#aaa;font-size:13px">Could not determine company domain — find the HR email on the company\'s careers page.</p>';
       document.getElementById('or-hr-note').textContent = '';
@@ -1128,6 +1142,9 @@ function uploadResume(input){
       toast('✅ Resume imported — click Save Profile to confirm');
     }).catch(()=>toast('Upload failed'));
 }
+
+// Apply filters on page load so applied jobs are hidden from "All" tab immediately
+document.addEventListener('DOMContentLoaded', () => applyFilters());
 </script>
 </body>
 </html>

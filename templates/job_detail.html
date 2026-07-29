@@ -198,6 +198,27 @@
       </button>
     </div>
 
+    <!-- Custom tailoring instructions -->
+    <div style="margin-top:20px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;
+                  color:#0d47a1;margin-bottom:8px">✨ Custom Tailoring Instructions</div>
+      <textarea id="custom-instructions"
+                placeholder="e.g. Highlight specific achievements that demonstrate problem-solving skills, such as reducing release failures or improving system scalability. Add a separate section for open-source contributions."
+                style="width:100%;min-height:90px;padding:10px 12px;border:1.5px solid #c7d5e8;
+                       border-radius:8px;font-size:13px;color:#333;line-height:1.6;
+                       font-family:inherit;resize:vertical;background:#f8fafd;outline:none"
+                onfocus="this.style.borderColor='#0d47a1'"
+                onblur="this.style.borderColor='#c7d5e8'"></textarea>
+      <div style="margin-top:8px;display:flex;align-items:center;gap:8px">
+        <button onclick="tailorWithInstructions()"
+                style="padding:8px 18px;border:none;border-radius:6px;background:#e65100;
+                       color:#fff;font-size:13px;font-weight:600;cursor:pointer">
+          ✨ Apply &amp; Re-tailor
+        </button>
+        <span style="font-size:11.5px;color:#aaa">Re-tailors the resume with your instructions injected into the AI prompt.</span>
+      </div>
+    </div>
+
     <!-- Email responses -->
     {% if job.email_responses %}
     <div style="margin-top:20px">
@@ -298,7 +319,7 @@
       <div class="outreach-actions">
         <button class="btn-copy" onclick="copyOutreach('or-body',this)">📋 Copy Body</button>
         <button class="btn-copy" id="or-copy-all" onclick="copyOutreachEmail(this)">📋 Copy All</button>
-        <a class="btn-mailto" id="or-mailto" href="#" target="_blank">✉️ Open in Mail App</a>
+        <a class="btn-mailto" id="or-mailto" href="#" target="_blank">✉️ Open in Gmail</a>
       </div>
     </div>
     <div class="outreach-panel" id="outreach-panel-2">
@@ -336,9 +357,14 @@ function _hideTailorOverlay(){
   document.getElementById('tailor-overlay').classList.remove('active');
 }
 
-function tailorJob(){
+function tailorWithInstructions(){
+  const txt=(document.getElementById('custom-instructions').value||'').trim();
+  tailorJob(txt||null);
+}
+function tailorJob(customInstructions){
   _showTailorOverlay();
-  fetch('/tailor/{{ job.id }}',{method:'POST'}).then(r=>r.json()).then(d=>{
+  const body=customInstructions?JSON.stringify({custom_instructions:customInstructions}):null;
+  fetch('/tailor/{{ job.id }}',{method:'POST',headers:body?{'Content-Type':'application/json'}:{},body:body||undefined}).then(r=>r.json()).then(d=>{
     const panel=document.getElementById('resume-panel');
     if(panel){
       panel.innerHTML=`

@@ -404,7 +404,7 @@ def _detect_domain(job: dict) -> tuple[str, str]:
     )
 
 
-def tailor_resume(job: dict, prev_tips: list[str] | None = None) -> dict:
+def tailor_resume(job: dict, prev_tips: list[str] | None = None, custom_instructions: str | None = None) -> dict:
     """
     Tailors the base resume for the given job.
     prev_tips: improvement_tips from a previous attempt — injected as extra
@@ -470,7 +470,11 @@ in this attempt by rewriting the relevant bullets to incorporate them naturally:
 Mark each addressed tip as implemented by noting it in the improvement_tips response
 (replace its text with "✓ Implemented: <what you did>"). Only list truly remaining gaps
 as plain tips.
-""" if prev_tips else ""}## Instructions
+""" if prev_tips else ""}{f"""## Custom Instructions from Candidate
+The candidate has provided the following specific instructions. You MUST follow these as high-priority directives when rewriting the resume:
+{custom_instructions}
+
+""" if custom_instructions else ""}## Instructions
 1. **SUMMARY**: Rewrite as a candidate APPLYING for this role. STRICT RULES:
    - **MAX 2 sentences, ~40 words total** — tight and punchy, no fluff
    - NEVER use the phrase "as a [job title] at [company]" — this implies already employed there
