@@ -133,7 +133,9 @@ def _bg_tailor(job_id: str, prev_result: dict = None, prev_pdf: str = None):
 
         from resume_tailor import tailor_resume
         result = None
-        prev_tips = None
+        # Seed tips from the previous tailor run so the first re-tailor attempt
+        # already addresses the known gaps rather than discovering them again.
+        prev_tips = (prev_result or {}).get("improvement_tips") or None
         for attempt in range(1, MAX_ATTEMPTS + 1):
             if attempt > 1:
                 score_prev = result.get("match_score", 0) or 0
