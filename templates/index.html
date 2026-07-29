@@ -68,6 +68,14 @@
     .badge-shine{background:#fce4ec;color:#880e4f;padding:2px 7px;border-radius:10px}
     .badge-remote{background:#e8f5e9;color:#2e7d32;padding:2px 7px;border-radius:10px}
     .badge-applied{background:#e8f5e9;color:#1b5e20;padding:2px 7px;border-radius:10px;font-weight:700}
+    .badge-rejected{background:#fce4ec;color:#b71c1c;padding:2px 7px;border-radius:10px;font-weight:700}
+    .badge-interview{background:#e3f2fd;color:#0d47a1;padding:2px 7px;border-radius:10px;font-weight:700}
+    .status-select{border-radius:6px;border:1.5px solid #c7d5e8;background:#fff;color:#555;
+                   font-size:12px;font-weight:600;padding:4px 8px;cursor:pointer;outline:none}
+    .status-select:hover{border-color:#0d47a1}
+    .status-select[data-val="applied"]  {background:#e8f5e9;color:#1b5e20;border-color:#a5d6a7}
+    .status-select[data-val="interview"]{background:#e3f2fd;color:#0d47a1;border-color:#90caf9}
+    .status-select[data-val="rejected"] {background:#fce4ec;color:#b71c1c;border-color:#ef9a9a}
     .badge-responded{background:#fff3e0;color:#e65100;padding:2px 7px;border-radius:10px;font-weight:700}
     .badge-product{background:#e3f2fd;color:#0d47a1;padding:2px 7px;border-radius:10px;font-weight:600;font-size:11px}
     .badge-service{background:#f3e5f5;color:#6a1b9a;padding:2px 7px;border-radius:10px;font-weight:600;font-size:11px}
@@ -305,9 +313,11 @@
   <!-- Status filter -->
   <div class="filter-group">
     <span class="filter-label">Status</span>
-    <button class="filter-btn active" data-filter="status" data-val="all"      onclick="applyFilters(this,'status')">All ({{ jobs|length }})</button>
-    <button class="filter-btn"        data-filter="status" data-val="tailored" onclick="applyFilters(this,'status')">Tailored ({{ jobs|selectattr('tailor_result')|list|length }})</button>
-    <button class="filter-btn"        data-filter="status" data-val="applied"  onclick="applyFilters(this,'status')">Applied ({{ jobs|selectattr('applied_at')|list|length }})</button>
+    <button class="filter-btn active" data-filter="status" data-val="all"       onclick="applyFilters(this,'status')">All ({{ jobs|rejectattr('applied_at')|list|length }})</button>
+    <button class="filter-btn"        data-filter="status" data-val="tailored"  onclick="applyFilters(this,'status')">Tailored ({{ jobs|selectattr('tailor_result')|rejectattr('applied_at')|list|length }})</button>
+    <button class="filter-btn"        data-filter="status" data-val="applied"   onclick="applyFilters(this,'status')">Applied ({{ jobs|selectattr('applied_at')|rejectattr('job_status','eq','interview')|rejectattr('job_status','eq','rejected')|list|length }})</button>
+    <button class="filter-btn"        data-filter="status" data-val="interview" onclick="applyFilters(this,'status')">🟢 Interview ({{ jobs|selectattr('job_status','eq','interview')|list|length }})</button>
+    <button class="filter-btn"        data-filter="status" data-val="rejected"  onclick="applyFilters(this,'status')">🔴 Rejected ({{ jobs|selectattr('job_status','eq','rejected')|list|length }})</button>
     <button class="filter-btn"        data-filter="status" data-val="responded" onclick="applyFilters(this,'status')">Responded ({{ jobs|selectattr('email_responses')|list|length }})</button>
   </div>
 
@@ -334,6 +344,7 @@
        data-source="{{ job.source }}"
        data-tailored="{{ 'yes' if tr else 'no' }}"
        data-applied="{{ 'yes' if job.applied_at else 'no' }}"
+       data-jobstatus="{{ job.job_status or '' }}"
        data-responded="{{ 'yes' if job.email_responses else 'no' }}"
        data-loc="{{ job.location|lower }}"
        data-expmin="{{ job.experience.split('–')[0].strip() if job.experience and '–' in job.experience else '' }}"
@@ -354,6 +365,8 @@
         {% if job.company_type == 'Service' %}<span class="badge-service">🔧 Service</span>{% endif %}
         {% if job.is_remote %}<span class="badge-remote">Remote</span>{% endif %}
         {% if job.applied_at %}<span class="badge-applied">✓ Applied</span>{% endif %}
+        {% if job.job_status == 'rejected' %}<span class="badge-rejected">🔴 Rejected</span>{% endif %}
+        {% if job.job_status == 'interview' %}<span class="badge-interview">🟢 Interview</span>{% endif %}
         {% if job.email_responses %}<span class="badge-responded" style="cursor:pointer" onclick="showResponses(event,'{{ job.id }}')">📬 {{ job.email_responses|length }} Response{{ 's' if job.email_responses|length > 1 else '' }}</span>{% endif %}
       </div>
       <div class="card-title">{{ job.title }}</div>
@@ -452,23 +465,8 @@
     <div class="card-footer">
       {% if tr %}
         <button class="btn-sm btn-primary" onclick="window.location='/job/{{ job.id }}'">📄 View Resume</button>
-        <a href="/diff/{{ job.id }}" target="_blank" class="btn-sm btn-secondary">🔍 Diff</a>
         <a href="/cover/{{ job.id }}" target="_blank" class="btn-sm" style="background:#e8f5e9;color:#1b5e20;border:1.5px solid #a5d6a7">📝 Cover Letter</a>
         <button class="btn-sm" style="background:#fce4ec;color:#880e4f;border:1.5px solid #f48fb1" onclick="openOutreach('{{ job.id }}')">📨 Outreach</button>
-        {% if job.pdf_path %}
-        {% set suggested = tr.layout_suggestion or 'modern' %}
-        <div class="pdf-split" id="pdf-split-{{ job.id }}">
-          <button class="btn-sm btn-secondary" onclick="togglePdfDropdown('{{ job.id }}')">⬇ PDF ▾</button>
-          <div class="pdf-dropdown">
-            <a href="/pdf/{{ job.id }}" target="_blank" style="font-weight:700;color:#0d47a1">⭐ Original (as previewed)</a>
-            <a href="/pdf/{{ job.id }}/classic"   target="_blank" {% if suggested=='classic'   %}style="font-weight:700;color:#2e7d32;background:#e8f5e9"{% endif %}>Classic B&amp;W{% if suggested=='classic'   %} ★ Recommended{% endif %}</a>
-            <a href="/pdf/{{ job.id }}/modern"    target="_blank" {% if suggested=='modern'    %}style="font-weight:700;color:#2e7d32;background:#e8f5e9"{% endif %}>Modern Sidebar{% if suggested=='modern'    %} ★ Recommended{% endif %}</a>
-            <a href="/pdf/{{ job.id }}/tech"      target="_blank" {% if suggested=='tech'      %}style="font-weight:700;color:#2e7d32;background:#e8f5e9"{% endif %}>Tech / FAANG{% if suggested=='tech'      %} ★ Recommended{% endif %}</a>
-            <a href="/pdf/{{ job.id }}/executive" target="_blank" {% if suggested=='executive' %}style="font-weight:700;color:#2e7d32;background:#e8f5e9"{% endif %}>Executive{% if suggested=='executive' %} ★ Recommended{% endif %}</a>
-            <a href="/pdf/{{ job.id }}/compact"   target="_blank" {% if suggested=='compact'   %}style="font-weight:700;color:#2e7d32;background:#e8f5e9"{% endif %}>Compact{% if suggested=='compact'   %} ★ Recommended{% endif %}</a>
-          </div>
-        </div>
-        {% endif %}
       {% else %}
         <button class="btn-sm btn-tailor" id="tailor-btn-{{ job.id }}" onclick="tailorJob('{{ job.id }}')">✨ Tailor Resume</button>
       {% endif %}
@@ -477,10 +475,14 @@
         <button class="btn-sm btn-apply">Apply →</button>
       </a>
       {% endif %}
-      <button class="btn-sm" id="apply-mark-{{ job.id }}"
-              style="{{ 'background:#e8f5e9;color:#1b5e20;border:1.5px solid #a5d6a7' if job.applied_at else 'background:#f5f5f5;color:#777;border:1.5px solid #ddd' }}"
-              data-applied="{{ 'yes' if job.applied_at else 'no' }}"
-              onclick="toggleApplied('{{ job.id }}', this)">{{ '✓ Applied' if job.applied_at else 'Mark Applied' }}</button>
+      <select class="status-select" id="status-select-{{ job.id }}"
+              data-val="{{ 'applied' if job.applied_at and not job.job_status else (job.job_status or '') }}"
+              onchange="setJobStatus('{{ job.id }}', this.value, this)">
+        <option value="">— Track Status —</option>
+        <option value="applied"   {% if job.applied_at and not job.job_status %}selected{% endif %}>✓ Applied</option>
+        <option value="interview" {% if job.job_status == 'interview' %}selected{% endif %}>🟢 Interview</option>
+        <option value="rejected"  {% if job.job_status == 'rejected'  %}selected{% endif %}>🔴 Rejected</option>
+      </select>
     </div>
   </div>
   {% endfor %}
@@ -716,10 +718,6 @@ function pollTailor(jobId, title, company){
             viewBtn.className='btn-sm btn-primary';
             viewBtn.textContent='📄 View Resume';
             viewBtn.onclick=()=>window.location='/job/'+jobId;
-            const diffBtn = document.createElement('a');
-            diffBtn.href='/diff/'+jobId; diffBtn.target='_blank';
-            diffBtn.className='btn-sm btn-secondary';
-            diffBtn.textContent='🔍 Diff';
             const coverBtn = document.createElement('a');
             coverBtn.href='/cover/'+jobId; coverBtn.target='_blank';
             coverBtn.className='btn-sm';
@@ -730,20 +728,7 @@ function pollTailor(jobId, title, company){
             outreachBtn.style.cssText='background:#fce4ec;color:#880e4f;border:1.5px solid #f48fb1';
             outreachBtn.textContent='📨 Outreach';
             outreachBtn.onclick=()=>openOutreach(jobId);
-            const pdfSplit = document.createElement('div');
-            pdfSplit.className='pdf-split'; pdfSplit.id='pdf-split-'+jobId;
-            pdfSplit.style.marginLeft='4px';
-            pdfSplit.innerHTML=
-              `<button class="btn-sm btn-secondary" onclick="togglePdfDropdown('${jobId}')">⬇ PDF ▾</button>`+
-              `<div class="pdf-dropdown">`+
-              `<a href="/pdf/${jobId}" target="_blank" style="font-weight:700;color:#0d47a1">⭐ Original (as previewed)</a>`+
-              `<a href="/pdf/${jobId}/classic"   target="_blank">Classic B&W</a>`+
-              `<a href="/pdf/${jobId}/modern"    target="_blank">Modern Sidebar</a>`+
-              `<a href="/pdf/${jobId}/tech"      target="_blank">Tech / FAANG</a>`+
-              `<a href="/pdf/${jobId}/executive" target="_blank">Executive</a>`+
-              `<a href="/pdf/${jobId}/compact"   target="_blank">Compact</a>`+
-              `</div>`;
-            wrap.prepend(pdfSplit); wrap.prepend(outreachBtn); wrap.prepend(coverBtn); wrap.prepend(diffBtn); wrap.prepend(viewBtn);
+            wrap.prepend(outreachBtn); wrap.prepend(coverBtn); wrap.prepend(viewBtn);
           }
           const card = document.getElementById('card-'+jobId);
           if(card) card.dataset.tailored='yes';
@@ -820,8 +805,12 @@ function applyFilters(btn, group){
     // Company type
     if(show && activeFilters.cotype !== 'all' && c.dataset.companytype !== activeFilters.cotype) show=false;
     // Status
-    if(show && activeFilters.status === 'tailored'   && c.dataset.tailored   !== 'yes') show=false;
-    if(show && activeFilters.status === 'applied'    && c.dataset.applied    !== 'yes') show=false;
+    const js = c.dataset.jobstatus || '';
+    if(activeFilters.status === 'all'      && c.dataset.applied === 'yes') show=false;
+    if(show && activeFilters.status === 'tailored'  && (c.dataset.tailored !== 'yes' || c.dataset.applied === 'yes')) show=false;
+    if(show && activeFilters.status === 'applied'   && (c.dataset.applied !== 'yes' || js === 'interview' || js === 'rejected')) show=false;
+    if(show && activeFilters.status === 'interview' && js !== 'interview') show=false;
+    if(show && activeFilters.status === 'rejected'  && js !== 'rejected')  show=false;
     if(show && activeFilters.status === 'responded'  && c.dataset.responded  !== 'yes') show=false;
     // Search text
     if(show && q && !c.dataset.text.includes(q)) show=false;
@@ -875,6 +864,55 @@ function toggleApplied(jobId, btn){
         toast('Removed from applied.');
       }
     });
+}
+
+function setJobStatus(jobId, newStatus, sel){
+  const card = document.getElementById('card-' + jobId);
+
+  // If selecting "applied" for the first time, mark as applied on backend
+  if(newStatus === 'applied'){
+    fetch(`/apply/${jobId}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({applied:true})})
+      .then(()=> fetch(`/job-status/${jobId}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:''})}))
+      .then(()=>{
+        if(card){ card.dataset.applied='yes'; card.dataset.jobstatus=''; }
+        sel.dataset.val = 'applied';
+        _updateBadges(card, 'applied');
+        toast('✓ Marked as Applied');
+      });
+    return;
+  }
+
+  // If clearing (— Track Status —), unapply
+  if(newStatus === ''){
+    fetch(`/apply/${jobId}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({applied:false})})
+      .then(()=>{
+        if(card){ card.dataset.applied='no'; card.dataset.jobstatus=''; }
+        sel.dataset.val = '';
+        _updateBadges(card, '');
+        toast('Status cleared');
+      });
+    return;
+  }
+
+  // interview / rejected — keep applied, just update job_status
+  fetch(`/job-status/${jobId}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:newStatus})})
+    .then(r=>r.json()).then(()=>{
+      if(card){ card.dataset.applied='yes'; card.dataset.jobstatus=newStatus; }
+      sel.dataset.val = newStatus;
+      _updateBadges(card, newStatus);
+      const msgs = {interview:'🟢 Marked for Interview', rejected:'🔴 Marked as Rejected'};
+      toast(msgs[newStatus]);
+    });
+}
+
+function _updateBadges(card, status){
+  if(!card) return;
+  card.querySelectorAll('.badge-applied,.badge-rejected,.badge-interview').forEach(b=>b.remove());
+  const src = card.querySelector('.card-source');
+  if(!src || !status) return;
+  const b = document.createElement('span');
+  const map = {applied:['badge-applied','✓ Applied'], interview:['badge-interview','🟢 Interview'], rejected:['badge-rejected','🔴 Rejected']};
+  if(map[status]){ b.className=map[status][0]; b.textContent=map[status][1]; src.appendChild(b); }
 }
 
 function checkResponses(){

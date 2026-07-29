@@ -772,6 +772,14 @@ def mark_applied(job_id):
     return jsonify({"ok": True, "applied": applied})
 
 
+@app.route("/job-status/<job_id>", methods=["POST"])
+def set_job_status(job_id):
+    data = request.get_json(silent=True) or {}
+    status = data.get("status", "")   # "rejected" | "interview" | ""
+    job_store.update_job(job_id, job_status=status)
+    return jsonify({"ok": True, "job_status": status})
+
+
 _gmail_check_running = False
 
 def _bg_check_responses():

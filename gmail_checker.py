@@ -275,8 +275,10 @@ def check_responses(applied_jobs: list[dict]) -> dict:
                         if any(s in from_low for s in _NOISE_SENDERS_DOMAIN_HARD):
                             continue
                         # Reject noreply/donotreply only when the company key is NOT in domain
+                        # AND not in the subject — ATS platforms like Workday send from
+                        # no-reply@myworkday.com but the subject contains the company name.
                         if any(s in from_low for s in _NOREPLY_PREFIXES):
-                            if key_low not in from_low:
+                            if key_low not in from_low and key_low not in subj_low:
                                 logger.debug(f"  Skipping noreply from non-company domain: '{from_addr[:60]}'")
                                 continue
 
