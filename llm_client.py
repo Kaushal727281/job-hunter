@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 GROQ_MODEL       = "llama-3.3-70b-versatile"
 DEEPSEEK_MODEL   = "deepseek-chat"
 MISTRAL_MODEL    = "mistral-small-latest"
-OPENROUTER_MODEL = "meta-llama/llama-3.3-70b-instruct:free"
+OPENROUTER_MODEL = "google/gemini-2.0-flash-exp:free"  # 1M context, free tier
 GEMINI_MODEL     = "gemini-1.5-flash"
 OLLAMA_BASE_URL  = "http://localhost:11434/v1"
 
@@ -154,11 +154,13 @@ def chat_complete(prompt: str, max_tokens: int = 6000, temperature: float = 0.5)
     if k:
         logger.info("  Trying OpenRouter (free model)")
         headers = {"HTTP-Referer": "https://github.com/job-hunter", "X-Title": "Job Hunter"}
+        # Free models on OpenRouter have limited output windows — cap to avoid truncation
+        or_max_tokens = min(max_tokens, 4096)
         # OpenRouter free models sometimes get upstream throttled — retry up to 3x
         for attempt in range(3):
             try:
                 return _openai_compat(k, "https://openrouter.ai/api/v1", OPENROUTER_MODEL,
-                                      prompt, max_tokens, temperature, extra_headers=headers)
+                                      prompt, or_max_tokens, temperature, extra_headers=headers)
             except Exception as e:
                 err = str(e)
                 if "429" in err and attempt < 2:
