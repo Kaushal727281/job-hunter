@@ -811,7 +811,7 @@ function applyFilters(btn, group){
     if(show && activeFilters.status === 'applied'   && (c.dataset.applied !== 'yes' || js === 'interview' || js === 'rejected')) show=false;
     if(show && activeFilters.status === 'interview' && js !== 'interview') show=false;
     if(show && activeFilters.status === 'rejected'  && js !== 'rejected')  show=false;
-    if(show && activeFilters.status === 'responded'  && c.dataset.responded  !== 'yes') show=false;
+    if(show && activeFilters.status === 'responded'  && (c.dataset.responded !== 'yes' || js === 'rejected')) show=false;
     // Search text
     if(show && q && !c.dataset.text.includes(q)) show=false;
     c.style.display = show ? '' : 'none';
