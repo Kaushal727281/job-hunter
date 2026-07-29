@@ -235,6 +235,8 @@ def check_responses(applied_jobs: list[dict]) -> dict:
                             "invitations@linkedin.com",
                             "notifications@linkedin.com",
                             "jobalerts@linkedin.com",
+                            "jobalerts-noreply@linkedin.com",
+                            "@linkedin.com",  # any LinkedIn sender is a platform alert, not a company reply
                         )
                         # Skip clearly non-job emails: security alerts, community/society groups,
                         # billing/subscription notices, promotional emails
