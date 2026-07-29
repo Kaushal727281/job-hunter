@@ -262,7 +262,7 @@ def index():
     jobs = job_store.all_jobs()
     def sort_key(j):
         tr = j.get("tailor_result") or {}
-        return (tr.get("match_score", 0) if tr else -1, j.get("fetched_date", ""))
+        return (j.get("fetched_date", ""), tr.get("match_score", 0) if tr else -1)
     jobs.sort(key=sort_key, reverse=True)
     status = {**_fetch_status, "last_run": _get_last_fetch_date()}
     return render_template("index.html", jobs=jobs, status=status, config=_load_config())
