@@ -151,6 +151,7 @@
       <a href="/diff/{{ job.id }}" target="_blank"><button class="btn btn-outline">🔍 What Changed?</button></a>
       <button class="btn btn-outline" onclick="openOutreach('{{ job.id }}')">📨 Outreach</button>
       <button class="btn btn-outline" id="retailor-btn" onclick="tailorJob()">Re-tailor</button>
+      <button class="btn btn-outline" onclick="toggleInstructionsBar()" id="custom-bar-toggle" title="Custom instructions / improvement tips">✨ ▾</button>
     {% else %}
       <button class="btn btn-white" id="tailor-btn" onclick="tailorJob()">✨ Tailor Resume</button>
     {% endif %}
@@ -159,6 +160,49 @@
     {% endif %}
   </div>
 </header>
+
+<!-- Custom Instructions / Tips bar -->
+<div id="instructions-bar" style="display:none;background:#1a237e;border-bottom:2px solid #0d47a1;padding:14px 28px;flex-shrink:0">
+  {% if job.tailor_result and job.tailor_result.improvement_tips %}
+  <div style="margin-bottom:10px">
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.6);margin-bottom:7px">
+      💡 Improvement Tips — click to add to instructions
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">
+      {% for tip in job.tailor_result.improvement_tips %}
+      <button onclick="addTipToInstructions(this)"
+              data-tip="{{ tip | replace('✓ Implemented: ', '') | e }}"
+              style="padding:5px 11px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;border:1.5px solid;
+                     {% if tip.startswith('✓') %}background:rgba(46,125,50,.25);color:#a5d6a7;border-color:rgba(165,214,167,.4)
+                     {% else %}background:rgba(255,255,255,.1);color:#fff;border-color:rgba(255,255,255,.25){% endif %}">
+        {{ tip }}
+      </button>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+  <div style="display:flex;gap:10px;align-items:flex-start">
+    <textarea id="custom-instructions"
+              placeholder="e.g. Highlight specific achievements that demonstrate problem-solving skills, such as reducing release failures or improving system scalability…"
+              style="flex:1;min-height:68px;padding:9px 12px;border:1.5px solid rgba(255,255,255,.3);
+                     border-radius:8px;font-size:13px;color:#fff;line-height:1.6;background:rgba(255,255,255,.1);
+                     font-family:inherit;resize:vertical;outline:none"
+              onfocus="this.style.borderColor='rgba(255,255,255,.7)'"
+              onblur="this.style.borderColor='rgba(255,255,255,.3)'"></textarea>
+    <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
+      <button onclick="tailorWithInstructions()"
+              style="padding:9px 18px;border:none;border-radius:6px;background:#ff6d00;
+                     color:#fff;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">
+        ✨ Apply &amp; Re-tailor
+      </button>
+      <button onclick="tailorJob()"
+              style="padding:7px 18px;border:1.5px solid rgba(255,255,255,.4);border-radius:6px;
+                     background:transparent;color:rgba(255,255,255,.8);font-size:12px;font-weight:600;cursor:pointer">
+        Quick Re-tailor
+      </button>
+    </div>
+  </div>
+</div>
 
 <div class="split">
 
@@ -196,27 +240,6 @@
                      padding:7px 16px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">
         {{ '✓ Applied — click to unmark' if job.applied_at else '✓ Mark as Applied' }}
       </button>
-    </div>
-
-    <!-- Custom tailoring instructions -->
-    <div style="margin-top:20px">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;
-                  color:#0d47a1;margin-bottom:8px">✨ Custom Tailoring Instructions</div>
-      <textarea id="custom-instructions"
-                placeholder="e.g. Highlight specific achievements that demonstrate problem-solving skills, such as reducing release failures or improving system scalability. Add a separate section for open-source contributions."
-                style="width:100%;min-height:90px;padding:10px 12px;border:1.5px solid #c7d5e8;
-                       border-radius:8px;font-size:13px;color:#333;line-height:1.6;
-                       font-family:inherit;resize:vertical;background:#f8fafd;outline:none"
-                onfocus="this.style.borderColor='#0d47a1'"
-                onblur="this.style.borderColor='#c7d5e8'"></textarea>
-      <div style="margin-top:8px;display:flex;align-items:center;gap:8px">
-        <button onclick="tailorWithInstructions()"
-                style="padding:8px 18px;border:none;border-radius:6px;background:#e65100;
-                       color:#fff;font-size:13px;font-weight:600;cursor:pointer">
-          ✨ Apply &amp; Re-tailor
-        </button>
-        <span style="font-size:11.5px;color:#aaa">Re-tailors the resume with your instructions injected into the AI prompt.</span>
-      </div>
     </div>
 
     <!-- Email responses -->
@@ -407,6 +430,22 @@ pollTailor();
 function togglePdfDropdown(){
   const el = document.getElementById('pdf-split-detail');
   if(el) el.classList.toggle('open');
+}
+function toggleInstructionsBar(){
+  const bar = document.getElementById('instructions-bar');
+  const btn = document.getElementById('custom-bar-toggle');
+  if(!bar) return;
+  const open = bar.style.display !== 'none';
+  bar.style.display = open ? 'none' : 'block';
+  if(btn) btn.textContent = open ? '✨ ▾' : '✨ ▴';
+  if(!open) document.getElementById('custom-instructions').focus();
+}
+function addTipToInstructions(btn){
+  const tip = btn.dataset.tip || '';
+  if(!tip) return;
+  const ta = document.getElementById('custom-instructions');
+  ta.value = ta.value ? ta.value.trimEnd() + '\n' + tip : tip;
+  ta.focus();
 }
 document.addEventListener('click', function(e){
   if(!e.target.closest('.pdf-split')){
