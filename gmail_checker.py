@@ -129,8 +129,14 @@ def _company_key(company: str) -> str:
     """First meaningful word of the company name for search."""
     stop = {"private", "limited", "pvt", "ltd", "inc", "corp", "technologies",
             "solutions", "services", "consulting", "india", "the", "and"}
-    words = [w for w in re.sub(r"[^a-zA-Z0-9 ]", "", company).split()
-             if w.lower() not in stop and len(w) > 2]
+    # Replace (not delete) stripped punctuation so possessives like "Moody's"
+    # split into "Moody s" -> key "Moody", instead of merging into "Moodys"
+    # which won't match how the real company writes its own name in emails.
+    cleaned = re.sub(r"[^a-zA-Z0-9]", " ", company)
+    # Split concatenated/camelCase names (e.g. "JPMorganChase" -> "JPMorgan Chase")
+    # so the search key matches how companies actually write their name in emails.
+    cleaned = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", cleaned)
+    words = [w for w in cleaned.split() if w.lower() not in stop and len(w) > 2]
     return words[0] if words else company.split()[0] if company.split() else ""
 
 

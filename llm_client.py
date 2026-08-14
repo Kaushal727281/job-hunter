@@ -27,7 +27,7 @@ GROQ_MODEL       = "llama-3.3-70b-versatile"
 DEEPSEEK_MODEL   = "deepseek-chat"
 MISTRAL_MODEL    = "mistral-small-latest"
 OPENROUTER_MODEL = "google/gemini-2.0-flash-exp:free"  # 1M context, free tier
-GEMINI_MODEL     = "gemini-1.5-flash"
+GEMINI_MODEL     = "gemini-2.0-flash"
 OLLAMA_BASE_URL  = "http://localhost:11434/v1"
 
 
