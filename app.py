@@ -763,6 +763,7 @@ def outreach(job_id):
     }
     domain = ""
     apply_link = job.get("apply_link", "")
+    apply_link_is_company_site = False
     try:
         from urllib.parse import urlparse
         netloc = urlparse(apply_link).netloc.lower()
@@ -770,12 +771,24 @@ def outreach(job_id):
             netloc = netloc.removeprefix(prefix)
         if netloc and not any(jb in netloc for jb in _job_boards):
             domain = netloc
+            apply_link_is_company_site = True
     except Exception:
         pass
     # Fallback: slug company name → domain guess
     if not domain and company:
         slug = re.sub(r"[^a-z0-9]", "", company.lower().split()[0])
         domain = f"{slug}.com" if slug else ""
+
+    # ── Job URL for sharing with referral contacts ───────────────────────────
+    # Prefer the company's own site over a LinkedIn/Indeed/etc. listing — those
+    # require login and expire, which makes them a poor thing to hand a referrer.
+    if apply_link_is_company_site:
+        job_url = apply_link
+    elif domain:
+        from urllib.parse import quote as _qj
+        job_url = f"https://www.google.com/search?q={_qj(f'site:{domain} {title}')}"
+    else:
+        job_url = ""
 
     # ── Hunter.io domain search (real verified emails) ──────────────────────
     hunter_key = os.getenv("HUNTER_API_KEY", "")
@@ -810,6 +823,27 @@ def outreach(job_id):
     if not hr_emails and domain:
         hr_emails = [f"careers@{domain}", f"hr@{domain}", f"talent@{domain}",
                      f"recruiting@{domain}", f"jobs@{domain}"]
+
+    # ── Referral contacts from your LinkedIn Connections export ─────────────
+    from linkedin_contacts import find_connections_at_company
+    referral_contacts = find_connections_at_company(company)
+
+    # ── Decision-maker search links (LinkedIn people search, no scraping) ───
+    # These just prefill LinkedIn's own search — you browse and message manually
+    # from your logged-in session, so there's no scraping/ban risk involved.
+    from urllib.parse import quote as _qd
+    skill_hint = key_matches[0] if key_matches else ""
+    _DECISION_TITLES = [
+        "Engineering Manager", "Director of Engineering", "VP Engineering",
+        "Head of Engineering", "Technical Lead", "CTO",
+    ]
+    decision_maker_links = []
+    for role_title in _DECISION_TITLES:
+        kw = f"{role_title} {skill_hint} {company}".strip()
+        decision_maker_links.append({
+            "label": role_title,
+            "url": f"https://www.linkedin.com/search/results/people/?keywords={_qd(kw)}&origin=GLOBAL_SEARCH",
+        })
 
     # ── LinkedIn InMail (connection request note ≤ 300 chars) ──────────────
     skills_str = ", ".join(key_matches[:3]) if key_matches else "Java & backend technologies"
@@ -851,13 +885,33 @@ def outreach(job_id):
     return jsonify({
         "company":            company,
         "title":              title,
+        "job_url":            job_url,
+        "job_url_is_company_site": apply_link_is_company_site,
         "linkedin_inmail":    inmail,
         "cold_email_subject": subject,
         "cold_email_body":    body,
         "hr_emails":          hr_emails,
         "hr_verified":        bool(hunter_key and hr_emails and not hr_emails[0].startswith("careers@")),
         "mailto":             mailto,
+        "referral_contacts":  referral_contacts,
+        "decision_maker_links": decision_maker_links,
     })
+
+
+@app.route("/verify-emails", methods=["POST"])
+def verify_emails_route():
+    """SMTP-level check (RCPT TO probe, no message sent) for a list of guessed HR emails."""
+    data = request.get_json(silent=True) or {}
+    emails = data.get("emails", [])[:10]
+    if not emails:
+        return jsonify({"ok": False, "message": "No emails provided"}), 400
+    from email_verifier import verify_emails
+    try:
+        results = verify_emails(emails)
+        return jsonify({"ok": True, "results": results})
+    except Exception as e:
+        logger.warning(f"Email verification failed: {e}")
+        return jsonify({"ok": False, "message": str(e)}), 500
 
 
 @app.route("/apply/<job_id>", methods=["POST"])

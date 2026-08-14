@@ -225,6 +225,11 @@
                   background:#f8fafd;border:1.5px solid #dde6f3;border-radius:7px;padding:9px 13px}
     .hr-email-addr{font-size:13px;color:#1e1e1e;font-family:monospace}
     .hr-email-note{font-size:11.5px;color:#aaa;margin-top:8px;line-height:1.5}
+    .hr-verify-badge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;white-space:nowrap}
+    .hr-verify-badge.badge-valid{background:#e3f5e9;color:#1e7e42}
+    .hr-verify-badge.badge-invalid{background:#fbe4e4;color:#b3261e}
+    .hr-verify-badge.badge-catch_all{background:#fff3d6;color:#8a6100}
+    .hr-verify-badge.badge-unknown{background:#eee;color:#777}
 
     /* ── Response Modal ── */
     #resp-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;
@@ -509,6 +514,8 @@
       <button class="outreach-tab active" onclick="switchOutreachTab(0,this)">📣 LinkedIn InMail</button>
       <button class="outreach-tab" onclick="switchOutreachTab(1,this)">📧 Cold Email</button>
       <button class="outreach-tab" onclick="switchOutreachTab(2,this)">🏢 HR Emails</button>
+      <button class="outreach-tab" onclick="switchOutreachTab(3,this)">🤝 Referrals</button>
+      <button class="outreach-tab" onclick="switchOutreachTab(4,this)">🎯 Decision-Makers</button>
     </div>
     <!-- Tab 0: LinkedIn InMail -->
     <div class="outreach-panel active" id="outreach-panel-0">
@@ -544,6 +551,27 @@
     <div class="outreach-panel" id="outreach-panel-2">
       <div id="or-hr-list"></div>
       <div class="hr-email-note" id="or-hr-note"></div>
+      <div class="outreach-actions">
+        <button class="btn-copy" id="or-verify-btn" onclick="verifyHrEmails(this)">🔍 Verify deliverability (free)</button>
+      </div>
+      <p style="font-size:11.5px;color:#aaa;line-height:1.5">
+        Checks with each domain's mail server whether it would accept the address — no email is actually sent. Some networks may return "unknown" if port 25 is blocked.
+      </p>
+    </div>
+    <!-- Tab 3: Referrals -->
+    <div class="outreach-panel" id="outreach-panel-3">
+      <div class="outreach-actions" id="or-joburl-actions" style="display:none">
+        <button class="btn-copy" id="or-joburl-btn" onclick="copyJobUrl(this)">📋 Copy Job Link (to share with connection)</button>
+      </div>
+      <div id="or-referral-list"></div>
+      <div class="hr-email-note" id="or-referral-note"></div>
+    </div>
+    <!-- Tab 4: Decision-Makers -->
+    <div class="outreach-panel" id="outreach-panel-4">
+      <div id="or-decision-list"></div>
+      <p style="font-size:11.5px;color:#aaa;line-height:1.5;margin-top:8px">
+        These open a prefilled LinkedIn people search in a new tab — you browse and message manually from your own logged-in session (no scraping, no risk to your account).
+      </p>
     </div>
   </div>
 </div>
@@ -1062,16 +1090,59 @@ function openOutreach(jobId){
     const list = document.getElementById('or-hr-list');
     if(d.hr_emails && d.hr_emails.length){
       list.innerHTML = d.hr_emails.map(em=>`
-        <div class="hr-email-row">
+        <div class="hr-email-row" data-email="${escHtml(em)}">
           <span class="hr-email-addr">${escHtml(em)}</span>
+          <span class="hr-verify-badge"></span>
           <button class="btn-copy" onclick="copyText('${escHtml(em)}',this)">📋 Copy</button>
         </div>`).join('');
+      document.getElementById('or-verify-btn').textContent = '🔍 Verify deliverability (free)';
+      document.getElementById('or-verify-btn').disabled = false;
       document.getElementById('or-hr-note').innerHTML = d.hr_verified
         ? '✅ Emails found via <strong>Hunter.io</strong> — real addresses from this company domain.'
         : '⚠️ These are <strong>guessed</strong> addresses. Add a free <strong>HUNTER_API_KEY</strong> in .env for real emails.';
     } else {
       list.innerHTML = '<p style="color:#aaa;font-size:13px">Could not determine company domain — find the HR email on the company\'s careers page.</p>';
       document.getElementById('or-hr-note').textContent = '';
+    }
+
+    // Tab 3: Referrals
+    const joburlActions = document.getElementById('or-joburl-actions');
+    if(d.job_url){
+      joburlActions.style.display = '';
+      document.getElementById('or-joburl-btn').textContent = d.job_url_is_company_site
+        ? '📋 Copy Job Link (company site)'
+        : '📋 Copy Search Link (finds it on their careers site)';
+    } else {
+      joburlActions.style.display = 'none';
+    }
+    const refList = document.getElementById('or-referral-list');
+    if(d.referral_contacts && d.referral_contacts.length){
+      refList.innerHTML = d.referral_contacts.map(c=>`
+        <div class="hr-email-row">
+          <span class="hr-email-addr">
+            ${escHtml(c.name)}${c.position ? ' — '+escHtml(c.position) : ''}
+            ${c.email ? '<br><span style="color:#aaa;font-size:12px">'+escHtml(c.email)+'</span>' : ''}
+          </span>
+          ${c.profile_url ? `<a class="btn-copy" href="${escHtml(c.profile_url)}" target="_blank">🔗 Profile</a>` : ''}
+        </div>`).join('');
+      document.getElementById('or-referral-note').innerHTML =
+        `🤝 Found from your LinkedIn connections — ${d.referral_contacts.length} contact(s) at ${escHtml(d.company)}.`;
+    } else {
+      refList.innerHTML = '<p style="color:#aaa;font-size:13px">No matching connections found at this company.</p>';
+      document.getElementById('or-referral-note').innerHTML =
+        '💡 Export your connections via LinkedIn Settings → Data Privacy → "Get a copy of your data" and save as <code>output/linkedin_connections.csv</code>.';
+    }
+
+    // Tab 4: Decision-Makers
+    const decList = document.getElementById('or-decision-list');
+    if(d.decision_maker_links && d.decision_maker_links.length){
+      decList.innerHTML = d.decision_maker_links.map(l=>`
+        <div class="hr-email-row">
+          <span class="hr-email-addr">${escHtml(l.label)}</span>
+          <a class="btn-copy" href="${escHtml(l.url)}" target="_blank">🔎 Search on LinkedIn</a>
+        </div>`).join('');
+    } else {
+      decList.innerHTML = '<p style="color:#aaa;font-size:13px">Could not build search links for this company.</p>';
     }
 
     // Reset to tab 0
@@ -1101,6 +1172,46 @@ function copyOutreachEmail(btn){
   if(!_outreachData) return;
   const text = `Subject: ${_outreachData.cold_email_subject}\n\n${_outreachData.cold_email_body}`;
   copyText(text, btn);
+}
+
+function copyJobUrl(btn){
+  if(!_outreachData || !_outreachData.job_url) return;
+  copyText(_outreachData.job_url, btn);
+}
+
+function verifyHrEmails(btn){
+  if(!_outreachData || !_outreachData.hr_emails || !_outreachData.hr_emails.length) return;
+  btn.disabled = true;
+  btn.textContent = '🔍 Checking mail servers…';
+  fetch('/verify-emails', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({emails: _outreachData.hr_emails})
+  }).then(r=>r.json()).then(d=>{
+    btn.disabled = false;
+    btn.textContent = '🔍 Verify deliverability (free)';
+    if(!d.ok){ toast('Verification failed: ' + (d.message||'')); return; }
+    const badges = {
+      valid:     '✅ Valid',
+      invalid:   '❌ Invalid',
+      catch_all: '⚠️ Catch-all (unconfirmed)',
+      unknown:   '❓ Unknown',
+    };
+    document.querySelectorAll('#or-hr-list .hr-email-row').forEach(row=>{
+      const em = row.dataset.email;
+      const res = d.results[em];
+      if(res){
+        const badgeEl = row.querySelector('.hr-verify-badge');
+        badgeEl.textContent = badges[res.status] || res.status;
+        badgeEl.title = res.detail || '';
+        badgeEl.className = 'hr-verify-badge badge-' + res.status;
+      }
+    });
+  }).catch(()=>{
+    btn.disabled = false;
+    btn.textContent = '🔍 Verify deliverability (free)';
+    toast('Verification request failed');
+  });
 }
 
 function copyText(text, btn){
