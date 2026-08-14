@@ -27,6 +27,13 @@ app = Flask(__name__)
 CONFIG_FILE  = Path(__file__).parent / "config.json"
 LAST_FETCH_FILE = Path(__file__).parent / "output" / "last_fetch.json"
 
+
+@app.template_filter("expmin")
+def _expmin_filter(exp: str) -> str:
+    """Extract the leading number from an experience string (e.g. '5+ Yrs' or '5–8 Yrs' -> '5')."""
+    m = re.search(r"\d+", exp or "")
+    return m.group() if m else ""
+
 _fetch_status = {"running": False, "message": "Idle", "last_run": None}
 _tailor_running: set[str] = set()
 
@@ -178,9 +185,17 @@ def _bg_tailor(job_id: str, prev_result: dict = None, prev_pdf: str = None, cust
         if not job:
             return
         # Get full JD once
-        from job_fetcher import fetch_full_jd
+        from job_fetcher import fetch_full_jd, extract_experience
         full_desc = fetch_full_jd(job)
         job_with_desc = {**job, "description": full_desc}
+
+        # Most sources (LinkedIn, Indeed, Glassdoor, RemoteOK, WWR, HNJobs) only
+        # get their full JD text here, lazily — backfill experience from it now.
+        exp_update = {}
+        if not job.get("experience"):
+            extracted_exp = extract_experience(full_desc)
+            if extracted_exp:
+                exp_update["experience"] = extracted_exp
 
         from resume_tailor import tailor_resume
         result = None
@@ -222,6 +237,7 @@ def _bg_tailor(job_id: str, prev_result: dict = None, prev_pdf: str = None, cust
             pdf_path=str(pdf_path),
             description=full_desc,
             tailor_error=None,
+            **exp_update,
         )
         logger.info(f"Tailored: {job['title']} @ {job['company']} — score {result.get('match_score')}/10 | layout: {layout}")
 

@@ -307,10 +307,15 @@
   <!-- Experience filter -->
   <div class="filter-group">
     <span class="filter-label">Exp</span>
-    <button class="filter-btn active" data-filter="exp" data-val="all"  onclick="applyFilters(this,'exp')">All</button>
-    <button class="filter-btn"        data-filter="exp" data-val="0-5"  onclick="applyFilters(this,'exp')">0–5 yrs</button>
-    <button class="filter-btn"        data-filter="exp" data-val="5-10" onclick="applyFilters(this,'exp')">5–10 yrs</button>
-    <button class="filter-btn"        data-filter="exp" data-val="10+"  onclick="applyFilters(this,'exp')">10+ yrs</button>
+    <button class="filter-btn active" data-filter="exp" data-val="all"   onclick="applyFilters(this,'exp')">All</button>
+    <button class="filter-btn"        data-filter="exp" data-val="0-2"   onclick="applyFilters(this,'exp')">0–2 yrs</button>
+    <button class="filter-btn"        data-filter="exp" data-val="2-4"   onclick="applyFilters(this,'exp')">2–4 yrs</button>
+    <button class="filter-btn"        data-filter="exp" data-val="4-6"   onclick="applyFilters(this,'exp')">4–6 yrs</button>
+    <button class="filter-btn"        data-filter="exp" data-val="6-8"   onclick="applyFilters(this,'exp')">6–8 yrs</button>
+    <button class="filter-btn"        data-filter="exp" data-val="8-10"  onclick="applyFilters(this,'exp')">8–10 yrs</button>
+    <button class="filter-btn"        data-filter="exp" data-val="10-12" onclick="applyFilters(this,'exp')">10–12 yrs</button>
+    <button class="filter-btn"        data-filter="exp" data-val="12-14" onclick="applyFilters(this,'exp')">12–14 yrs</button>
+    <button class="filter-btn"        data-filter="exp" data-val="14+"   onclick="applyFilters(this,'exp')">14+ yrs</button>
   </div>
 
   <div class="toolbar-divider"></div>
@@ -352,7 +357,7 @@
        data-jobstatus="{{ job.job_status or '' }}"
        data-responded="{{ 'yes' if job.email_responses else 'no' }}"
        data-loc="{{ job.location|lower }}"
-       data-expmin="{{ job.experience.split('–')[0].strip() if job.experience and '–' in job.experience else '' }}"
+       data-expmin="{{ job.experience|expmin }}"
        data-text="{{ (job.title + ' ' + job.company + ' ' + job.location)|lower }}"
        data-responses="{{ job.email_responses | tojson | forceescape if job.email_responses else '[]' }}"
        data-companytype="{{ job.company_type or 'Unknown' }}"
@@ -824,9 +829,14 @@ function applyFilters(btn, group){
       if(expRaw !== ''){
         const expMin = parseInt(expRaw);
         if(!isNaN(expMin)){
-          if(activeFilters.exp === '0-5'  && (expMin < 0  || expMin >= 5))  show=false;
-          if(activeFilters.exp === '5-10' && (expMin < 5  || expMin >= 10)) show=false;
-          if(activeFilters.exp === '10+'  && expMin < 10) show=false;
+          const bucket = activeFilters.exp;
+          if(bucket.endsWith('+')){
+            const lo = parseInt(bucket);
+            if(expMin < lo) show=false;
+          } else {
+            const [lo, hi] = bucket.split('-').map(Number);
+            if(expMin < lo || expMin >= hi) show=false;
+          }
         }
       }
     }

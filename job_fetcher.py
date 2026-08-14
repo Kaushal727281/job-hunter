@@ -324,6 +324,26 @@ def _norm_key(title: str, company: str) -> str:
     return " ".join(sorted(words))
 
 
+EXP_RANGE_RE   = re.compile(r"(\d{1,2})\s*(?:-|–|—|to)\s*(\d{1,2})\+?\s*(?:years?|yrs?)\b", re.I)
+EXP_PLUS_RE    = re.compile(r"(\d{1,2})\s*\+\s*(?:years?|yrs?)\b", re.I)
+EXP_ATLEAST_RE = re.compile(r"(?:minimum|min\.?|at least)\s*(?:of\s*)?(\d{1,2})\s*(?:years?|yrs?)\b", re.I)
+
+
+def extract_experience(text: str) -> str:
+    """Best-effort extraction of required experience from free-form JD text.
+    Only Shine's listing HTML has a structured experience field — every other
+    source leaves it blank, so this scans the description text as a fallback."""
+    if not text:
+        return ""
+    m = EXP_RANGE_RE.search(text)
+    if m:
+        return f"{m.group(1)}–{m.group(2)} Yrs"
+    m = EXP_PLUS_RE.search(text) or EXP_ATLEAST_RE.search(text)
+    if m:
+        return f"{m.group(1)}+ Yrs"
+    return ""
+
+
 def _job_base(overrides: dict) -> dict:
     base = {
         "id": "", "title": "", "company": "", "location": "",
@@ -335,6 +355,8 @@ def _job_base(overrides: dict) -> dict:
         "company_tags": "", "salary_estimate": "",
     }
     base.update(overrides)
+    if not base["experience"]:
+        base["experience"] = extract_experience(base.get("description", ""))
     company = base["company"]
     base["company_type"] = _classify_company(company)
     cr = _rate_company(company)
@@ -889,24 +911,61 @@ def _fetch_hnjobs_jd(apply_link: str) -> str:
 
 # ── Full JD dispatcher ─────────────────────────────────────────────────────
 
+def _fetch_detail_text(job: dict) -> str:
+    """Fetch the job's actual detail page, regardless of any existing description
+    snippet. Used for availability checks — closure banners only live on the
+    detail page, never in a list-page card snippet."""
+    src  = job.get("source", "")
+    link = job.get("apply_link", "")
+    if src == "LinkedIn":
+        return _fetch_linkedin_jd(job["id"])
+    if src == "Shine":
+        return _fetch_shine_jd(link)
+    if src == "Indeed":
+        return _fetch_indeed_jd(job["id"])
+    if src == "Glassdoor":
+        return _fetch_glassdoor_jd(link)
+    # HNJobs, RemoteOK, WeWorkRemotely, and any future source — fetch from apply link
+    if link:
+        return _fetch_generic_jd(link, src)
+    return ""
+
+
 def fetch_full_jd(job: dict) -> str:
     existing = job.get("description", "")
     if existing and len(existing) > 400:
         return existing
-    src = job.get("source", "")
-    link = job.get("apply_link", "")
-    if src == "LinkedIn":
-        return _fetch_linkedin_jd(job["id"]) or existing
-    if src == "Shine":
-        return _fetch_shine_jd(link) or existing
-    if src == "Indeed":
-        return _fetch_indeed_jd(job["id"]) or existing
-    if src == "Glassdoor":
-        return _fetch_glassdoor_jd(link) or existing
-    # HNJobs, RemoteOK, WeWorkRemotely, and any future source — fetch from apply link
-    if link:
-        return _fetch_generic_jd(link, src) or existing
-    return existing
+    return _fetch_detail_text(job) or existing
+
+
+_CLOSED_PATTERNS = (
+    "no longer accepting applications", "no longer accepting applicants",
+    "is no longer available", "is no longer active", "no longer active",
+    "position has been filled", "position has already been filled",
+    "job has expired", "listing has expired", "job posting has expired",
+    "applications are closed", "we are no longer accepting",
+    "this job has closed", "this posting is closed", "this position is closed",
+    "hiring for this position has ended", "no longer taking applications",
+)
+
+
+def is_job_closed(text: str) -> bool:
+    """Best-effort detection of 'this job is closed/expired' banners in JD text."""
+    if not text:
+        return False
+    low = text.lower()
+    return any(p in low for p in _CLOSED_PATTERNS)
+
+
+def check_job_availability(job: dict) -> tuple[bool, str]:
+    """Fetch the job's detail page and check whether it's still open.
+    Returns (is_available, detail_text). If the detail page can't be fetched
+    (network error, source doesn't support it), assumes still open rather
+    than dropping a possibly-live job on a fetch failure."""
+    detail_text = _fetch_detail_text(job)
+    if not detail_text:
+        return True, job.get("description", "")
+    return not is_job_closed(detail_text), detail_text
 
 
 # ── Main entry ─────────────────────────────────────────────────────────────
@@ -978,6 +1037,18 @@ def fetch_jobs(config: dict, limit: int | None = None) -> list[dict]:
             nums = re.findall(r"\d+", job["experience"])
             if nums and (int(nums[0]) < min_exp or int(nums[0]) > max_exp):
                 return False
+        # Last (most expensive) check — fetch the real detail page and skip
+        # postings that are closed/expired/no longer accepting applications.
+        is_available, detail_text = check_job_availability(job)
+        time.sleep(0.3)
+        if not is_available:
+            logger.info(f"  Skipping closed/expired: '{job['title']}' @ {job.get('company','?')}")
+            seen.add(job["id"])
+            return False
+        if detail_text and len(detail_text) > len(job.get("description", "")):
+            job["description"] = detail_text
+            if not job.get("experience"):
+                job["experience"] = extract_experience(detail_text)
         all_jobs.append(job)
         seen.add(job["id"])
         if nk:
