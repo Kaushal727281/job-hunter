@@ -77,7 +77,48 @@ if not exist "config.json" (
     echo [OK] config.json already exists - skipping
 )
 
-:: ── 7. Chrome check ──────────────────────────
+:: ── 7. Ollama + local LLM models ─────────────
+echo.
+echo [>>] Checking for Ollama (local LLM runtime)...
+set OLLAMA_OK=0
+where ollama >nul 2>&1 && set OLLAMA_OK=1
+if "%OLLAMA_OK%"=="1" (
+    echo [OK] Ollama already installed
+) else (
+    echo [!] Ollama not found - installing via winget...
+    where winget >nul 2>&1
+    if errorlevel 1 (
+        echo [X] winget not available.
+        echo     Install manually: https://ollama.com/download
+        echo     Then re-run setup.bat to pull the local models.
+    ) else (
+        winget install --id Ollama.Ollama -e --silent --accept-source-agreements --accept-package-agreements
+        set "PATH=%PATH%;%LOCALAPPDATA%\Programs\Ollama"
+        where ollama >nul 2>&1 && set OLLAMA_OK=1
+        if "!OLLAMA_OK!"=="1" (
+            echo [OK] Ollama installed
+        ) else (
+            echo [!] Ollama installed but not on PATH in this window.
+            echo     Close this window, open a new terminal, and re-run setup.bat.
+        )
+    )
+)
+
+if "%OLLAMA_OK%"=="1" (
+    echo.
+    echo [>>] Pulling local models: llama3.1:8b and qwen2.5:7b - about 5GB each...
+    ollama pull llama3.1:8b
+    ollama pull qwen2.5:7b
+    echo [OK] Local models ready
+
+    findstr /R /C:"^OLLAMA_MODEL=$" .env >nul 2>&1
+    if not errorlevel 1 (
+        powershell -NoProfile -Command "(Get-Content .env) -replace '^OLLAMA_MODEL=$','OLLAMA_MODEL=llama3.1:8b' | Set-Content .env"
+        echo [OK] Set OLLAMA_MODEL=llama3.1:8b in .env - Ollama will run as the primary LLM
+    )
+)
+
+:: ── 8. Chrome check ──────────────────────────
 echo.
 echo [>>] Checking for Chrome (needed for PDF generation)...
 set CHROME_FOUND=0
@@ -96,7 +137,7 @@ if "%CHROME_FOUND%"=="1" (
     )
 )
 
-:: ── 8. Output dir ─────────────────────────────
+:: ── 9. Output dir ─────────────────────────────
 if not exist "output" mkdir output
 echo [OK] output\ ready
 
@@ -108,7 +149,7 @@ echo   ════════════════════════�
 echo.
 echo   Next steps:
 echo.
-echo   1. Add your Groq API key to .env
+echo   1. Add your Groq API key to .env (optional if Ollama is set up)
 echo      Get free key: https://console.groq.com
 echo.
 echo   2. Replace base_resume.html with your resume
@@ -121,4 +162,8 @@ echo        python app.py
 echo.
 echo   5. Open browser: http://localhost:5000
 echo.
+if "%OLLAMA_OK%"=="1" (
+    echo   Local models llama3.1:8b and qwen2.5:7b are installed via Ollama.
+    echo.
+)
 pause

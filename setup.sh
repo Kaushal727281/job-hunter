@@ -120,7 +120,52 @@ else
   ok "config.json already exists — skipping"
 fi
 
-# ── 6. Chrome / Chromium check ────────────────
+# ── 6. Ollama + local LLM models ──────────────
+step "Checking for Ollama (local LLM runtime)"
+OLLAMA_OK=false
+if command -v ollama &>/dev/null; then
+  OLLAMA_OK=true
+  ok "Ollama already installed"
+else
+  warn "Ollama not found — installing..."
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    if command -v brew &>/dev/null; then
+      brew install ollama -q || true
+    else
+      err "Homebrew not found — install Ollama manually from https://ollama.com/download"
+    fi
+  else
+    (curl -fsSL https://ollama.com/install.sh | sh) || true
+  fi
+  if command -v ollama &>/dev/null; then
+    OLLAMA_OK=true
+    ok "Ollama installed"
+  else
+    err "Ollama install failed — install manually from https://ollama.com/download"
+  fi
+fi
+
+if [ "$OLLAMA_OK" = true ]; then
+  step "Pulling local models: llama3.1:8b and qwen2.5:7b (~5GB each)"
+  if ! curl -s -o /dev/null http://localhost:11434; then
+    if [[ "$OSTYPE" == "darwin"* ]] && command -v brew &>/dev/null; then
+      brew services start ollama &>/dev/null || (nohup ollama serve &>/dev/null &)
+    else
+      nohup ollama serve &>/dev/null &
+    fi
+    sleep 2
+  fi
+  ollama pull llama3.1:8b || warn "Failed to pull llama3.1:8b — check your internet connection and re-run later"
+  ollama pull qwen2.5:7b  || warn "Failed to pull qwen2.5:7b — check your internet connection and re-run later"
+  ok "Local models ready"
+
+  if grep -qE "^OLLAMA_MODEL=$" .env 2>/dev/null; then
+    sed -i.bak 's/^OLLAMA_MODEL=$/OLLAMA_MODEL=llama3.1:8b/' .env && rm -f .env.bak
+    ok "Set OLLAMA_MODEL=llama3.1:8b in .env — Ollama will run as the primary LLM"
+  fi
+fi
+
+# ── 7. Chrome / Chromium check ────────────────
 step "Checking for Chrome / Chromium (needed for PDF generation)"
 CHROME_FOUND=false
 
@@ -159,7 +204,7 @@ if [ "$CHROME_FOUND" = false ]; then
   fi
 fi
 
-# ── 7. Output dir ─────────────────────────────
+# ── 8. Output dir ─────────────────────────────
 step "Creating output directory"
 mkdir -p output
 ok "output/ ready"
@@ -191,3 +236,8 @@ echo ""
 echo "  5. Open in browser:"
 echo "       http://localhost:5000"
 echo ""
+
+if [ "$OLLAMA_OK" = true ]; then
+  echo "  Local models llama3.1:8b and qwen2.5:7b are installed via Ollama."
+  echo ""
+fi
