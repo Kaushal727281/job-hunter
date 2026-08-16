@@ -209,6 +209,10 @@ step "Creating output directory"
 mkdir -p output
 ok "output/ ready"
 
+# ── 9. Personal info (name, Gmail, LinkedIn CSV) ──
+step "Let's fill in your personal details"
+python configure.py
+
 # ── Done ──────────────────────────────────────
 echo ""
 echo -e "${GREEN}  ══════════════════════════════════════${NC}"
@@ -227,7 +231,7 @@ fi
 echo "  2. Add your resume:"
 echo "       Replace base_resume.html with your own HTML resume"
 echo ""
-echo "  3. Update config.json with your name + job queries"
+echo "  3. Update config.json job_search.queries / locations for what to search"
 echo ""
 echo "  4. Start the app:"
 echo "       source .venv/bin/activate"

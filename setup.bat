@@ -141,6 +141,11 @@ if "%CHROME_FOUND%"=="1" (
 if not exist "output" mkdir output
 echo [OK] output\ ready
 
+:: ── 10. Personal info (name, Gmail, LinkedIn CSV) ──
+echo.
+echo [>>] Let's fill in your personal details...
+python configure.py
+
 :: ── Done ──────────────────────────────────────
 echo.
 echo   ══════════════════════════════════════
@@ -154,7 +159,7 @@ echo      Get free key: https://console.groq.com
 echo.
 echo   2. Replace base_resume.html with your resume
 echo.
-echo   3. Update config.json with your name + job queries
+echo   3. Update config.json job_search.queries / locations for what to search
 echo.
 echo   4. Start the app:
 echo        .venv\Scripts\activate
