@@ -1,6 +1,12 @@
 # Secrets
 .env
 
+# Personal data — each install has its own; don't let clones inherit
+# whoever committed last. See config.example.json to bootstrap a new one.
+config.json
+base_resume.html
+base_resume.html.bak
+
 # Runtime data
 seen_jobs.json
 output/

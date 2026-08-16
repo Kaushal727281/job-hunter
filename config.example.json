@@ -5,12 +5,6 @@
     "total_experience_years": 5
   },
   "job_search": {
-    "queries": [
-      "Senior Java Developer",
-      "Lead Software Engineer",
-      "Senior Backend Engineer",
-      "Java Tech Lead"
-    ],
     "locations": [
       "Bengaluru",
       "Hyderabad",
@@ -26,15 +20,6 @@
     ]
   },
   "filters": {
-    "exclude_keywords": [
-      "intern",
-      "fresher",
-      "0-2 years",
-      "junior",
-      "trainee"
-    ],
-    "min_experience_years": 3,
-    "max_experience_years": 15,
     "job_types": [],
     "min_salary_lpa": 0
   },

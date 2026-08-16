@@ -159,7 +159,8 @@ echo      Get free key: https://console.groq.com
 echo.
 echo   2. Replace base_resume.html with your resume
 echo.
-echo   3. Update config.json job_search.queries / locations for what to search
+echo   3. Update config.json job_search.locations for where to search
+echo      (search queries are derived from base_resume.html automatically)
 echo.
 echo   4. Start the app:
 echo        .venv\Scripts\activate

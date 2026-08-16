@@ -968,16 +968,98 @@ def check_job_availability(job: dict) -> tuple[bool, str]:
     return not is_job_closed(detail_text), detail_text
 
 
+# ── Resume-driven search profile ────────────────────────────────────────────
+# Search queries and the junior/fresher exclusion filter come from the
+# uploaded resume + years of experience, not a hand-maintained list — so
+# they stay in sync whenever the resume is replaced or experience changes.
+
+BASE_RESUME_PATH = Path(__file__).parent / "base_resume.html"
+
+_SENIORITY_WORDS = {
+    "senior", "sr", "sr.", "junior", "jr", "jr.", "lead", "principal", "staff",
+    "associate", "intern", "trainee", "graduate", "entry-level", "entry",
+}
+
+
+def _strip_seniority(title: str) -> str:
+    words = [w for w in title.split() if w.lower().strip(".,") not in _SENIORITY_WORDS]
+    return " ".join(words).strip() or title
+
+
+def _resume_title(resume_path: Path = BASE_RESUME_PATH) -> str:
+    """Pull the target role from the resume: the banner's role line
+    (e.g. 'Junior DevOps Engineer · Cloud & Automation · 1 Year Experience')
+    falling back to the most recent job title in Professional Experience."""
+    if not resume_path.exists():
+        return ""
+    try:
+        soup = BeautifulSoup(resume_path.read_text(encoding="utf-8"), "html.parser")
+        role_el = soup.find(class_="role")
+        if role_el:
+            title = role_el.get_text(" ", strip=True).split("·")[0].strip()
+            if title:
+                return title
+        job_title_el = soup.find(class_="job-title")
+        if job_title_el:
+            return job_title_el.get_text(" ", strip=True)
+    except Exception as e:
+        logger.warning(f"Failed to read target role from resume: {e}")
+    return ""
+
+
+def derive_search_queries(candidate: dict, resume_path: Path = BASE_RESUME_PATH) -> list[str]:
+    """Build search queries from the resume's target role + years of
+    experience, e.g. 1 yr 'DevOps Engineer' -> ['Junior DevOps Engineer',
+    'DevOps Engineer', 'Associate DevOps Engineer']."""
+    title = _resume_title(resume_path)
+    if not title:
+        return []
+    years = candidate.get("total_experience_years", 0) or 0
+    base = _strip_seniority(title)
+    if years <= 2:
+        prefixes = ["Junior", "", "Associate"]
+    elif years <= 5:
+        prefixes = ["", "Senior"]
+    else:
+        prefixes = ["Senior", "Lead", ""]
+    queries, seen_q = [], set()
+    for prefix in prefixes:
+        q = f"{prefix} {base}".strip()
+        if q and q.lower() not in seen_q:
+            queries.append(q)
+            seen_q.add(q.lower())
+    return queries
+
+
+def _auto_exclude_keywords(years: float) -> list[str]:
+    """Postings for 0-experience roles are never relevant once you have any
+    real work experience; 'junior'/'0-2 years' only become irrelevant once
+    you've outgrown that band."""
+    exclude = ["intern", "fresher", "trainee"]
+    if years > 3:
+        exclude += ["junior", "0-2 years"]
+    return exclude
+
+
 # ── Main entry ─────────────────────────────────────────────────────────────
 
 def fetch_jobs(config: dict, limit: int | None = None) -> list[dict]:
     search_cfg = config["job_search"]
-    filters    = config.get("filters", {})
+    candidate  = config.get("candidate", {})
     max_jobs   = limit or search_cfg.get("max_jobs_per_run", 60)
     days       = int(search_cfg.get("days_old", 3))
-    exclude    = [k.lower() for k in filters.get("exclude_keywords", [])]
-    min_exp    = filters.get("min_experience_years", 0)
-    max_exp    = filters.get("max_experience_years", 99)
+    years      = candidate.get("total_experience_years", 0) or 0
+
+    queries = derive_search_queries(candidate)
+    if not queries:
+        queries = search_cfg.get("queries", [])
+        logger.warning("  Couldn't derive a target role from base_resume.html "
+                        "— falling back to job_search.queries in config.json")
+
+    exclude = _auto_exclude_keywords(years)
+    min_exp = max(0, years - 1)
+    max_exp = years + 5
+
     enabled    = {s.lower() for s in search_cfg.get(
         "sources", ["LinkedIn", "Shine", "Foundit", "RemoteOK",
                     "WeWorkRemotely", "HNJobs", "Indeed"])}
@@ -1055,7 +1137,7 @@ def fetch_jobs(config: dict, limit: int | None = None) -> list[dict]:
             seen_keys.add(nk)
         return True
 
-    for query in search_cfg["queries"]:
+    for query in queries:
         if len(all_jobs) >= max_jobs:
             break
 

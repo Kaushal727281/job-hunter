@@ -80,10 +80,12 @@ Replace `base_resume.html` with your own resume in HTML format. The file must us
 ### 4. Edit config.json
 
 Open `config.json` and update:
-- `candidate.name` / `candidate.email` — your details
-- `job_search.queries` — job titles to search for
+- `candidate.name` / `candidate.email` / `candidate.total_experience_years` — your details
 - `job_search.locations` — cities or "Remote India"
-- `filters.min_experience_years` — filter out junior roles
+
+Search queries and the junior/fresher exclusion filter aren't configured here —
+they're derived automatically from `base_resume.html`'s target role and your
+`total_experience_years`, so they stay in sync whenever you update your resume.
 
 ### 5. Run the app
 
@@ -169,6 +171,6 @@ job-hunter/
 | `Groq rate limit — try again in Xm` | Free tier: 100K tokens/day. Wait and retry. |
 | `Chrome/Chromium not found` | Install [Google Chrome](https://www.google.com/chrome/) |
 | PDF downloads but is blank | Make sure Chrome is not sandboxed; try `--no-sandbox` (already set) |
-| No jobs fetched | Check internet connection; broaden `config.json` queries or increase `days_old` |
+| No jobs fetched | Check internet connection; check `base_resume.html`'s role title is set correctly, or increase `days_old` |
 | Tailored resume looks plain | Re-tailor the job — old resumes used a previous template |
 | Gmail replies not showing | Set `GMAIL_ADDRESS` and `GMAIL_APP_PASSWORD` in `.env` |
