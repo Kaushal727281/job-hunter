@@ -334,7 +334,8 @@ def index():
         return (j.get("fetched_date", ""), tr.get("match_score", 0) if tr else -1)
     jobs.sort(key=sort_key, reverse=True)
     status = {**_fs(), "last_run": _get_last_fetch_date()}
-    return render_template("index.html", jobs=jobs, status=status, config=_load_config())
+    has_resume = profiles.base_resume_path().exists()
+    return render_template("index.html", jobs=jobs, status=status, config=_load_config(), has_resume=has_resume)
 
 
 @app.route("/fetch", methods=["POST"])

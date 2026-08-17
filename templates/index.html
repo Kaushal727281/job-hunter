@@ -501,9 +501,16 @@
 
 {% else %}
 <div class="empty">
+{% if not has_resume %}
+  <div id="no-resume-banner" style="background:#fff3e0;border:1px solid #ffb74d;border-radius:10px;padding:20px 28px;max-width:460px;margin:0 auto 28px;text-align:left">
+    <div style="font-size:22px;margin-bottom:8px">📄 Upload your resume first</div>
+    <p style="margin:0 0 14px;font-size:14px;color:#5d4037">Job Hunter needs your resume to know what roles to search for. Without it, no searches will run.</p>
+    <button class="btn btn-white" style="background:#e65100;color:#fff;padding:10px 22px;border-radius:8px;font-size:14px;border:none;cursor:pointer" onclick="document.getElementById('settings-overlay').classList.add('open')">Upload Resume →</button>
+  </div>
+{% endif %}
   <h2>No jobs yet</h2>
-  <p>Click <strong>Fetch New Jobs</strong> to scrape Naukri + LinkedIn</p>
-  <button class="btn btn-white" style="background:#0d47a1;color:#fff;padding:11px 24px;border-radius:8px;font-size:14px;border:none;cursor:pointer" onclick="startFetch()">Fetch Now</button>
+  <p id="empty-hint">{% if has_resume %}Click <strong>Fetch New Jobs</strong> to scrape LinkedIn + Shine{% else %}After uploading your resume, fetch jobs{% endif %}</p>
+  <button id="empty-fetch-btn" class="btn btn-white" style="background:#0d47a1;color:#fff;padding:11px 24px;border-radius:8px;font-size:14px;border:none;cursor:pointer;{% if not has_resume %}display:none{% endif %}" onclick="startFetch()">Fetch Now</button>
 </div>
 {% endif %}
 
@@ -1264,6 +1271,13 @@ function uploadResume(input){
           ' — <a href="/resume-base" target="_blank" style="color:#0d47a1">Preview</a>';
       }
       toast('✅ Resume imported — click Save Profile to confirm');
+      // Hide the "upload resume first" banner and reveal the Fetch Now button
+      const banner = document.getElementById('no-resume-banner');
+      if(banner) banner.style.display = 'none';
+      const hint = document.getElementById('empty-hint');
+      if(hint) hint.innerHTML = 'Click <strong>Fetch New Jobs</strong> to scrape LinkedIn + Shine';
+      const fetchBtn = document.getElementById('empty-fetch-btn');
+      if(fetchBtn) fetchBtn.style.display = '';
     }).catch(()=>toast('Upload failed'));
 }
 
