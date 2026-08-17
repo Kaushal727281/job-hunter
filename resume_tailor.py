@@ -295,7 +295,7 @@ def _bold_keywords(soup: BeautifulSoup, keywords: list) -> BeautifulSoup:
             break
 
         pattern = re.compile(
-            "(" + "|".join(re.escape(k) for k in remaining) + ")",
+            r"(?<![A-Za-z0-9])(" + "|".join(re.escape(k) for k in remaining) + r")(?![A-Za-z0-9])",
             re.IGNORECASE,
         )
 
