@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Job Hunter — Who's applying?</title>
+<style>
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f9;color:#1e1e1e;
+       min-height:100vh;display:flex;align-items:center;justify-content:center;margin:0}
+  .card{background:#fff;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,.08);
+        padding:36px 40px;max-width:420px;width:100%}
+  h1{font-size:20px;margin:0 0 6px}
+  .sub{font-size:13px;color:#777;margin:0 0 24px}
+  .profile-list{display:flex;flex-direction:column;gap:8px;margin-bottom:24px}
+  .profile-btn{display:block;width:100%;text-align:left;padding:12px 16px;border-radius:8px;
+               border:1.5px solid #dde6f3;background:#f8fafd;color:#1e1e1e;font-size:14px;
+               font-weight:600;cursor:pointer}
+  .profile-btn:hover{border-color:#0d47a1;background:#eef4fc}
+  .new-form{border-top:1px solid #eee;padding-top:20px}
+  .new-form label{font-size:12px;color:#777;display:block;margin-bottom:6px}
+  .new-form input{width:100%;padding:10px 12px;border-radius:8px;border:1.5px solid #dde6f3;
+                   font-size:14px;margin-bottom:10px;box-sizing:border-box}
+  .new-form button{width:100%;padding:10px;border-radius:8px;border:none;background:#0d47a1;
+                    color:#fff;font-size:14px;font-weight:600;cursor:pointer}
+  .empty-note{font-size:13px;color:#999;margin-bottom:20px}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Who's applying?</h1>
+  <p class="sub">Pick a profile — each person's resume, jobs, and applications stay separate.</p>
+
+  {% if available %}
+  <form method="post" class="profile-list">
+    {% for name in available %}
+    <button type="submit" name="profile" value="{{ name }}" class="profile-btn">{{ name.replace('-', ' ').title() }}</button>
+    {% endfor %}
+  </form>
+  {% else %}
+  <p class="empty-note">No profiles yet — create the first one below.</p>
+  {% endif %}
+
+  <form method="post" class="new-form">
+    <label for="new_name">+ New profile</label>
+    <input type="text" id="new_name" name="new_name" placeholder="Full name" autocomplete="off"/>
+    <button type="submit">Create</button>
+  </form>
+</div>
+</body>
+</html>

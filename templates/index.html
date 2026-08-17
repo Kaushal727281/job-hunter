@@ -261,6 +261,7 @@
     <button class="btn btn-outline" id="resp-btn" onclick="checkResponses()">📬 Check Responses</button>
     <button class="btn btn-outline" onclick="openSettings()">⚙️ Settings</button>
     <button class="btn btn-outline" onclick="if(confirm('Clear all jobs?')) clearAll()">Clear All</button>
+    <a class="btn btn-outline" href="/profiles" style="text-decoration:none">👤 Switch Profile</a>
   </div>
 </header>
 
@@ -1247,7 +1248,9 @@ function uploadResume(input){
       metaEl.innerHTML = `<strong>✅ Resume imported successfully</strong>
         ${meta.name ? '<br>Name: <b>'+escHtml(meta.name)+'</b>' : ''}
         ${meta.email ? '<br>Email: <b>'+escHtml(meta.email)+'</b>' : ''}
-        ${meta.phone ? '<br>Phone: <b>'+escHtml(meta.phone)+'</b>' : ''}`;
+        ${meta.phone ? '<br>Phone: <b>'+escHtml(meta.phone)+'</b>' : ''}
+        ${d.cleared_jobs ? '<br>🧹 Cleared '+d.cleared_jobs+' job(s) from the previous resume (applications you tracked were kept)' : ''}
+        ${d.warning ? '<br><span style="color:#b3261e">⚠️ '+escHtml(d.warning)+'</span>' : ''}`;
       // Fill profile fields with extracted values
       if(meta.name)  document.getElementById('s-name').value  = meta.name;
       if(meta.email) document.getElementById('s-email').value = meta.email;

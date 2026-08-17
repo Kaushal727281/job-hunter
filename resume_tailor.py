@@ -11,21 +11,19 @@ import re
 import json
 import logging
 import truststore
-from pathlib import Path
 from bs4 import BeautifulSoup, NavigableString
 from dotenv import load_dotenv
+
+import profiles
 
 truststore.inject_into_ssl()
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-BASE_RESUME_PATH = Path(__file__).parent / "base_resume.html"
-CONFIG_FILE      = Path(__file__).parent / "config.json"
-
 
 def _candidate_name() -> str:
     try:
-        return json.loads(CONFIG_FILE.read_text(encoding="utf-8")).get("candidate", {}).get("name", "The candidate")
+        return json.loads(profiles.config_path().read_text(encoding="utf-8")).get("candidate", {}).get("name", "The candidate")
     except Exception:
         return "The candidate"
 
@@ -420,7 +418,7 @@ def tailor_resume(job: dict, prev_tips: list[str] | None = None, custom_instruct
         "improvement_tips": list   — remaining gaps after tailoring
       }
     """
-    base_html = BASE_RESUME_PATH.read_text(encoding="utf-8")
+    base_html = profiles.base_resume_path().read_text(encoding="utf-8")
     soup = BeautifulSoup(base_html, "html.parser")
     sections = _extract_sections(soup)
 
@@ -481,8 +479,18 @@ The candidate has provided the following specific instructions. You MUST follow 
    - NEVER say "at [company]" or "for [company]" at the end of the sentence
    - DO start with: "[X]+ years of experience in [core skills]..."
    - DO end with what value the candidate brings, NOT where they are going
-   - BAD example: "...seeking a role as Full Stack Engineer at Deutsche Bank"
-   - GOOD example: "...bringing 7 years of enterprise Java expertise and a proven record of delivering scalable solutions."
+   - MUST reference at least 2 specifics unique to THIS job description below (e.g. if the JD
+     asks for team leadership/mentoring and the candidate's bullets show that, say so explicitly —
+     don't write a generic summary that could apply to any Java role)
+   - If the JD emphasizes people/team responsibilities (leading, mentoring, managing, driving a
+     team's technical decisions) AND the candidate's own bullets below already show this (e.g.
+     "Mentored engineers", "Led development"), you MUST explicitly name that leadership angle in
+     the summary — this is the single highest-value match when the JD asks for it. Only claim it
+     if it is truthfully backed by the candidate's bullets; never invent a leadership claim.
+   - BAD example (generic, could apply to any job — do not imitate this wording): "...seeking a role as Full Stack Engineer at Deutsche Bank"
+   - BAD example (real-sounding but too generic — do not copy this phrasing, it is illustrative only): "...bringing 7 years of enterprise Java expertise and a proven record of delivering scalable solutions."
+   - The example above shows the SHAPE only. Your actual summary must name specific JD-relevant
+     skills/responsibilities from THIS posting, not restate the example's wording.
 
 2. **BOLD_KEYWORDS** — skill/keyword matching (CRITICAL):
    Step A — Compare the JD skills/technologies to the candidate's resume. List every skill word that appears in BOTH the JD and the resume (exact or close match, e.g. "REST APIs" matches "RESTful APIs").

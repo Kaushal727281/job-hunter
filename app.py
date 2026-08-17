@@ -13,10 +13,11 @@ import re
 import time
 from datetime import datetime, date
 from pathlib import Path
-from flask import Flask, render_template, jsonify, request, Response
+from flask import Flask, render_template, jsonify, request, Response, session, redirect, url_for
 from bs4 import BeautifulSoup
 
 import job_store
+import profiles
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -24,8 +25,13 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-CONFIG_FILE  = Path(__file__).parent / "config.json"
-LAST_FETCH_FILE = Path(__file__).parent / "output" / "last_fetch.json"
+
+# Stable across restarts so profile-picker sessions survive a server restart —
+# generated once on first run, not regenerated (which would log everyone out).
+_SECRET_KEY_FILE = Path(__file__).parent / ".flask_secret_key"
+if not _SECRET_KEY_FILE.exists():
+    _SECRET_KEY_FILE.write_text(os.urandom(32).hex(), encoding="utf-8")
+app.secret_key = _SECRET_KEY_FILE.read_text(encoding="utf-8").strip()
 
 
 @app.template_filter("expmin")
@@ -34,45 +40,60 @@ def _expmin_filter(exp: str) -> str:
     m = re.search(r"\d+", exp or "")
     return m.group() if m else ""
 
-_fetch_status = {"running": False, "message": "Idle", "last_run": None}
+# Keyed by profile name — each person's fetch progress is independent, so
+# one profile's fetch doesn't show up as another's status. Mutated in place
+# (never reassigned wholesale) since _fs() hands back a live reference.
+_fetch_status: dict[str, dict] = {}
 _tailor_running: set[str] = set()
+
+
+def _fs(profile: str = None) -> dict:
+    profile = profile or profiles.get_active_profile()
+    return _fetch_status.setdefault(profile, {"running": False, "message": "Idle", "last_run": None})
 
 
 def _get_last_fetch_date() -> str:
     """Return the date string of the last completed fetch, or ''."""
     try:
-        return json.loads(LAST_FETCH_FILE.read_text(encoding="utf-8")).get("date", "")
+        path = profiles.output_dir() / "last_fetch.json"
+        return json.loads(path.read_text(encoding="utf-8")).get("date", "")
     except Exception:
         return ""
 
 
 def _save_last_fetch_date():
-    LAST_FETCH_FILE.parent.mkdir(exist_ok=True)
-    LAST_FETCH_FILE.write_text(json.dumps({"date": str(date.today())}), encoding="utf-8")
+    path = profiles.output_dir() / "last_fetch.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"date": str(date.today())}), encoding="utf-8")
 
 
 def _load_config():
-    return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+    return json.loads(profiles.config_path().read_text(encoding="utf-8"))
 
 
 # ── Background workers ───────────────────────────────────────────────────────
+# Each of these runs in a spawned thread, which doesn't inherit Flask's
+# session — the caller captures profiles.get_active_profile() before
+# spawning and passes it in; the first line here sets it for this thread.
 
-def _bg_score(job_ids: list[str]):
+def _bg_score(job_ids: list[str], profile: str):
     """Score newly fetched jobs with Ollama in the background."""
+    profiles.set_active_profile(profile)
     def _status(msg):
-        _fetch_status["message"] = msg
+        _fs(profile)["message"] = msg
     try:
         from job_scorer import score_jobs
         score_jobs(job_ids, status_cb=_status)
-        _fetch_status["message"] = f"Done — {len(job_ids)} new jobs scored"
+        _fs(profile)["message"] = f"Done — {len(job_ids)} new jobs scored"
     except Exception as e:
         logger.warning(f"Fit-scoring failed: {e}")
-        _fetch_status["message"] = f"Done — scoring skipped ({e})"
+        _fs(profile)["message"] = f"Done — scoring skipped ({e})"
 
 
-def _bg_fetch():
-    global _fetch_status
-    _fetch_status = {"running": True, "message": "Fetching jobs…", "last_run": None}
+def _bg_fetch(profile: str):
+    profiles.set_active_profile(profile)
+    st = _fs(profile)
+    st.update(running=True, message="Fetching jobs…", last_run=None)
     try:
         from job_fetcher import fetch_jobs
         config = _load_config()
@@ -80,14 +101,14 @@ def _bg_fetch():
         new_ids = job_store.upsert_jobs_return_ids(jobs)
         added = len(new_ids)
         _save_last_fetch_date()
-        _fetch_status = {"running": False, "message": f"Done — {added} new jobs added", "last_run": str(date.today())}
-        logger.info(f"Fetch complete: {added} new jobs")
+        st.update(running=False, message=f"Done — {added} new jobs added", last_run=str(date.today()))
+        logger.info(f"[{profile}] Fetch complete: {added} new jobs")
         if new_ids:
-            t = threading.Thread(target=_bg_score, args=(new_ids,), daemon=True)
+            t = threading.Thread(target=_bg_score, args=(new_ids, profile), daemon=True)
             t.start()
     except Exception as e:
-        logger.exception("Fetch failed")
-        _fetch_status = {"running": False, "message": f"Error: {e}", "last_run": None}
+        logger.exception(f"[{profile}] Fetch failed")
+        st.update(running=False, message=f"Error: {e}", last_run=None)
 
 
 def _suggest_layout(job: dict) -> tuple[str, str]:
@@ -172,11 +193,12 @@ def _verify_tips(tips: list[str], resume_html: str) -> list[str]:
     return verified
 
 
-def _bg_tailor(job_id: str, prev_result: dict = None, prev_pdf: str = None, custom_instructions: str = None):
+def _bg_tailor(job_id: str, profile: str, prev_result: dict = None, prev_pdf: str = None, custom_instructions: str = None):
     """
     Run tailor in background. Retries up to 3× until match_score >= 8.
     prev_result/prev_pdf are the values cleared before starting so we can restore if something goes wrong.
     """
+    profiles.set_active_profile(profile)
     MAX_ATTEMPTS = 3
     TARGET_SCORE = 8
 
@@ -273,6 +295,37 @@ def _bg_tailor(job_id: str, prev_result: dict = None, prev_pdf: str = None, cust
 
 # ── Routes ───────────────────────────────────────────────────────────────────
 
+@app.before_request
+def _select_profile():
+    """Every request must have an active profile before hitting a view —
+    redirect to the picker if none is chosen yet (or none exist at all).
+    No password: this is a shared family computer, not internet-facing."""
+    if request.endpoint in ("profiles_page", "static") or request.path.startswith("/static"):
+        return
+    available = profiles.list_profiles()
+    if not available:
+        return redirect(url_for("profiles_page"))
+    name = session.get("profile")
+    if not name or name not in available:
+        return redirect(url_for("profiles_page"))
+    profiles.set_active_profile(name)
+
+
+@app.route("/profiles", methods=["GET", "POST"])
+def profiles_page():
+    if request.method == "POST":
+        new_name = request.form.get("new_name", "").strip()
+        if new_name:
+            slug = profiles.create_profile(new_name)
+            session["profile"] = slug
+            return redirect(url_for("index"))
+        chosen = request.form.get("profile", "").strip()
+        if chosen in profiles.list_profiles():
+            session["profile"] = chosen
+            return redirect(url_for("index"))
+    return render_template("profiles.html", available=profiles.list_profiles())
+
+
 @app.route("/")
 def index():
     jobs = job_store.all_jobs()
@@ -280,22 +333,22 @@ def index():
         tr = j.get("tailor_result") or {}
         return (j.get("fetched_date", ""), tr.get("match_score", 0) if tr else -1)
     jobs.sort(key=sort_key, reverse=True)
-    status = {**_fetch_status, "last_run": _get_last_fetch_date()}
+    status = {**_fs(), "last_run": _get_last_fetch_date()}
     return render_template("index.html", jobs=jobs, status=status, config=_load_config())
 
 
 @app.route("/fetch", methods=["POST"])
 def fetch():
-    if _fetch_status["running"]:
+    if _fs()["running"]:
         return jsonify({"ok": False, "message": "Already running"})
-    t = threading.Thread(target=_bg_fetch, daemon=True)
+    t = threading.Thread(target=_bg_fetch, args=(profiles.get_active_profile(),), daemon=True)
     t.start()
     return jsonify({"ok": True, "message": "Fetch started"})
 
 
 @app.route("/fetch-status")
 def fetch_status():
-    return jsonify(_fetch_status)
+    return jsonify(_fs())
 
 
 @app.route("/tailor/<job_id>", methods=["POST"])
@@ -314,7 +367,7 @@ def tailor(job_id):
     prev_pdf    = job.get("pdf_path")
     # Clear now so polling returns done=False until fresh output arrives
     job_store.update_job(job_id, tailor_result=None, pdf_path=None, tailor_error=None)
-    t = threading.Thread(target=_bg_tailor, args=(job_id, prev_result, prev_pdf, custom_instructions), daemon=True)
+    t = threading.Thread(target=_bg_tailor, args=(job_id, profiles.get_active_profile(), prev_result, prev_pdf, custom_instructions), daemon=True)
     t.start()
     return jsonify({"ok": True, "message": "Tailoring started"})
 
@@ -946,40 +999,40 @@ def set_job_status(job_id):
     return jsonify({"ok": True, "job_status": status})
 
 
-_gmail_check_running = False
+_gmail_check_running: set[str] = set()  # profile names currently checking
 
-def _bg_check_responses():
-    global _gmail_check_running
+def _bg_check_responses(profile: str):
+    profiles.set_active_profile(profile)
     try:
         from gmail_checker import check_responses
         applied = job_store.applied_jobs()
         if not applied:
             return
-        logger.info(f"Checking Gmail for {len(applied)} applied job(s)…")
+        logger.info(f"[{profile}] Checking Gmail for {len(applied)} applied job(s)…")
         results = check_responses(applied)
         for job_id, responses in results.items():
             job_store.set_responses(job_id, responses)
-        logger.info(f"Gmail check done — {len(results)} job(s) with responses")
+        logger.info(f"[{profile}] Gmail check done — {len(results)} job(s) with responses")
     except Exception as e:
-        logger.exception(f"Gmail check failed: {e}")
+        logger.exception(f"[{profile}] Gmail check failed: {e}")
     finally:
-        _gmail_check_running = False
+        _gmail_check_running.discard(profile)
 
 
 @app.route("/check-responses", methods=["POST"])
 def check_responses():
-    global _gmail_check_running
-    if _gmail_check_running:
+    profile = profiles.get_active_profile()
+    if profile in _gmail_check_running:
         return jsonify({"ok": False, "message": "Already checking"})
-    _gmail_check_running = True
-    t = threading.Thread(target=_bg_check_responses, daemon=True)
+    _gmail_check_running.add(profile)
+    t = threading.Thread(target=_bg_check_responses, args=(profile,), daemon=True)
     t.start()
     return jsonify({"ok": True, "message": "Checking Gmail inbox…"})
 
 
 @app.route("/check-responses-status")
 def check_responses_status():
-    return jsonify({"running": _gmail_check_running})
+    return jsonify({"running": profiles.get_active_profile() in _gmail_check_running})
 
 
 @app.route("/remove/<job_id>", methods=["POST"])
@@ -996,8 +1049,6 @@ def clear():
 
 # ── Resume Import & Settings ──────────────────────────────────────────────
 
-BASE_RESUME_PATH = Path(__file__).parent / "base_resume.html"
-
 _DATE_PAT = re.compile(
     r"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[\s.,]*\d{4}"
     r"|\d{1,2}[/\-]\d{4}"
@@ -1010,9 +1061,17 @@ _SECTION_PAT = re.compile(
     r"^(SUMMARY|PROFILE|OBJECTIVE|PROFESSIONAL\s*SUMMARY|CAREER\s*SUMMARY|ABOUT\s*ME"
     r"|EXPERIENCE|WORK\s*EXPERIENCE|PROFESSIONAL\s*EXPERIENCE|EMPLOYMENT|WORK\s*HISTORY"
     r"|EDUCATION|ACADEMIC|QUALIFICATIONS|SKILLS|TECHNICAL\s*SKILLS|CORE\s*SKILLS"
-    r"|CERTIFICATIONS|PROJECTS|ACHIEVEMENTS|INTERESTS|LANGUAGES)$",
+    r"|CERTIFICATIONS|(?:KEY\s*|PERSONAL\s*|NOTABLE\s*|SIDE\s*)?PROJECTS"
+    r"|ACHIEVEMENTS|INTERESTS|LANGUAGES)$",
     re.I,
 )
+# Explicit bullet markers — a new bullet starts ONLY on one of these (or the first
+# line of a block). Any other line is a PDF line-wrap continuation of the bullet
+# in progress, not a new bullet — merging them back avoids splitting one sentence
+# into multiple fragments (the artifact that produced e.g. "...as full legacy" /
+# "modernization of the monolithic..." as two separate bullets).
+_BULLET_MARKER_PAT = re.compile(r"^[•\-*▸►→]|^\d+[.)]\s")
+_BULLET_STRIP_PAT  = re.compile(r"^[•\-*▸►→]\s*|^\d+[.)]\s*")
 
 
 def _pdf_to_html(pdf_bytes: bytes) -> str:
@@ -1076,8 +1135,12 @@ def _pdf_to_html(pdf_bytes: bytes) -> str:
                     return sections[sk]
         return []
 
-    summary_lines = _get_section("SUMMARY", "PROFILE", "OBJECTIVE", "ABOUT")
-    exp_lines     = _get_section("EXPERIENCE", "EMPLOYMENT", "WORK HISTORY", "WORKHISTORY")
+    summary_lines  = _get_section("SUMMARY", "PROFILE", "OBJECTIVE", "ABOUT")
+    exp_lines      = _get_section("EXPERIENCE", "EMPLOYMENT", "WORK HISTORY", "WORKHISTORY")
+    project_lines  = _get_section("PROJECTS", "KEYPROJECTS", "PERSONALPROJECTS",
+                                   "NOTABLEPROJECTS", "SIDEPROJECTS")
+    skills_lines   = _get_section("SKILLS", "TECHNICALSKILLS", "CORESKILLS")
+    edu_lines      = _get_section("EDUCATION", "ACADEMIC", "QUALIFICATIONS")
 
     # Fallback: if summary section is empty (common with multi-column PDFs),
     # collect long sentence-like lines from all pre-experience sections
@@ -1100,7 +1163,7 @@ def _pdf_to_html(pdf_bytes: bytes) -> str:
     cur_job: dict | None   = None
     pending_header: list[str] = []   # lines before a date line
 
-    for ln in exp_lines:
+    for i, ln in enumerate(exp_lines):
         if _DATE_PAT.search(ln):
             # commit pending header lines as title/company of new job
             if cur_job:
@@ -1120,13 +1183,32 @@ def _pdf_to_html(pdf_bytes: bytes) -> str:
                 pending_header.append(ln)
         else:
             # inside a job block
-            if re.match(r"^[•\-*▸►→]|^\d+\.", ln):
-                bullet = re.sub(r"^[•\-*▸►→\d.]\s*", "", ln).strip()
+            if _BULLET_MARKER_PAT.match(ln):
+                bullet = _BULLET_STRIP_PAT.sub("", ln).strip()
                 cur_job["bullets"].append(bullet)
-            elif len(ln) > 30 and not _DATE_PAT.search(ln):
-                cur_job["bullets"].append(ln)
             else:
-                pending_header = [ln]   # short line = likely start of next job title
+                # Is this line the next job's title/company, or bullet content?
+                # A header line is followed within 2 lines by a date; content
+                # never is. (A fixed length threshold doesn't work here — a
+                # PDF line-wrap tail like "support and REST API layer." is
+                # short but is still bullet content, not a job header.)
+                upcoming = exp_lines[i + 1:i + 3]
+                if len(ln) <= 70 and any(_DATE_PAT.search(u) for u in upcoming):
+                    pending_header.append(ln)
+                else:
+                    # No marker — CSS-only list bullets (the common case for
+                    # resumes rendered via Chrome print-to-PDF) leave no glyph
+                    # in the text layer at all, so marker presence can't tell
+                    # wrap-continuation apart from a genuine new bullet.
+                    # Sentence-terminal punctuation can: if the previous bullet
+                    # already ended a sentence, this line starts a new one;
+                    # otherwise it's a wrapped continuation.
+                    prev = cur_job["bullets"][-1] if cur_job["bullets"] else ""
+                    if prev and not prev.rstrip().endswith((".", "!", "?", ":")):
+                        cur_job["bullets"][-1] = f"{prev} {ln}".strip()
+                    else:
+                        # First line of this job's bullets, plain-paragraph resume
+                        cur_job["bullets"].append(ln)
 
     if cur_job:
         job_blocks.append(cur_job)
@@ -1140,6 +1222,54 @@ def _pdf_to_html(pdf_bytes: bytes) -> str:
         and not re.match(r"^\d{2}/\d{2}/\d{4}", jb["title"])  # date "16/07/2026"
         and (jb["bullets"] or jb["company"])  # must have content
     ]
+
+    # ── Parse Projects: "Name [role]" title line, then a merged description ──
+    # (best-effort — arbitrary resume layouts vary a lot; this covers the common
+    # "short title line, then wrapped prose" shape)
+    project_blocks: list[dict] = []
+    cur_proj: dict | None = None
+    for ln in project_lines:
+        looks_like_title = len(ln) <= 70 and not ln.rstrip().endswith((".", ",", ";"))
+        starts_new = cur_proj is None or (
+            looks_like_title and (not cur_proj["desc"] or cur_proj["desc"][-1].endswith((".", "!", "?")))
+        )
+        if starts_new:
+            if cur_proj:
+                project_blocks.append(cur_proj)
+            cur_proj = {"name": ln, "desc": []}
+        elif len(ln) > 30 and cur_proj["desc"]:
+            # PDF line-wrap continuation — merge into the running description
+            cur_proj["desc"][-1] = f"{cur_proj['desc'][-1]} {ln}".strip()
+        else:
+            cur_proj["desc"].append(ln)
+    if cur_proj:
+        project_blocks.append(cur_proj)
+    project_blocks = [p for p in project_blocks if len(p["name"]) > 3 and p["desc"]]
+
+    # ── Parse Skills: split on common separators into flat tag list ──────────
+    skill_tags: list[str] = []
+    for ln in skills_lines:
+        skill_tags.extend(t.strip() for t in re.split(r"[•·,|]", ln) if t.strip())
+
+    # ── Parse Education: anchor on the date line, take preceding lines as
+    #    degree/school (best-effort — falls back to first two lines if no date) ─
+    education = None
+    for i, ln in enumerate(edu_lines):
+        dm = _DATE_PAT.search(ln)
+        if dm:
+            preceding = [l for l in edu_lines[:i] if not _DATE_PAT.search(l)]
+            education = {
+                "degree": preceding[0] if preceding else "",
+                "school": preceding[1] if len(preceding) > 1 else "",
+                "year":   dm.group(0),
+            }
+            break
+    if education is None and edu_lines:
+        education = {
+            "degree": edu_lines[0],
+            "school": edu_lines[1] if len(edu_lines) > 1 else "",
+            "year":   "",
+        }
 
     # ── Phone: reject date-like matches and prefer 10-digit Indian numbers ──
     phone_candidates = re.findall(r"(\+?91[\s\-]?[6-9]\d{9}|[6-9]\d{9}|\+?\d[\d\s\-().]{8,14}\d)", full_text)
@@ -1168,6 +1298,32 @@ def _pdf_to_html(pdf_bytes: bytes) -> str:
           <ul>{bullets_html}</ul>
         </div>"""
 
+    projects_html = ""
+    for pb in project_blocks:
+        desc = " ".join(pb["desc"])
+        projects_html += f"""
+        <div class="project">
+          <div class="project-name">{esc(pb['name'])}</div>
+          <p>{esc(desc)}</p>
+        </div>"""
+
+    skills_html = ""
+    if skill_tags:
+        tags_html = "".join(f'<span class="tag">{esc(t)}</span>' for t in skill_tags)
+        skills_html = f"""
+        <div class="skill-group">
+          <div class="skill-tags">{tags_html}</div>
+        </div>"""
+
+    edu_html = ""
+    if education:
+        edu_html = f"""
+        <div class="edu-block">
+          <div class="edu-degree">{esc(education['degree'])}</div>
+          <div class="edu-school">{esc(education['school'])}</div>
+          <div class="edu-year">{esc(education['year'])}</div>
+        </div>"""
+
     summary_html = esc(" ".join(summary_lines)) if summary_lines else ""
 
     html = f"""<!DOCTYPE html>
@@ -1176,18 +1332,32 @@ def _pdf_to_html(pdf_bytes: bytes) -> str:
   <meta charset="UTF-8"/>
   <title>{esc(name)} – Resume</title>
   <style>
-    body{{font-family:'Segoe UI',Arial,sans-serif;max-width:860px;margin:40px auto;padding:0 32px;color:#1e1e1e}}
+    /* Disable ligature substitution (fi/ffi -> single glyph) so PDF text
+       extraction (ATS parsers) reads plain "fi"/"ffi", not a ligature glyph
+       most keyword matching won't recognize. */
+    body{{font-family:'Segoe UI',Arial,sans-serif;max-width:860px;margin:40px auto;padding:0 32px;color:#1e1e1e;
+         font-feature-settings:"liga" 0,"clig" 0,"dlig" 0;-webkit-font-feature-settings:"liga" 0}}
     h1{{font-size:28px;font-weight:700;margin-bottom:4px}}
     .contact{{font-size:13px;color:#555;margin-bottom:18px}}
-    .section-title{{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;
+    /* No letter-spacing — Chrome's PDF text layer bakes letter-spacing in as
+       literal space characters between every letter ("C O R E"), which breaks
+       ATS section-header matching. */
+    .section-title{{font-size:13px;font-weight:700;text-transform:uppercase;
                     color:#0d47a1;border-bottom:1.5px solid #0d47a1;padding-bottom:4px;margin:22px 0 10px}}
     .summary-text{{font-size:14px;line-height:1.7;color:#333}}
-    .job{{margin-bottom:18px}}
-    .job-title{{font-size:15px;font-weight:700}}
+    .job,.project{{margin-bottom:18px}}
+    .job-title,.project-name{{font-size:15px;font-weight:700}}
     .job-company{{font-size:13px;color:#555}}
     .job-date{{font-size:12px;color:#888;margin-bottom:6px}}
     ul{{margin:6px 0 0 18px;padding:0}}
     li{{font-size:13px;line-height:1.65;margin-bottom:3px}}
+    .project p{{font-size:13px;line-height:1.6;color:#333;margin-top:4px}}
+    .skill-tags{{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px}}
+    .tag{{color:#0d47a1}}
+    .tag:not(:last-child)::after{{content:", ";color:#1e1e1e}}
+    .edu-degree{{font-weight:700;font-size:13px}}
+    .edu-school{{color:#0d47a1;font-size:13px}}
+    .edu-year{{color:#888;font-size:12px}}
   </style>
 </head>
 <body>
@@ -1202,11 +1372,25 @@ def _pdf_to_html(pdf_bytes: bytes) -> str:
 
   <div class="section-title">Professional Experience</div>
   {jobs_html if jobs_html else '<p style="color:#999;font-size:13px">Experience section could not be parsed — please review the imported resume.</p>'}
-
+{f'''
+  <div class="section-title">Key Projects</div>
+  {projects_html}''' if projects_html else ''}
+{f'''
+  <div class="section-title">Core Skills</div>
+  {skills_html}''' if skills_html else ''}
+{f'''
+  <div class="section-title">Education</div>
+  {edu_html}''' if edu_html else ''}
 </body>
 </html>"""
 
-    meta = {"name": name, "email": email, "phone": phone}
+    meta = {
+        "name": name, "email": email, "phone": phone,
+        "counts": {
+            "jobs": len(job_blocks), "projects": len(project_blocks),
+            "skills": len(skill_tags), "education": 1 if education else 0,
+        },
+    }
     return html, meta
 
 
@@ -1269,11 +1453,13 @@ def upload_resume():
         return jsonify({"ok": False, "message": "File seems too small or empty"}), 400
 
     # Save as new base resume (keep backup of previous)
-    backup = BASE_RESUME_PATH.with_suffix(".html.bak")
-    if BASE_RESUME_PATH.exists():
-        backup.write_bytes(BASE_RESUME_PATH.read_bytes())
+    resume_path = profiles.base_resume_path()
+    backup = resume_path.with_suffix(".html.bak")
+    if resume_path.exists():
+        backup.write_bytes(resume_path.read_bytes())
 
-    BASE_RESUME_PATH.write_text(html, encoding="utf-8")
+    resume_path.parent.mkdir(parents=True, exist_ok=True)
+    resume_path.write_text(html, encoding="utf-8")
 
     # Use metadata extracted directly from PDF (avoids re-parsing glued HTML artifacts)
     # For HTML uploads, parse metadata from the HTML structure
@@ -1285,13 +1471,39 @@ def upload_resume():
         cfg["candidate"]["name"] = meta["name"]
     if meta["email"]:
         cfg["candidate"]["email"] = meta["email"]
-    CONFIG_FILE.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
+    profiles.config_path().write_text(json.dumps(cfg, indent=2), encoding="utf-8")
 
     logger.info(f"Resume imported: {meta['name']} <{meta['email']}>")
+
+    # A new resume means a new set of relevant jobs — dashboard entries from
+    # the previous resume that were never applied to are just noise now
+    # (they were fetched/scored against someone else's role and skills).
+    # Anything with real application history is untouched regardless.
+    from job_fetcher import release_seen_ids
+    cleared_ids = job_store.clear_untracked_jobs()
+    if cleared_ids:
+        release_seen_ids(set(cleared_ids))
+        logger.info(f"Cleared {len(cleared_ids)} untracked jobs from the previous resume")
+
+    # PDF extraction is best-effort — warn rather than silently ship a resume
+    # missing sections a human would notice (skills feed the job-relevance
+    # filter in job_fetcher.py, so a thin extraction there also weakens fetch).
+    warning = None
+    counts = meta.get("counts")
+    if counts is not None:
+        thin = [label for label, key in
+                (("experience", "jobs"), ("skills", "skills"), ("education", "education"))
+                if not counts.get(key)]
+        if thin:
+            warning = (f"Heads up: couldn't find a {'/'.join(thin)} section in this PDF — "
+                        f"review base_resume.html and fill in what's missing.")
+
     return jsonify({
         "ok": True,
         "message": "Resume imported successfully",
         "meta": meta,
+        "warning": warning,
+        "cleared_jobs": len(cleared_ids),
         "has_structure": bool(BeautifulSoup(html, "html.parser").find(class_="summary-text")),
     })
 
@@ -1299,9 +1511,10 @@ def upload_resume():
 @app.route("/resume-base")
 def resume_base():
     """Show the current base resume HTML."""
-    if not BASE_RESUME_PATH.exists():
+    resume_path = profiles.base_resume_path()
+    if not resume_path.exists():
         return "No base resume found", 404
-    return Response(BASE_RESUME_PATH.read_text(encoding="utf-8"), mimetype="text/html")
+    return Response(resume_path.read_text(encoding="utf-8"), mimetype="text/html")
 
 
 @app.route("/settings", methods=["GET", "POST"])
@@ -1318,16 +1531,32 @@ def settings():
                     except (ValueError, TypeError):
                         continue
                 cfg["candidate"][field] = val
-        CONFIG_FILE.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
+        profiles.config_path().write_text(json.dumps(cfg, indent=2), encoding="utf-8")
         logger.info(f"Settings updated: {cfg['candidate']}")
         return jsonify({"ok": True, "candidate": cfg["candidate"]})
     cfg = _load_config()
-    has_resume = BASE_RESUME_PATH.exists()
+    has_resume = profiles.base_resume_path().exists()
     return jsonify({"candidate": cfg["candidate"], "has_resume": has_resume})
 
 
+def _startup_fetch_check():
+    """Auto-fetch on startup for every profile not already fetched today.
+    Runs in its own thread so the server starts serving immediately rather
+    than waiting for every profile's fetch to finish; profiles are still
+    fetched one at a time within this thread, not in parallel, to avoid
+    hammering job boards from every profile at once."""
+    for name in profiles.list_profiles():
+        profiles.set_active_profile(name)
+        if _get_last_fetch_date() != str(date.today()):
+            logger.info(f"[{name}] New day detected — auto-fetching jobs on startup")
+            _bg_fetch(name)
+        else:
+            logger.info(f"[{name}] Already fetched today ({date.today()}) — skipping startup fetch")
+
+
 def _daily_scheduler():
-    """Background thread: trigger a fetch every day at 08:00 local time."""
+    """Background thread: trigger a fetch every day at 08:00 local time,
+    once per profile, sequentially."""
     while True:
         now = datetime.now()
         # Seconds until next 08:00
@@ -1337,20 +1566,17 @@ def _daily_scheduler():
         wait_secs = (target - now).total_seconds()
         logger.info(f"Daily scheduler: next fetch in {wait_secs/3600:.1f} h (at 08:00)")
         time.sleep(wait_secs)
-        if not _fetch_status["running"]:
-            logger.info("Daily scheduler: triggering morning fetch")
-            t = threading.Thread(target=_bg_fetch, daemon=True)
-            t.start()
+        logger.info("Daily scheduler: triggering morning fetch for all profiles")
+        for name in profiles.list_profiles():
+            if not _fs(name)["running"]:
+                _bg_fetch(name)
 
 
 if __name__ == "__main__":
-    # Auto-fetch on startup if not already fetched today
-    if _get_last_fetch_date() != str(date.today()):
-        logger.info("New day detected — auto-fetching jobs on startup")
-        t = threading.Thread(target=_bg_fetch, daemon=True)
-        t.start()
-    else:
-        logger.info(f"Already fetched today ({date.today()}) — skipping startup fetch")
+    profiles.migrate_legacy_layout()
+
+    startup = threading.Thread(target=_startup_fetch_check, daemon=True)
+    startup.start()
 
     # Start background daily scheduler (fires at 08:00 every morning)
     sched = threading.Thread(target=_daily_scheduler, daemon=True)

@@ -15,6 +15,8 @@ from pathlib import Path
 from datetime import date
 from dotenv import load_dotenv
 
+import profiles
+
 load_dotenv()
 logger = logging.getLogger(__name__)
 
@@ -91,9 +93,10 @@ def send_digest(jobs_with_results: list[dict], config: dict):
     Send the morning digest email.
     jobs_with_results: list of dicts with keys: job, tailor_result (optional), pdf_path (optional)
     """
-    gmail_addr = os.getenv("GMAIL_ADDRESS")
-    app_password = os.getenv("GMAIL_APP_PASSWORD")
-    recipient = os.getenv("DIGEST_RECIPIENT", gmail_addr)
+    profile_env = profiles.get_profile_env()
+    gmail_addr = profile_env.get("GMAIL_ADDRESS") or os.getenv("GMAIL_ADDRESS")
+    app_password = profile_env.get("GMAIL_APP_PASSWORD") or os.getenv("GMAIL_APP_PASSWORD")
+    recipient = profile_env.get("DIGEST_RECIPIENT") or os.getenv("DIGEST_RECIPIENT") or gmail_addr
 
     if not gmail_addr or not app_password:
         raise EnvironmentError("GMAIL_ADDRESS and GMAIL_APP_PASSWORD must be set in .env")

@@ -66,18 +66,7 @@ if not errorlevel 1 (
     echo [!] GROQ_API_KEY is not set - get a free key at https://console.groq.com
 )
 
-:: ── 6. config.json ───────────────────────────
-echo.
-echo [>>] Setting up config.json...
-if not exist "config.json" (
-    copy config.example.json config.json >nul
-    echo [OK] Created config.json from config.example.json
-    echo [!] Open config.json and update your name + job queries
-) else (
-    echo [OK] config.json already exists - skipping
-)
-
-:: ── 7. Ollama + local LLM models ─────────────
+:: ── 6. Ollama + local LLM models ─────────────
 echo.
 echo [>>] Checking for Ollama (local LLM runtime)...
 set OLLAMA_OK=0
@@ -118,7 +107,7 @@ if "%OLLAMA_OK%"=="1" (
     )
 )
 
-:: ── 8. Chrome check ──────────────────────────
+:: ── 7. Chrome check ──────────────────────────
 echo.
 echo [>>] Checking for Chrome (needed for PDF generation)...
 set CHROME_FOUND=0
@@ -137,11 +126,11 @@ if "%CHROME_FOUND%"=="1" (
     )
 )
 
-:: ── 9. Output dir ─────────────────────────────
+:: ── 8. Output dir ─────────────────────────────
 if not exist "output" mkdir output
 echo [OK] output\ ready
 
-:: ── 10. Personal info (name, Gmail, LinkedIn CSV) ──
+:: ── 9. Personal info (name, Gmail, LinkedIn CSV) ──
 echo.
 echo [>>] Let's fill in your personal details...
 python configure.py
@@ -157,16 +146,21 @@ echo.
 echo   1. Add your Groq API key to .env (optional if Ollama is set up)
 echo      Get free key: https://console.groq.com
 echo.
-echo   2. Replace base_resume.html with your resume
+echo   2. Upload your resume once the app is running - via the web UI, or drop
+echo      an HTML resume at profiles\your-profile\base_resume.html directly.
 echo.
-echo   3. Update config.json job_search.locations for where to search
-echo      (search queries are derived from base_resume.html automatically)
+echo   3. Update profiles\your-profile\config.json job_search.locations
+echo      (search queries are derived from your resume automatically)
 echo.
 echo   4. Start the app:
 echo        .venv\Scripts\activate
 echo        python app.py
 echo.
-echo   5. Open browser: http://localhost:5000
+echo   5. Open browser and pick your profile: http://localhost:5000
+echo.
+echo   Multiple people sharing this install? Run "python configure.py" again
+echo   any time to add another profile - each gets their own resume, jobs,
+echo   and tracked applications, kept separate.
 echo.
 if "%OLLAMA_OK%"=="1" (
     echo   Local models llama3.1:8b and qwen2.5:7b are installed via Ollama.

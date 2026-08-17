@@ -10,19 +10,17 @@ import json
 import logging
 import re
 import time
-from pathlib import Path
 from bs4 import BeautifulSoup
 
-logger = logging.getLogger(__name__)
+import profiles
 
-CONFIG_FILE      = Path(__file__).parent / "config.json"
-BASE_RESUME_PATH = Path(__file__).parent / "base_resume.html"
+logger = logging.getLogger(__name__)
 
 
 def _candidate_profile() -> dict:
     """Extract name, years exp, and flat skill list from config + base resume."""
     try:
-        cfg = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+        cfg = json.loads(profiles.config_path().read_text(encoding="utf-8"))
         candidate = cfg.get("candidate", {})
         name  = candidate.get("name", "The candidate")
         years = candidate.get("total_experience_years", 0)
@@ -31,7 +29,7 @@ def _candidate_profile() -> dict:
 
     skills = []
     try:
-        soup = BeautifulSoup(BASE_RESUME_PATH.read_text(encoding="utf-8"), "html.parser")
+        soup = BeautifulSoup(profiles.base_resume_path().read_text(encoding="utf-8"), "html.parser")
         for sg in soup.find_all(class_="skill-group"):
             skills += [t.get_text(strip=True) for t in sg.find_all(class_="tag") if t.get_text(strip=True)]
         if not skills:

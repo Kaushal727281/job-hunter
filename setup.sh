@@ -110,17 +110,7 @@ else
   ok "GROQ_API_KEY looks set"
 fi
 
-# ── 5. Config file ────────────────────────────
-step "Setting up config.json"
-if [ ! -f "config.json" ]; then
-  cp config.example.json config.json
-  ok "Created config.json from config.example.json"
-  warn "Open config.json and update your name + job queries"
-else
-  ok "config.json already exists — skipping"
-fi
-
-# ── 6. Ollama + local LLM models ──────────────
+# ── 5. Ollama + local LLM models ──────────────
 step "Checking for Ollama (local LLM runtime)"
 OLLAMA_OK=false
 if command -v ollama &>/dev/null; then
@@ -165,7 +155,7 @@ if [ "$OLLAMA_OK" = true ]; then
   fi
 fi
 
-# ── 7. Chrome / Chromium check ────────────────
+# ── 6. Chrome / Chromium check ────────────────
 step "Checking for Chrome / Chromium (needed for PDF generation)"
 CHROME_FOUND=false
 
@@ -204,12 +194,12 @@ if [ "$CHROME_FOUND" = false ]; then
   fi
 fi
 
-# ── 8. Output dir ─────────────────────────────
+# ── 7. Output dir ─────────────────────────────
 step "Creating output directory"
 mkdir -p output
 ok "output/ ready"
 
-# ── 9. Personal info (name, Gmail, LinkedIn CSV) ──
+# ── 8. Personal info (name, Gmail, LinkedIn CSV) ──
 step "Let's fill in your personal details"
 python configure.py
 
@@ -228,18 +218,22 @@ if grep -q "your_groq_api_key_here" .env 2>/dev/null; then
   echo ""
 fi
 
-echo "  2. Add your resume:"
-echo "       Replace base_resume.html with your own HTML resume"
+echo "  2. Upload your resume once the app is running — via the web UI, or drop"
+echo "     an HTML resume at profiles/<your-profile>/base_resume.html directly."
 echo ""
-echo "  3. Update config.json job_search.locations for where to search"
-echo "       (search queries are derived from base_resume.html automatically)"
+echo "  3. Update profiles/<your-profile>/config.json job_search.locations"
+echo "       (search queries are derived from your resume automatically)"
 echo ""
 echo "  4. Start the app:"
 echo "       source .venv/bin/activate"
 echo "       python app.py"
 echo ""
-echo "  5. Open in browser:"
+echo "  5. Open in browser and pick your profile:"
 echo "       http://localhost:5000"
+echo ""
+echo "  Multiple people sharing this install? Run 'python configure.py' again"
+echo "  any time to add another profile — each gets their own resume, jobs,"
+echo "  and tracked applications, kept separate."
 echo ""
 
 if [ "$OLLAMA_OK" = true ]; then

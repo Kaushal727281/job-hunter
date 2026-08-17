@@ -5,26 +5,32 @@ All jobs are persisted in output/jobs.json.
 
 import json
 import threading
-from pathlib import Path
 from typing import Optional
 
-STORE_FILE = Path(__file__).parent / "output" / "jobs.json"
+import profiles
+
 _lock = threading.Lock()
 
 
+def _store_file():
+    return profiles.jobs_store_path()
+
+
 def _read() -> list[dict]:
-    STORE_FILE.parent.mkdir(exist_ok=True)
-    if STORE_FILE.exists():
+    store_file = _store_file()
+    store_file.parent.mkdir(parents=True, exist_ok=True)
+    if store_file.exists():
         try:
-            return json.loads(STORE_FILE.read_text(encoding="utf-8"))
+            return json.loads(store_file.read_text(encoding="utf-8"))
         except Exception:
             return []
     return []
 
 
 def _write(jobs: list[dict]):
-    STORE_FILE.parent.mkdir(exist_ok=True)
-    STORE_FILE.write_text(json.dumps(jobs, indent=2, ensure_ascii=False), encoding="utf-8")
+    store_file = _store_file()
+    store_file.parent.mkdir(parents=True, exist_ok=True)
+    store_file.write_text(json.dumps(jobs, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
 def all_jobs() -> list[dict]:
@@ -106,3 +112,17 @@ def remove_job(job_id: str):
 def clear_all():
     with _lock:
         _write([])
+
+
+def clear_untracked_jobs() -> list[str]:
+    """Remove every job with no application history (no job_status, no
+    applied_at) — the browse-only results of whatever resume/queries were
+    active before. Jobs you've actually applied to or set a status on are
+    never touched, regardless of resume changes. Returns the removed IDs so
+    the caller can free them in job_fetcher's seen-jobs set for re-fetching."""
+    with _lock:
+        jobs = _read()
+        tracked = [j for j in jobs if j.get("job_status") or j.get("applied_at")]
+        removed_ids = [j["id"] for j in jobs if not (j.get("job_status") or j.get("applied_at"))]
+        _write(tracked)
+        return removed_ids

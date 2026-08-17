@@ -10,11 +10,10 @@ No scraping involved — this is your own sanctioned data export.
 import csv
 import logging
 import re
-from pathlib import Path
+
+import profiles
 
 logger = logging.getLogger(__name__)
-
-CONNECTIONS_FILE = Path(__file__).parent / "output" / "linkedin_connections.csv"
 
 _STOP_WORDS = {"private", "limited", "pvt", "ltd", "inc", "corp", "technologies",
                "solutions", "services", "consulting", "india", "the", "and", "co"}
@@ -30,10 +29,11 @@ def _company_key(company: str) -> str:
 
 def _load_connections() -> list[dict]:
     """Parse LinkedIn's Connections.csv, skipping the notes preamble LinkedIn adds above the header."""
-    if not CONNECTIONS_FILE.exists():
+    connections_file = profiles.linkedin_csv_path()
+    if not connections_file.exists():
         return []
     try:
-        with CONNECTIONS_FILE.open(encoding="utf-8-sig", newline="") as f:
+        with connections_file.open(encoding="utf-8-sig", newline="") as f:
             lines = f.readlines()
         header_idx = next(
             (i for i, line in enumerate(lines) if line.strip().startswith("First Name")),

@@ -2,24 +2,22 @@
 configure.py
 Interactive first-run wizard — asks for the personal info the app can't
 guess (name, Gmail login, LinkedIn connections export) and writes it into
-.env and config.json. Safe to re-run any time to update a value; existing
-values are shown as the default so pressing Enter keeps them.
+a profile's .env and config.json. Safe to re-run any time to update a
+value; existing values are shown as the default so pressing Enter keeps
+them. Multiple people can share one install — each gets their own profile
+under profiles/<name>/, picked at the start of this script.
 
 Run:  python configure.py
 """
 
-import json
 import re
 import shutil
 import getpass
 from pathlib import Path
 
+import profiles
+
 ROOT = Path(__file__).parent
-ENV_FILE = ROOT / ".env"
-ENV_EXAMPLE = ROOT / ".env.example"
-CONFIG_FILE = ROOT / "config.json"
-CONFIG_EXAMPLE = ROOT / "config.example.json"
-CSV_DEST = ROOT / "output" / "linkedin_connections.csv"
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
@@ -31,19 +29,33 @@ def ask(prompt: str, default: str = "", secret: bool = False) -> str:
     return value or default
 
 
-def read_env() -> dict:
-    if not ENV_FILE.exists():
-        shutil.copy(ENV_EXAMPLE, ENV_FILE)
-    values, lines = {}, ENV_FILE.read_text(encoding="utf-8").splitlines()
-    for line in lines:
+def pick_profile() -> str:
+    existing = profiles.list_profiles()
+    print("── Which profile is this for? ──────────────────────")
+    if existing:
+        for i, name in enumerate(existing, 1):
+            print(f"  {i}. {name.replace('-', ' ').title()}")
+        print(f"  {len(existing) + 1}. + New profile")
+        choice = input(f"Choose [1-{len(existing) + 1}]: ").strip()
+        if choice.isdigit() and 1 <= int(choice) <= len(existing):
+            return existing[int(choice) - 1]
+    new_name = input("Full name for the new profile: ").strip() or "profile"
+    slug = profiles.create_profile(new_name)
+    print(f"  ✓ Created profile '{new_name}'")
+    return slug
+
+
+def read_env(env_file: Path) -> dict:
+    values = {}
+    for line in env_file.read_text(encoding="utf-8").splitlines():
         if "=" in line and not line.strip().startswith("#"):
             k, _, v = line.partition("=")
             values[k.strip()] = v.strip()
     return values
 
 
-def write_env(updates: dict):
-    lines = ENV_FILE.read_text(encoding="utf-8").splitlines()
+def write_env(env_file: Path, updates: dict):
+    lines = env_file.read_text(encoding="utf-8").splitlines()
     seen = set()
     for i, line in enumerate(lines):
         if "=" in line and not line.strip().startswith("#"):
@@ -54,30 +66,28 @@ def write_env(updates: dict):
     for key, val in updates.items():
         if key not in seen:
             lines.append(f"{key}={val}")
-    ENV_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
-
-
-def read_config() -> dict:
-    if not CONFIG_FILE.exists():
-        shutil.copy(CONFIG_EXAMPLE, CONFIG_FILE)
-    return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-
-
-def write_config(cfg: dict):
-    CONFIG_FILE.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
+    env_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def main():
     print()
     print("  ╔══════════════════════════════════════╗")
-    print("  ║      Job Hunter — First-Run Setup    ║")
+    print("  ║      Job Hunter — Profile Setup      ║")
     print("  ╚══════════════════════════════════════╝")
+    print()
+
+    slug = pick_profile()
+    env_file = profiles.profile_env_path(slug)
+    config_file = profiles.config_path(slug)
+    csv_dest = profiles.linkedin_csv_path(slug)
+
     print()
     print("  Press Enter to keep the current/default value shown in [brackets].")
     print()
 
-    env = read_env()
-    cfg = read_config()
+    env = read_env(env_file)
+    import json
+    cfg = json.loads(config_file.read_text(encoding="utf-8"))
     candidate = cfg.setdefault("candidate", {})
 
     # ── Name ───────────────────────────────────────────────────────────────
@@ -118,10 +128,6 @@ def main():
         env_updates["GMAIL_ADDRESS"] = gmail_addr
     if gmail_pwd:
         env_updates["GMAIL_APP_PASSWORD"] = gmail_pwd
-    # .env.example ships DIGEST_RECIPIENT as a literal placeholder — since it's
-    # a non-empty string, code that does getenv("DIGEST_RECIPIENT", gmail_addr)
-    # would use that placeholder as the actual send target instead of falling
-    # back to gmail_addr. Point it at the real address unless already customized.
     digest = env.get("DIGEST_RECIPIENT", "")
     if gmail_addr and (not digest or digest == "your.email@gmail.com"):
         env_updates["DIGEST_RECIPIENT"] = gmail_addr
@@ -133,31 +139,37 @@ def main():
     print("  \"Get a copy of your data\" -> Connections. You'll get an email")
     print("  with a download link for a Connections.csv file.")
     csv_default = ""
-    if CSV_DEST.exists():
+    if csv_dest.exists():
         csv_default = "(already imported — press Enter to keep it, or paste a new path to replace it)"
     csv_path = ask("Path to your downloaded Connections.csv", csv_default)
     if csv_path and csv_path != csv_default:
         src = Path(csv_path).expanduser()
         if src.exists():
-            CSV_DEST.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy(src, CSV_DEST)
-            print(f"  ✓ Copied to {CSV_DEST.relative_to(ROOT)}")
+            csv_dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(src, csv_dest)
+            print(f"  ✓ Copied to {csv_dest.relative_to(ROOT)}")
         else:
             print(f"  ✗ Couldn't find {src} — skipping. Re-run this script once you have it.")
 
-    write_env(env_updates)
-    write_config(cfg)
+    write_env(env_file, env_updates)
+    config_file.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
+
+    shared_env = ROOT / ".env"
+    has_shared_llm_key = False
+    if shared_env.exists():
+        shared_values = read_env(shared_env)
+        has_shared_llm_key = bool(shared_values.get("GROQ_API_KEY") or shared_values.get("OLLAMA_MODEL"))
 
     print()
     print("  ══════════════════════════════════════")
-    print("   Saved!")
+    print(f"   Saved profile: {name}")
     print("  ══════════════════════════════════════")
     print()
     print("  Still worth checking before your first run:")
-    print("    - config.json -> job_search.queries / locations (what to search for)")
-    print("    - base_resume.html -> replace with your own resume")
-    if not env.get("GROQ_API_KEY") and not env.get("OLLAMA_MODEL"):
-        print("    - .env -> add a GROQ_API_KEY (console.groq.com) or run setup to install Ollama locally")
+    print(f"    - profiles/{slug}/config.json -> job_search.locations (where to search)")
+    print(f"    - profiles/{slug}/base_resume.html -> upload your resume via the web UI")
+    if not has_shared_llm_key:
+        print("    - .env (shared) -> add a GROQ_API_KEY (console.groq.com) or run setup to install Ollama locally")
     print()
 
 

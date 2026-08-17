@@ -13,21 +13,22 @@ import re
 from datetime import datetime, timezone
 from email.header import decode_header
 from email.utils import parsedate_to_datetime
-from pathlib import Path
 from dotenv import load_dotenv
+
+import profiles
 
 load_dotenv()
 logger = logging.getLogger(__name__)
-_CONFIG_FILE = Path(__file__).parent / "config.json"
 
 
 def _get_gmail_address() -> str:
-    """Return Gmail address: .env GMAIL_ADDRESS first, then config.json candidate.email."""
-    addr = os.getenv("GMAIL_ADDRESS", "")
+    """Return Gmail address: the active profile's .env GMAIL_ADDRESS first,
+    then config.json candidate.email."""
+    addr = profiles.get_profile_env().get("GMAIL_ADDRESS") or os.getenv("GMAIL_ADDRESS", "")
     if addr:
         return addr
     try:
-        return json.loads(_CONFIG_FILE.read_text(encoding="utf-8")).get("candidate", {}).get("email", "")
+        return json.loads(profiles.config_path().read_text(encoding="utf-8")).get("candidate", {}).get("email", "")
     except Exception:
         return ""
 
@@ -151,7 +152,7 @@ def check_responses(applied_jobs: list[dict]) -> dict:
         { job_id: [ {from, subject, snippet, date, msg_id}, ... ] }
     """
     addr = _get_gmail_address()
-    pwd  = os.getenv("GMAIL_APP_PASSWORD")
+    pwd  = profiles.get_profile_env().get("GMAIL_APP_PASSWORD") or os.getenv("GMAIL_APP_PASSWORD")
     if not addr or not pwd:
         raise EnvironmentError("GMAIL_ADDRESS / GMAIL_APP_PASSWORD not set in .env or config.json")
 

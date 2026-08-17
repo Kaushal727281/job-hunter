@@ -25,12 +25,11 @@ from datetime import date
 from pathlib import Path
 from dotenv import load_dotenv
 
+import profiles
+
 truststore.inject_into_ssl()
 load_dotenv()
 logger = logging.getLogger(__name__)
-
-SEEN_JOBS_FILE  = Path(__file__).parent / "output" / "seen_jobs.json"
-COOKIES_DIR     = Path(__file__).parent / "output" / "cookies"
 
 
 # ── Cookie helpers ─────────────────────────────────────────────────────────
@@ -43,7 +42,7 @@ def _load_cookies(site: str) -> dict:
       [{"name": "CTK", "value": "abc123", "domain": ".indeed.com", ...}, ...]
     Returns a plain {name: value} dict ready to pass to requests.
     """
-    path = COOKIES_DIR / f"{site}_cookies.json"
+    path = profiles.cookies_dir() / f"{site}_cookies.json"
     if not path.exists():
         return {}
     try:
@@ -384,13 +383,27 @@ _BASE_HEADERS = {
 # ── Seen-jobs dedup ────────────────────────────────────────────────────────
 
 def _load_seen() -> set:
-    SEEN_JOBS_FILE.parent.mkdir(exist_ok=True)
-    if SEEN_JOBS_FILE.exists():
-        return set(json.loads(SEEN_JOBS_FILE.read_text(encoding="utf-8")))
+    seen_file = profiles.seen_jobs_path()
+    seen_file.parent.mkdir(parents=True, exist_ok=True)
+    if seen_file.exists():
+        return set(json.loads(seen_file.read_text(encoding="utf-8")))
     return set()
 
 def _save_seen(seen: set):
-    SEEN_JOBS_FILE.write_text(json.dumps(sorted(seen), indent=2), encoding="utf-8")
+    seen_file = profiles.seen_jobs_path()
+    seen_file.parent.mkdir(parents=True, exist_ok=True)
+    seen_file.write_text(json.dumps(sorted(seen), indent=2), encoding="utf-8")
+
+
+def release_seen_ids(ids: set):
+    """Remove the given job IDs from the seen-jobs dedup set, so they're
+    eligible to be fetched again — used when clearing a previous resume's
+    untracked jobs, since 'already seen' would otherwise permanently hide
+    them even though they were never actually judged against this resume."""
+    if not ids:
+        return
+    seen = _load_seen()
+    _save_seen(seen - ids)
 
 
 # ── LinkedIn ───────────────────────────────────────────────────────────────
@@ -973,8 +986,6 @@ def check_job_availability(job: dict) -> tuple[bool, str]:
 # uploaded resume + years of experience, not a hand-maintained list — so
 # they stay in sync whenever the resume is replaced or experience changes.
 
-BASE_RESUME_PATH = Path(__file__).parent / "base_resume.html"
-
 _SENIORITY_WORDS = {
     "senior", "sr", "sr.", "junior", "jr", "jr.", "lead", "principal", "staff",
     "associate", "intern", "trainee", "graduate", "entry-level", "entry",
@@ -986,10 +997,11 @@ def _strip_seniority(title: str) -> str:
     return " ".join(words).strip() or title
 
 
-def _resume_title(resume_path: Path = BASE_RESUME_PATH) -> str:
+def _resume_title(resume_path: Path = None) -> str:
     """Pull the target role from the resume: the banner's role line
     (e.g. 'Junior DevOps Engineer · Cloud & Automation · 1 Year Experience')
     falling back to the most recent job title in Professional Experience."""
+    resume_path = resume_path or profiles.base_resume_path()
     if not resume_path.exists():
         return ""
     try:
@@ -1007,7 +1019,50 @@ def _resume_title(resume_path: Path = BASE_RESUME_PATH) -> str:
     return ""
 
 
-def derive_search_queries(candidate: dict, resume_path: Path = BASE_RESUME_PATH) -> list[str]:
+def _resume_skill_keywords(resume_path: Path = None) -> list[str]:
+    """Pull the candidate's actual skill tags from the resume's .skill-group
+    blocks, so fetched jobs can be checked for real overlap with what the
+    candidate can actually do — not just the search query used to find them."""
+    resume_path = resume_path or profiles.base_resume_path()
+    if not resume_path.exists():
+        return []
+    try:
+        soup = BeautifulSoup(resume_path.read_text(encoding="utf-8"), "html.parser")
+        keywords = []
+        for sg in soup.find_all(class_="skill-group"):
+            for tag in sg.find_all(class_="tag"):
+                text = tag.get_text(" ", strip=True)
+                if text:
+                    keywords.append(text)
+        return keywords
+    except Exception as e:
+        logger.warning(f"Failed to read skills from resume: {e}")
+        return []
+
+
+def _has_skill_overlap(job: dict, skill_keywords: list[str]) -> bool:
+    """True if the job's title/description mentions at least one of the
+    candidate's actual skills. Skill tags are often multi-word ('Spring Boot',
+    'AWS (EC2, S3, Lambda, RDS)') — check each word separately too, so a job
+    mentioning just 'AWS' still matches the fuller tag.
+
+    A short/empty description (common — see the near-empty-description rate
+    per source logged during fetch) isn't enough independent signal to reject
+    on title alone, so skip the gate rather than risk a false negative."""
+    if len(job.get("description") or "") < 50:
+        return True
+    text = f"{job.get('title', '')} {job.get('description', '')}".lower()
+    for kw in skill_keywords:
+        kw_low = kw.lower()
+        if kw_low in text:
+            return True
+        for word in re.findall(r"[a-z0-9+#.]{3,}", kw_low):
+            if word in text:
+                return True
+    return False
+
+
+def derive_search_queries(candidate: dict, resume_path: Path = None) -> list[str]:
     """Build search queries from the resume's target role + years of
     experience, e.g. 1 yr 'DevOps Engineer' -> ['Junior DevOps Engineer',
     'DevOps Engineer', 'Associate DevOps Engineer']."""
@@ -1059,6 +1114,7 @@ def fetch_jobs(config: dict, limit: int | None = None) -> list[dict]:
     exclude = _auto_exclude_keywords(years)
     min_exp = max(0, years - 1)
     max_exp = years + 5
+    skill_keywords = _resume_skill_keywords()
 
     enabled    = {s.lower() for s in search_cfg.get(
         "sources", ["LinkedIn", "Shine", "Foundit", "RemoteOK",
@@ -1119,6 +1175,13 @@ def fetch_jobs(config: dict, limit: int | None = None) -> list[dict]:
             nums = re.findall(r"\d+", job["experience"])
             if nums and (int(nums[0]) < min_exp or int(nums[0]) > max_exp):
                 return False
+        # Only show jobs relevant to what's actually in the resume — the search
+        # query can still pull in loosely-related job-board results (e.g. a
+        # "Junior DevOps Engineer" query returning a "Junior QA Engineer"
+        # posting). Skips the gate if we have no skills to check against.
+        if skill_keywords and not _has_skill_overlap(job, skill_keywords):
+            logger.debug(f"  Skill filter: skipping '{job['title']}' @ {job.get('company','?')} — no overlap with resume skills")
+            return False
         # Last (most expensive) check — fetch the real detail page and skip
         # postings that are closed/expired/no longer accepting applications.
         is_available, detail_text = check_job_availability(job)
