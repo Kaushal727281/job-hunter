@@ -6,6 +6,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Open+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
   <style>
+    /* Single-column, not two-column — the previous .columns flex layout
+       caused the EDUCATION section header to render mid-sentence inside
+       the TiffinLane project description when read by an ATS text parser
+       (Chrome's PDF text stream orders by vertical position across both
+       columns). Stacking everything keeps reading order strictly linear. */
     @page { margin: 0.5in 0.55in; size: A4; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -38,11 +43,6 @@
     }
     .contact a { color: #7C3AED; text-decoration: none; }
 
-    /* ── Two-column body ── */
-    .columns { display: flex; gap: 22px; }
-    .col-main { flex: 1; }
-    .col-side { width: 210px; min-width: 210px; }
-
     /* ── Section titles ── */
     .section-title {
       font-family: 'Poppins', sans-serif;
@@ -57,16 +57,17 @@
     /* ── Summary ── */
     .summary-text { font-size: 10pt; line-height: 1.55; color: #475569; }
 
-    /* ── Experience ── */
+    /* ── Experience ──
+       Dates are stacked blocks, not flex-positioned to the side — see note
+       above about why side-positioned content breaks ATS text extraction. */
     .job { margin-bottom: 12px; }
     .job:last-child { margin-bottom: 0; }
-    .job-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
     .job-title {
       font-family: 'Poppins', sans-serif;
       font-size: 10.5pt; font-weight: 600; color: #312E81;
     }
     .job-company { font-size: 9.5pt; color: #475569; margin-top: 1px; }
-    .job-date { font-size: 9pt; color: #94A3B8; white-space: nowrap; flex-shrink: 0; }
+    .job-date { font-size: 9pt; color: #94A3B8; margin-top: 1px; }
     ul { margin: 5px 0 0 14px; padding: 0; }
     li { font-size: 9.5pt; line-height: 1.5; margin-bottom: 4px; color: #475569; }
     li::marker { color: #7C3AED; }
@@ -74,16 +75,15 @@
     /* ── Projects ── */
     .project { margin-bottom: 10px; }
     .project:last-child { margin-bottom: 0; }
-    .project-header { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
     .project-name {
       font-family: 'Poppins', sans-serif;
       font-size: 10pt; font-weight: 600; color: #312E81;
     }
-    .project-role { font-size: 8.5pt; color: #94A3B8; white-space: nowrap; }
+    .project-role { font-size: 8.5pt; color: #94A3B8; }
     .project-stack { font-size: 8.5pt; color: #7C3AED; margin: 6px 0 3px; font-weight: 500; }
     .project-desc { font-size: 9.5pt; line-height: 1.5; color: #475569; }
 
-    /* ── Skill highlight boxes (right column) ── */
+    /* ── Skill highlight boxes ── */
     .skill-box { margin-bottom: 10px; }
     .skill-box-label {
       font-family: 'Poppins', sans-serif;
@@ -99,7 +99,7 @@
       padding: 6px 9px; line-height: 1.6;
     }
 
-    /* ── Education (right) ── */
+    /* ── Education ── */
     .edu-degree {
       font-family: 'Poppins', sans-serif;
       font-size: 10pt; font-weight: 600; color: #312E81;
@@ -107,11 +107,15 @@
     .edu-school { font-size: 9pt; color: #475569; margin-top: 2px; }
     .edu-date { font-size: 8.5pt; color: #94A3B8; margin-top: 2px; }
 
-    /* ── Certifications (right) ── */
-    .cert-item { font-size: 9pt; color: #475569; margin-bottom: 5px; line-height: 1.4; padding-left: 14px; position: relative; }
-    .cert-item::before { content: "▸"; color: #7C3AED; position: absolute; left: 0; font-weight: 700; }
+    /* ── Certifications ──
+       No position:absolute on the bullet glyph — an absolutely-positioned
+       pseudo-element got extracted into the PDF text layer separately from
+       its actual text, landing as an empty "▸" line with the cert text
+       elsewhere. A plain inline glyph stays attached to its text. */
+    .cert-item { font-size: 9pt; color: #475569; margin-bottom: 5px; line-height: 1.4; }
+    .cert-item::before { content: "▸  "; color: #7C3AED; font-weight: 700; }
 
-    /* ── Soft skills (right) ── */
+    /* ── Soft skills ── */
     .soft-item { font-size: 9pt; color: #475569; margin-bottom: 4px; line-height: 1.4; }
     .soft-item::before { content: "✓  "; color: #7C3AED; font-weight: 700; }
 
@@ -130,88 +134,70 @@
   <div class="contact">
     {% if email %}<a href="mailto:{{ email }}">{{ email }}</a>{% endif %}
     {% if phone %}<span>{{ phone }}</span>{% endif %}
-    {% if linkedin %}<a href="{{ linkedin }}">LinkedIn</a>{% endif %}
-    {% if github %}<a href="{{ github }}">GitHub</a>{% endif %}
+    {% if linkedin %}<a href="{{ linkedin }}">{{ linkedin | replace('https://', '') | replace('http://', '') }}</a>{% endif %}
+    {% if github %}<a href="{{ github }}">{{ github | replace('https://', '') | replace('http://', '') }}</a>{% endif %}
   </div>
 </div>
 
-<div class="columns">
+{% if summary %}
+<div class="section-title">Summary</div>
+<div class="summary-text">{{ summary | safe }}</div>
+{% endif %}
 
-  <!-- Left: Summary + Experience + Projects -->
-  <div class="col-main">
-
-    {% if summary %}
-    <div class="section-title">Summary</div>
-    <div class="summary-text">{{ summary | safe }}</div>
-    {% endif %}
-
-    {% if jobs %}
-    <div class="section-title">Experience</div>
-    {% for job in jobs %}
-    <div class="job">
-      <div class="job-header">
-        <div>
-          <div class="job-title">{{ job.title }}</div>
-          {% if job.company %}<div class="job-company">{{ job.company }}</div>{% endif %}
-        </div>
-        {% if job.date %}<div class="job-date">{{ job.date }}</div>{% endif %}
-      </div>
-      {% if job.bullets %}
-      <ul>{% for b in job.bullets %}<li>{{ b | safe }}</li>{% endfor %}</ul>
-      {% endif %}
-    </div>
-    {% endfor %}
-    {% endif %}
-
-    {% if projects %}
-    <div class="section-title">Projects</div>
-    {% for p in projects %}
-    <div class="project">
-      <div class="project-header">
-        <span class="project-name">{{ p.name }}</span>
-        {% if p.role %}<span class="project-role">{{ p.role }}</span>{% endif %}
-      </div>
-      {% if p.stack %}<div class="project-stack">{{ p.stack | join(' · ') }}</div>{% endif %}
-      {% if p.description %}<div class="project-desc">{{ p.description }}</div>{% endif %}
-    </div>
-    {% endfor %}
-    {% endif %}
-
-  </div>
-
-  <!-- Right: Skills + Education + Certs -->
-  <div class="col-side">
-
-    {% if skill_groups %}
-    <div class="section-title">Technical Skills</div>
-    {% for sg in skill_groups %}
-    <div class="skill-box">
-      {% if sg.label %}<div class="skill-box-label">{{ sg.label }}</div>{% endif %}
-      <div class="skill-box-content">{{ sg.tags | join(', ') }}</div>
-    </div>
-    {% endfor %}
-    {% endif %}
-
-    {% if education %}
-    <div class="section-title">Education</div>
-    <div class="edu-degree">{{ education.degree }}</div>
-    {% if education.school %}<div class="edu-school">{{ education.school }}</div>{% endif %}
-    {% if education.date %}<div class="edu-date">{{ education.date }}</div>{% endif %}
-    {% endif %}
-
-    {% if certifications %}
-    <div class="section-title">Certifications</div>
-    {% for c in certifications %}<div class="cert-item">{{ c }}</div>{% endfor %}
-    {% endif %}
-
-    {% if soft_skills %}
-    <div class="section-title">Soft Skills</div>
-    {% for s in soft_skills %}<div class="soft-item">{{ s | replace('✔ ', '') | replace('✔', '') }}</div>{% endfor %}
-    {% endif %}
-
-  </div>
-
+{% if jobs %}
+<div class="section-title">Experience</div>
+{% for job in jobs %}
+<div class="job">
+  <div class="job-title">{{ job.title }}</div>
+  {% if job.company %}<div class="job-company">{{ job.company }}</div>{% endif %}
+  {% if job.date %}<div class="job-date">{{ job.date }}</div>{% endif %}
+  {% if job.bullets %}
+  <ul>{% for b in job.bullets %}<li>{{ b | safe }}</li>{% endfor %}</ul>
+  {% endif %}
 </div>
+{% endfor %}
+{% endif %}
+
+{% if projects %}
+<div class="section-title">Projects</div>
+{% for p in projects %}
+<div class="project">
+  <div class="project-header">
+    <span class="project-name">{{ p.name }}</span>
+    {% if p.role %}<span class="project-role">{{ p.role }}</span>{% endif %}
+  </div>
+  {% if p.stack %}<div class="project-stack">{{ p.stack | join(' · ') }}</div>{% endif %}
+  {% if p.description %}<div class="project-desc">{{ p.description }}</div>{% endif %}
+</div>
+{% endfor %}
+{% endif %}
+
+{% if skill_groups %}
+<div class="section-title">Technical Skills</div>
+{% for sg in skill_groups %}
+<div class="skill-box">
+  {% if sg.label %}<div class="skill-box-label">{{ sg.label }}</div>{% endif %}
+  <div class="skill-box-content">{{ sg.tags | join(', ') }}</div>
+</div>
+{% endfor %}
+{% endif %}
+
+{% if education %}
+<div class="section-title">Education</div>
+<div class="edu-degree">{{ education.degree }}</div>
+{% if education.school %}<div class="edu-school">{{ education.school }}</div>{% endif %}
+{% if education.date %}<div class="edu-date">{{ education.date }}</div>{% endif %}
+{% endif %}
+
+{% if certifications %}
+<div class="section-title">Certifications</div>
+{% for c in certifications %}<div class="cert-item">{{ c }}</div>{% endfor %}
+{% endif %}
+
+{% if soft_skills %}
+<div class="section-title">Soft Skills</div>
+{% for s in soft_skills %}<div class="soft-item">{{ s | replace('✔ ', '') | replace('✔', '') }}</div>{% endfor %}
+{% endif %}
 
 </body>
 </html>

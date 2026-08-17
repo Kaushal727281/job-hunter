@@ -70,16 +70,20 @@
     .skill-label { font-weight: 700; color: #1E293B; }
     .skill-value { color: #475569; }
 
-    /* ── Experience ── */
+    /* ── Experience ──
+       Dates/roles are stacked blocks, not flex-positioned to the side —
+       Chrome's PDF text layer doesn't reliably preserve DOM order for
+       flex-positioned "float right" content, which showed up as dates
+       and other fields landing in the wrong section entirely when
+       extracted by an ATS parser. Stacking guarantees linear reading order. */
     .job { margin-bottom: 9px; }
     .job:last-child { margin-bottom: 0; }
-    .job-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
     .job-title {
       font-family: 'Merriweather', Georgia, serif;
       font-size: 10.5pt; font-weight: 700; color: #1E293B;
     }
     .job-company { font-size: 9.5pt; color: #0EA5E9; margin-top: 1px; font-weight: 500; }
-    .job-date { font-size: 9pt; color: #64748B; white-space: nowrap; flex-shrink: 0; padding-top: 1px; }
+    .job-date { font-size: 9pt; color: #64748B; margin-top: 1px; }
     ul { margin: 4px 0 0 15px; padding: 0; }
     li { font-size: 9.5pt; line-height: 1.4; margin-bottom: 3px; color: #475569; }
     li::marker { color: #0EA5E9; }
@@ -87,20 +91,18 @@
     /* ── Projects ── */
     .project { margin-bottom: 7px; }
     .project:last-child { margin-bottom: 0; }
-    .project-header { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
     .project-name {
       font-family: 'Merriweather', Georgia, serif;
       font-size: 10pt; font-weight: 700; color: #1E293B;
     }
-    .project-role { font-size: 9pt; color: #64748B; white-space: nowrap; font-style: italic; }
+    .project-role { font-size: 9pt; color: #64748B; font-style: italic; }
     .project-stack { font-size: 9pt; color: #0EA5E9; margin: 4px 0 2px; font-weight: 500; }
     .project-desc { font-size: 9.5pt; line-height: 1.4; color: #475569; }
 
     /* ── Education ── */
-    .edu-row { display: flex; justify-content: space-between; align-items: baseline; }
     .edu-degree { font-size: 10pt; font-weight: 600; color: #1E293B; }
     .edu-school { font-size: 9.5pt; color: #64748B; margin-top: 2px; font-style: italic; }
-    .edu-date { font-size: 9pt; color: #64748B; white-space: nowrap; }
+    .edu-date { font-size: 9pt; color: #64748B; margin-top: 1px; }
 
     /* ── Certifications ── */
     .cert-item { font-size: 9.5pt; color: #475569; margin-bottom: 3px; line-height: 1.4; }
@@ -121,8 +123,8 @@
   <div class="contact">
     {% if email %}<a href="mailto:{{ email }}">{{ email }}</a>{% endif %}
     {% if phone %}<span>{{ phone }}</span>{% endif %}
-    {% if linkedin %}<a href="{{ linkedin }}">LinkedIn</a>{% endif %}
-    {% if github %}<a href="{{ github }}">GitHub</a>{% endif %}
+    {% if linkedin %}<a href="{{ linkedin }}">{{ linkedin | replace('https://', '') | replace('http://', '') }}</a>{% endif %}
+    {% if github %}<a href="{{ github }}">{{ github | replace('https://', '') | replace('http://', '') }}</a>{% endif %}
   </div>
 </div>
 
@@ -160,13 +162,9 @@
   <div class="section-title">Professional Experience</div>
   {% for job in jobs %}
   <div class="job">
-    <div class="job-header">
-      <div>
-        <div class="job-title">{{ job.title }}</div>
-        {% if job.company %}<div class="job-company">{{ job.company }}</div>{% endif %}
-      </div>
-      {% if job.date %}<div class="job-date">{{ job.date }}</div>{% endif %}
-    </div>
+    <div class="job-title">{{ job.title }}</div>
+    {% if job.company %}<div class="job-company">{{ job.company }}</div>{% endif %}
+    {% if job.date %}<div class="job-date">{{ job.date }}</div>{% endif %}
     {% if job.bullets %}
     <ul>{% for b in job.bullets %}<li>{{ b | safe }}</li>{% endfor %}</ul>
     {% endif %}
@@ -194,13 +192,9 @@
 {% if education %}
 <div class="section">
   <div class="section-title">Education</div>
-  <div class="edu-row">
-    <div>
-      <div class="edu-degree">{{ education.degree }}</div>
-      {% if education.school %}<div class="edu-school">{{ education.school }}</div>{% endif %}
-    </div>
-    {% if education.date %}<div class="edu-date">{{ education.date }}</div>{% endif %}
-  </div>
+  <div class="edu-degree">{{ education.degree }}</div>
+  {% if education.school %}<div class="edu-school">{{ education.school }}</div>{% endif %}
+  {% if education.date %}<div class="edu-date">{{ education.date }}</div>{% endif %}
 </div>
 {% endif %}
 
