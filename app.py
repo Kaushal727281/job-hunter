@@ -250,7 +250,7 @@ def _bg_tailor(job_id: str, profile: str, prev_result: dict = None, prev_pdf: st
         # Save tailored resume HTML + cover note
         from pdf_generator import save_and_convert
         safe = (job["company"] + "-" + job["title"]).replace("/", "-").replace(" ", "_")[:50]
-        job_dir = Path(__file__).parent / "output" / job["fetched_date"] / safe
+        job_dir = profiles.output_dir() / job["fetched_date"] / safe
         pdf_path = save_and_convert(result["resume_html"], job_dir, "resume")
         (job_dir / "cover_note.txt").write_text(result.get("cover_note", ""), encoding="utf-8")
 
@@ -636,7 +636,7 @@ def diff_view(job_id):
     if not job or not job.get("tailor_result"):
         return "Resume not tailored yet", 404
 
-    base_html = (Path(__file__).parent / "base_resume.html").read_text(encoding="utf-8")
+    base_html = profiles.base_resume_path().read_text(encoding="utf-8")
 
     # Extract text sections from both original and tailored HTML
     def extract(html):
