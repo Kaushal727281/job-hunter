@@ -175,7 +175,7 @@ def chat_complete(prompt: str, max_tokens: int = 6000, temperature: float = 0.5)
     # ── 5. Gemini ─────────────────────────────────────────────────────────────
     k = os.getenv("GEMINI_API_KEY", "").strip()
     if k:
-        logger.info("  Trying Gemini 1.5 Flash")
+        logger.info("  Trying Gemini 2.0 Flash")
         return _gemini_complete(prompt, k, max_tokens, temperature)
 
     raise EnvironmentError(
