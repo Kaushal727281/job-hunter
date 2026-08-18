@@ -1256,3 +1256,32 @@ def fetch_jobs(config: dict, limit: int | None = None) -> list[dict]:
     _save_company_cache(cache)
 
     return all_jobs
+
+
+# ── Career-site scraper wrapper ──────────────────────────────────────────────
+
+def fetch_career_sites(config: dict, tier_filter: list = None, type_filter: str = None) -> list:
+    """
+    Scrape jobs directly from company career pages via career_scraper.
+
+    Parameters
+    ----------
+    config       : profile config dict (used to pull keyword queries)
+    tier_filter  : list of tier ints to include (e.g. [1] or [1,2]), or None for all
+    type_filter  : 'product' | 'service' | None for all
+
+    Returns a list of job dicts in the same schema as fetch_jobs().
+    """
+    import career_scraper  # local module next to job_fetcher.py
+
+    keywords = config.get("job_search", {}).get("queries", [])
+    logger.info(f"[CareerSites] Starting scrape — tier={tier_filter} type={type_filter} keywords={keywords}")
+    jobs = career_scraper.scrape_all_companies(
+        tier_filter=tier_filter,
+        type_filter=type_filter,
+        keywords=keywords,
+        location="India",
+        max_workers=5,
+    )
+    logger.info(f"[CareerSites] Scraped {len(jobs)} jobs from career sites")
+    return jobs

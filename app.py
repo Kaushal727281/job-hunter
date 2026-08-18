@@ -44,12 +44,19 @@ def _expmin_filter(exp: str) -> str:
 # one profile's fetch doesn't show up as another's status. Mutated in place
 # (never reassigned wholesale) since _fs() hands back a live reference.
 _fetch_status: dict[str, dict] = {}
+_career_fetch_status: dict[str, dict] = {}
 _tailor_running: set[str] = set()
 
 
 def _fs(profile: str = None) -> dict:
     profile = profile or profiles.get_active_profile()
     return _fetch_status.setdefault(profile, {"running": False, "message": "Idle", "last_run": None})
+
+
+def _cfs(profile: str = None) -> dict:
+    """Return (and lazily create) the career-fetch status dict for a profile."""
+    profile = profile or profiles.get_active_profile()
+    return _career_fetch_status.setdefault(profile, {"running": False, "message": "Idle"})
 
 
 def _get_last_fetch_date() -> str:
@@ -109,6 +116,34 @@ def _bg_fetch(profile: str):
     except Exception as e:
         logger.exception(f"[{profile}] Fetch failed")
         st.update(running=False, message=f"Error: {e}", last_run=None)
+
+
+def _bg_fetch_careers(profile: str, tier_filter, type_filter):
+    """Background worker: scrape company career pages and upsert results."""
+    profiles.set_active_profile(profile)
+    st = _cfs(profile)
+    tier_label = f"T{'/'.join(str(t) for t in tier_filter)}" if tier_filter else "All"
+    type_label = type_filter or "all"
+    st.update(running=True, message=f"Scraping career sites ({tier_label}, {type_label})…")
+    try:
+        from job_fetcher import fetch_career_sites
+        config = _load_config()
+        jobs = fetch_career_sites(config, tier_filter=tier_filter, type_filter=type_filter)
+        # career_scraper uses "job_id" key; job_store expects "id"
+        for j in jobs:
+            if "job_id" in j and "id" not in j:
+                j["id"] = j.pop("job_id")
+        new_ids = job_store.upsert_jobs_return_ids(jobs)
+        added = len(new_ids)
+        _save_last_fetch_date()
+        st.update(running=False, message=f"Done — {added} new jobs from career sites")
+        logger.info(f"[{profile}] Career-site fetch complete: {added} new jobs")
+        if new_ids:
+            t = threading.Thread(target=_bg_score, args=(new_ids, profile), daemon=True)
+            t.start()
+    except Exception as e:
+        logger.exception(f"[{profile}] Career-site fetch failed")
+        st.update(running=False, message=f"Error: {e}")
 
 
 def _suggest_layout(job: dict) -> tuple[str, str]:
@@ -334,8 +369,9 @@ def index():
         return (j.get("fetched_date", ""), tr.get("match_score", 0) if tr else -1)
     jobs.sort(key=sort_key, reverse=True)
     status = {**_fs(), "last_run": _get_last_fetch_date()}
+    career_status = _cfs()
     has_resume = profiles.base_resume_path().exists()
-    return render_template("index.html", jobs=jobs, status=status, config=_load_config(), has_resume=has_resume)
+    return render_template("index.html", jobs=jobs, status=status, career_status=career_status, config=_load_config(), has_resume=has_resume)
 
 
 @app.route("/fetch", methods=["POST"])
@@ -350,6 +386,27 @@ def fetch():
 @app.route("/fetch-status")
 def fetch_status():
     return jsonify(_fs())
+
+
+@app.route("/fetch-careers", methods=["POST"])
+def fetch_careers():
+    if _cfs()["running"]:
+        return jsonify({"ok": False, "message": "Career fetch already running"})
+    data = request.get_json(silent=True) or {}
+    tier_filter = data.get("tier_filter")   # list[int] or None
+    type_filter = data.get("type_filter")   # str or None
+    # Normalise tier_filter: convert JSON numbers to Python ints
+    if isinstance(tier_filter, list):
+        tier_filter = [int(t) for t in tier_filter]
+    profile = profiles.get_active_profile()
+    t = threading.Thread(target=_bg_fetch_careers, args=(profile, tier_filter, type_filter), daemon=True)
+    t.start()
+    return jsonify({"ok": True, "message": "Career-site scrape started"})
+
+
+@app.route("/fetch-careers-status")
+def fetch_careers_status():
+    return jsonify(_cfs())
 
 
 @app.route("/tailor/<job_id>", methods=["POST"])

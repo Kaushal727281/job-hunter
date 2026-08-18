@@ -79,6 +79,15 @@
     .badge-responded{background:#fff3e0;color:#e65100;padding:2px 7px;border-radius:10px;font-weight:700}
     .badge-product{background:#e3f2fd;color:#0d47a1;padding:2px 7px;border-radius:10px;font-weight:600;font-size:11px}
     .badge-service{background:#f3e5f5;color:#6a1b9a;padding:2px 7px;border-radius:10px;font-weight:600;font-size:11px}
+    .badge-greenhouse{background:#e8f5e9;color:#1b5e20;padding:2px 7px;border-radius:10px}
+    .badge-lever{background:#e8f5e9;color:#1b5e20;padding:2px 7px;border-radius:10px}
+    .badge-workday{background:#fff8e1;color:#f57f17;padding:2px 7px;border-radius:10px}
+    .badge-tier1{background:#e8f5e9;color:#1b5e20;padding:2px 6px;border-radius:10px;font-size:10px;font-weight:700}
+    .badge-tier2{background:#e3f2fd;color:#1565c0;padding:2px 6px;border-radius:10px;font-size:10px;font-weight:700}
+    .badge-tier3{background:#fff3e0;color:#e65100;padding:2px 6px;border-radius:10px;font-size:10px;font-weight:700}
+    .career-opt{display:block;width:100%;text-align:left;border:none;background:none;padding:7px 12px;
+                font-size:13px;cursor:pointer;border-radius:5px;color:#1e1e1e}
+    .career-opt:hover{background:#e8f0fb;color:#0d47a1}
     .card-title{font-size:15px;font-weight:700;color:#0d47a1;line-height:1.3;margin-bottom:3px}
     .card-company{font-size:13px;font-weight:600;color:#333}
     .card-meta{font-size:12px;color:#777;margin-top:3px}
@@ -258,6 +267,22 @@
   <div class="header-right">
     <span id="status-msg">{{ status.message }}{% if status.last_run and not status.running %} · Last fetch: {{ status.last_run }}{% endif %}</span>
     <button class="btn btn-white" id="fetch-btn" onclick="startFetch()">Fetch New Jobs</button>
+    <div class="career-fetch-wrap" style="position:relative;display:inline-block">
+      <button class="btn btn-outline" id="career-btn" onclick="toggleCareerMenu()">Career Sites ▾</button>
+      <div id="career-menu" style="display:none;position:absolute;right:0;top:40px;background:#fff;
+           border:1.5px solid #c7d5e8;border-radius:8px;padding:8px;min-width:200px;z-index:100;
+           box-shadow:0 4px 16px rgba(0,0,0,0.12)">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#999;padding:4px 8px 8px">Fetch from career sites</div>
+        <button class="career-opt" onclick="startCareerFetch('all','all')">All Companies</button>
+        <button class="career-opt" onclick="startCareerFetch([1],'all')">Tier 1 Only (&gt;$1B)</button>
+        <button class="career-opt" onclick="startCareerFetch([1,2],'all')">Tier 1 + 2</button>
+        <button class="career-opt" onclick="startCareerFetch('all','product')">Product Only</button>
+        <button class="career-opt" onclick="startCareerFetch('all','service')">Service Only</button>
+        <button class="career-opt" onclick="startCareerFetch([1],'product')">T1 Product</button>
+        <button class="career-opt" onclick="startCareerFetch([1],'service')">T1 Service</button>
+      </div>
+      <span id="career-status-msg" style="font-size:12px;color:rgba(255,255,255,0.8);margin-left:8px"></span>
+    </div>
     <button class="btn btn-outline" id="resp-btn" onclick="checkResponses()">📬 Check Responses</button>
     <button class="btn btn-outline" onclick="openSettings()">⚙️ Settings</button>
     <button class="btn btn-outline" onclick="if(confirm('Clear all jobs?')) clearAll()">Clear All</button>
@@ -277,6 +302,18 @@
     <button class="filter-btn"        data-filter="source" data-val="WeWorkRemotely"   onclick="applyFilters(this,'source')">WWR ({{ jobs|selectattr('source','eq','WeWorkRemotely')|list|length }})</button>
     <button class="filter-btn"        data-filter="source" data-val="HNJobs"           onclick="applyFilters(this,'source')">HN Jobs ({{ jobs|selectattr('source','eq','HNJobs')|list|length }})</button>
     <button class="filter-btn"        data-filter="source" data-val="Indeed"           onclick="applyFilters(this,'source')">Indeed ({{ jobs|selectattr('source','eq','Indeed')|list|length }})</button>
+    <button class="filter-btn"        data-filter="source" data-val="career_site"      onclick="applyFilters(this,'source')">Career Sites</button>
+  </div>
+
+  <div class="toolbar-divider"></div>
+
+  <!-- Tier filter -->
+  <div class="filter-group">
+    <span class="filter-label">Tier</span>
+    <button class="filter-btn active" data-filter="tier" data-val="all" onclick="applyFilters(this,'tier')">All</button>
+    <button class="filter-btn"        data-filter="tier" data-val="1"   onclick="applyFilters(this,'tier')">T1</button>
+    <button class="filter-btn"        data-filter="tier" data-val="2"   onclick="applyFilters(this,'tier')">T2</button>
+    <button class="filter-btn"        data-filter="tier" data-val="3"   onclick="applyFilters(this,'tier')">T3</button>
   </div>
 
   <div class="toolbar-divider"></div>
@@ -362,6 +399,7 @@
        data-text="{{ (job.title + ' ' + job.company + ' ' + job.location)|lower }}"
        data-responses="{{ job.email_responses | tojson | forceescape if job.email_responses else '[]' }}"
        data-companytype="{{ job.company_type or 'Unknown' }}"
+       data-tier="{{ job.tier or '' }}"
        data-fitscore="{{ score if score else fit }}">
 
     <div class="card-top-right">
@@ -371,9 +409,10 @@
 
     <div class="card-header">
       <div class="card-source">
-        <span class="badge-{{ job.source|lower }}">{{ job.source }}</span>
+        <span class="badge-{{ job.source.split(':')[0]|lower }}">{{ job.source }}</span>
         {% if job.company_type == 'Product' %}<span class="badge-product">🏭 Product</span>{% endif %}
         {% if job.company_type == 'Service' %}<span class="badge-service">🔧 Service</span>{% endif %}
+        {% if job.tier %}<span class="badge-tier{{ job.tier }}" title="Tier {{ job.tier }} company">T{{ job.tier }}</span>{% endif %}
         {% if job.is_remote %}<span class="badge-remote">Remote</span>{% endif %}
         {% if job.applied_at %}<span class="badge-applied">✓ Applied</span>{% endif %}
         {% if job.job_status == 'rejected' %}<span class="badge-rejected">🔴 Rejected</span>{% endif %}
@@ -789,7 +828,7 @@ function pollTailor(jobId, title, company){
 }
 
 // Active filter state
-const activeFilters = {source:'all', loc:'all', role:'all', exp:'all', status:'all', cotype:'all'};
+const activeFilters = {source:'all', loc:'all', role:'all', exp:'all', status:'all', cotype:'all', tier:'all'};
 
 function applyFilters(btn, group){
   if(btn && group){
@@ -802,7 +841,15 @@ function applyFilters(btn, group){
   document.querySelectorAll('.card').forEach(c=>{
     let show = true;
     // Source
-    if(activeFilters.source !== 'all' && c.dataset.source !== activeFilters.source) show=false;
+    if(activeFilters.source !== 'all'){
+      const src = (c.dataset.source || '').toLowerCase();
+      const _careerAtsSystems = ['greenhouse','lever','workday','smartrecruiters','icims'];
+      if(activeFilters.source === 'career_site'){
+        if(!_careerAtsSystems.some(ats => src.includes(ats))) show=false;
+      } else {
+        if(c.dataset.source !== activeFilters.source) show=false;
+      }
+    }
     // Location
     if(show && activeFilters.loc !== 'all'){
       const loc = (c.dataset.loc||'').toLowerCase();
@@ -850,6 +897,8 @@ function applyFilters(btn, group){
     }
     // Company type
     if(show && activeFilters.cotype !== 'all' && c.dataset.companytype !== activeFilters.cotype) show=false;
+    // Tier
+    if(show && activeFilters.tier !== 'all' && c.dataset.tier !== activeFilters.tier) show=false;
     // Status
     const js = c.dataset.jobstatus || '';
     if(activeFilters.status === 'all'      && c.dataset.applied === 'yes') show=false;
@@ -982,6 +1031,48 @@ function checkResponses(){
 
 // Resume auto-poll if fetch was running before reload
 if("{{ status.running }}"==="True") pollFetch();
+
+// ── Career Sites fetch ────────────────────────────────────────────────────
+function toggleCareerMenu(){
+  const m = document.getElementById('career-menu');
+  m.style.display = m.style.display === 'none' ? 'block' : 'none';
+}
+document.addEventListener('click', function(e){
+  if(!e.target.closest('.career-fetch-wrap'))
+    document.getElementById('career-menu').style.display='none';
+});
+let careerTimer = null;
+function startCareerFetch(tier, type){
+  document.getElementById('career-menu').style.display='none';
+  const btn = document.getElementById('career-btn');
+  btn.innerHTML='<span class="spinner"></span>Scraping…';
+  btn.disabled=true;
+  document.getElementById('career-status-msg').textContent='Starting…';
+  fetch('/fetch-careers',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({tier_filter: tier==='all'?null:tier, type_filter: type==='all'?null:type})
+  }).then(r=>r.json()).then(d=>{
+    if(!d.ok){ toast('⚠️ '+d.message); btn.innerHTML='Career Sites ▾'; btn.disabled=false; return; }
+    pollCareerFetch();
+  });
+}
+function pollCareerFetch(){
+  if(careerTimer) clearInterval(careerTimer);
+  careerTimer = setInterval(()=>{
+    fetch('/fetch-careers-status').then(r=>r.json()).then(d=>{
+      document.getElementById('career-status-msg').textContent = d.message || '';
+      if(!d.running){
+        clearInterval(careerTimer);
+        careerTimer = null;
+        document.getElementById('career-btn').innerHTML='Career Sites ▾';
+        document.getElementById('career-btn').disabled=false;
+        toast('Career scrape done! Refreshing…');
+        setTimeout(()=>location.reload(), 1200);
+      }
+    });
+  }, 2000);
+}
+// Auto-resume poll if career fetch was running before page reload
+if("{{ career_status.running }}"==="True") pollCareerFetch();
 
 function showResponses(evt, jobId){
   if(evt) evt.stopPropagation();
