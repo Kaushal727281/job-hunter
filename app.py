@@ -130,12 +130,19 @@ def _bg_fetch_careers(profile: str, tier_filter, type_filter):
         config = _load_config()
         jobs = fetch_career_sites(config, tier_filter=tier_filter, type_filter=type_filter)
         # career_scraper uses "job_id" key; job_store expects "id"
-        # also backfill apply_link from url so the Apply button renders
+        # also backfill apply_link, fetched_date, and decode HTML entities in description
+        from html import unescape
+        from bs4 import BeautifulSoup as _BS
+        today = str(date.today())
         for j in jobs:
             if "job_id" in j and "id" not in j:
                 j["id"] = j.pop("job_id")
             if j.get("url") and not j.get("apply_link"):
                 j["apply_link"] = j["url"]
+            if not j.get("fetched_date"):
+                j["fetched_date"] = today
+            if j.get("description"):
+                j["description"] = _BS(unescape(j["description"]), "html.parser").get_text(" ").strip()
         new_ids = job_store.upsert_jobs_return_ids(jobs)
         added = len(new_ids)
         _save_last_fetch_date()
@@ -288,7 +295,7 @@ def _bg_tailor(job_id: str, profile: str, prev_result: dict = None, prev_pdf: st
         # Save tailored resume HTML + cover note
         from pdf_generator import save_and_convert
         safe = (job["company"] + "-" + job["title"]).replace("/", "-").replace(" ", "_")[:50]
-        job_dir = profiles.output_dir() / job["fetched_date"] / safe
+        job_dir = profiles.output_dir() / (job.get("fetched_date") or job.get("date_posted", str(date.today()))[:10]) / safe
         pdf_path = save_and_convert(result["resume_html"], job_dir, "resume")
         (job_dir / "cover_note.txt").write_text(result.get("cover_note", ""), encoding="utf-8")
 
