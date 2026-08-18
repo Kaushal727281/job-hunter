@@ -237,6 +237,97 @@
        onclick="markApplied()">Apply on {{ job.source }} →</a>
     {% endif %}
 
+    <!-- ATS Advisor Panel -->
+    {% if ats_profile or ats_report %}
+    <div style="margin-top:22px;border:1.5px solid #c7d5e8;border-radius:10px;overflow:hidden">
+
+      <!-- Header: company ATS profile -->
+      <div style="background:#e8f0fb;padding:11px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #c7d5e8">
+        <span style="font-size:18px">🤖</span>
+        <div style="flex:1">
+          <div style="font-size:12px;font-weight:700;color:#0d47a1;text-transform:uppercase;letter-spacing:.8px">ATS Advisor</div>
+          <div style="font-size:12px;color:#444;margin-top:1px">
+            <b>{{ ats_profile.label }}</b> &nbsp;·&nbsp; {{ ats_profile.ats_system }}
+          </div>
+        </div>
+        {% if ats_report %}
+        <div style="padding:5px 13px;border-radius:20px;font-size:12px;font-weight:700;
+          {% if ats_report.verdict_color == 'green' %}background:#e8f5e9;color:#2e7d32;border:1.5px solid #a5d6a7
+          {% elif ats_report.verdict_color == 'orange' %}background:#fff3e0;color:#e65100;border:1.5px solid #ffb74d
+          {% else %}background:#ffebee;color:#c62828;border:1.5px solid #ef9a9a{% endif %}">
+          {{ ats_report.verdict }}
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Template recommendation -->
+      <div style="padding:11px 16px;border-bottom:1px solid #eef2f8;background:#fff">
+        <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px">Recommended Template</div>
+        <div style="font-size:13px;font-weight:700;color:#0d47a1;text-transform:capitalize">{{ ats_profile.template }}</div>
+        <div style="font-size:12px;color:#555;margin-top:2px">{{ ats_profile.template_why }}</div>
+      </div>
+
+      {% if ats_report %}
+      <!-- Keyword score bar -->
+      <div style="padding:11px 16px;border-bottom:1px solid #eef2f8;background:#fff">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.7px">Keyword Match</div>
+          <div style="font-size:13px;font-weight:700;
+            {% if ats_report.keyword_score >= 75 %}color:#2e7d32
+            {% elif ats_report.keyword_score >= 50 %}color:#e65100
+            {% else %}color:#c62828{% endif %}">{{ ats_report.keyword_score }}%</div>
+        </div>
+        <div style="background:#e8edf5;border-radius:4px;height:7px;overflow:hidden">
+          <div style="height:100%;border-radius:4px;width:{{ ats_report.keyword_score }}%;
+            {% if ats_report.keyword_score >= 75 %}background:#43a047
+            {% elif ats_report.keyword_score >= 50 %}background:#fb8c00
+            {% else %}background:#e53935{% endif %}"></div>
+        </div>
+        {% if ats_report.keyword_hits %}
+        <div style="margin-top:7px;font-size:11.5px;color:#555">
+          <span style="color:#2e7d32;font-weight:600">✅ Found:</span>
+          {{ ats_report.keyword_hits | join(', ') }}
+        </div>
+        {% endif %}
+        {% if ats_report.keyword_misses %}
+        <div style="margin-top:4px;font-size:11.5px;color:#555">
+          <span style="color:#c62828;font-weight:600">❌ Missing:</span>
+          {{ ats_report.keyword_misses[:8] | join(', ') }}{% if ats_report.keyword_misses|length > 8 %} +{{ ats_report.keyword_misses|length - 8 }} more{% endif %}
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Verdict summary + recommendations -->
+      <div style="padding:11px 16px;background:#fff">
+        <div style="font-size:12px;color:#333;font-weight:500;margin-bottom:8px">{{ ats_report.summary }}</div>
+        {% for rec in ats_report.recommendations %}
+        <div style="font-size:12px;color:#444;margin-bottom:4px;line-height:1.5">{{ rec }}</div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <!-- ATS rules (collapsible) -->
+      <details style="border-top:1px solid #eef2f8">
+        <summary style="padding:10px 16px;font-size:12px;font-weight:600;color:#0d47a1;cursor:pointer;background:#f5f8fc;list-style:none;display:flex;align-items:center;gap:6px">
+          <span>▶</span> {{ ats_profile.label }} ATS Rules ({{ ats_profile.rules|length }})
+        </summary>
+        <div style="padding:10px 16px;background:#fff">
+          {% for rule in ats_profile.rules %}
+          <div style="font-size:12px;color:#333;margin-bottom:5px;line-height:1.5">{{ rule }}</div>
+          {% endfor %}
+          {% if ats_profile.parse_notes %}
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid #eef2f8">
+            <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px">Parser Notes</div>
+            {% for note in ats_profile.parse_notes %}
+            <div style="font-size:11.5px;color:#666;margin-bottom:3px">• {{ note }}</div>
+            {% endfor %}
+          </div>
+          {% endif %}
+        </div>
+      </details>
+    </div>
+    {% endif %}
+
     <!-- Applied status -->
     <div style="margin-top:16px;display:flex;align-items:center;gap:10px">
       <button id="apply-mark-btn" onclick="toggleApplied(this)"

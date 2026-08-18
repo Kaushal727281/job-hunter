@@ -404,8 +404,14 @@ def job_detail(job_id):
     job = job_store.get_job(job_id)
     if not job:
         return "Job not found", 404
+    from ats_advisor import get_company_ats_profile, run_ats_postmortem
+    ats_profile = get_company_ats_profile(job)
+    tr = job.get("tailor_result")
+    ats_report = run_ats_postmortem(job, tr["resume_html"]) if tr and tr.get("resume_html") else None
     return render_template("job_detail.html", job=job,
-                           tailoring=job_id in _tailor_running)
+                           tailoring=job_id in _tailor_running,
+                           ats_profile=ats_profile,
+                           ats_report=ats_report)
 
 
 @app.route("/resume/<job_id>")
