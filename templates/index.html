@@ -896,7 +896,7 @@ function applyFilters(btn, group){
       }
     }
     // Company type
-    if(show && activeFilters.cotype !== 'all' && c.dataset.companytype !== activeFilters.cotype) show=false;
+    if(show && activeFilters.cotype !== 'all' && (c.dataset.companytype||'').toLowerCase() !== activeFilters.cotype.toLowerCase()) show=false;
     // Tier
     if(show && activeFilters.tier !== 'all' && c.dataset.tier !== activeFilters.tier) show=false;
     // Status
