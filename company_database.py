@@ -125,7 +125,7 @@ PRODUCT_TIER1 = [
     {"name": "Zoom", "career_url": "https://careers.zoom.us", "tier": 1, "company_type": "product", "valuation_usd_b": 22.0, "india_office": True, "remote": True, "ats_type": "greenhouse", "hq": "San Jose, USA", "india_hq": "Bengaluru"},
     {"name": "Slack (Salesforce)", "career_url": "https://slack.com/careers", "tier": 1, "company_type": "product", "valuation_usd_b": 27.7, "india_office": True, "remote": True, "ats_type": "workday", "hq": "San Francisco, USA", "india_hq": "Bengaluru"},
     # ---- File / Collab ----
-    {"name": "Dropbox", "career_url": "https://jobs.dropbox.com", "tier": 1, "company_type": "product", "valuation_usd_b": 10.0, "india_office": True, "remote": True, "ats_type": "greenhouse", "hq": "San Francisco, USA", "india_hq": "Hyderabad"},
+    {"name": "Dropbox", "career_url": "https://jobs.dropbox.com", "tier": 1, "company_type": "product", "valuation_usd_b": 10.0, "india_office": True, "remote": True, "ats_type": "greenhouse", "ats_token": "dropbox", "hq": "San Francisco, USA", "india_hq": "Hyderabad"},
     {"name": "Box", "career_url": "https://boards.greenhouse.io/boxinc", "tier": 1, "company_type": "product", "valuation_usd_b": 4.2, "india_office": True, "remote": True, "ats_type": "greenhouse", "hq": "Redwood City, USA", "india_hq": "Bengaluru"},
     {"name": "DocuSign", "career_url": "https://careers.docusign.com", "tier": 1, "company_type": "product", "valuation_usd_b": 12.0, "india_office": True, "remote": True, "ats_type": "greenhouse", "hq": "San Francisco, USA", "india_hq": "Hyderabad"},
     # ---- CRM / Marketing ----
@@ -164,8 +164,8 @@ PRODUCT_TIER1 = [
     {"name": "Nykaa", "career_url": "https://careers.nykaa.com", "tier": 1, "company_type": "product", "valuation_usd_b": 3.0, "india_office": True, "remote": False, "ats_type": "custom", "hq": "Mumbai, India", "india_hq": "Mumbai"},
     {"name": "Snapdeal", "career_url": "https://www.snapdeal.com/careers", "tier": 1, "company_type": "product", "valuation_usd_b": 1.2, "india_office": True, "remote": False, "ats_type": "custom", "hq": "New Delhi, India", "india_hq": "New Delhi"},
     # ---- India Unicorns -- Food / Mobility ----
-    {"name": "Swiggy", "career_url": "https://careers.swiggy.com", "tier": 1, "company_type": "product", "valuation_usd_b": 10.7, "india_office": True, "remote": False, "ats_type": "lever", "hq": "Bengaluru, India", "india_hq": "Bengaluru"},
-    {"name": "Zomato", "career_url": "https://www.zomato.com/careers", "tier": 1, "company_type": "product", "valuation_usd_b": 9.5, "india_office": True, "remote": False, "ats_type": "lever", "hq": "Gurugram, India", "india_hq": "Gurugram"},
+    {"name": "Swiggy", "career_url": "https://careers.swiggy.com/jobs", "tier": 1, "company_type": "product", "valuation_usd_b": 10.7, "india_office": True, "remote": False, "ats_type": "smartrecruiters", "ats_token": "Swiggy", "hq": "Bengaluru, India", "india_hq": "Bengaluru"},
+    {"name": "Zomato (Eternal)", "career_url": "https://www.eternal.com/careers/", "tier": 1, "company_type": "product", "valuation_usd_b": 9.5, "india_office": True, "remote": False, "ats_type": "custom", "hq": "Gurugram, India", "india_hq": "Gurugram"},
     {"name": "Ola Cabs", "career_url": "https://careers.olacabs.com", "tier": 1, "company_type": "product", "valuation_usd_b": 7.3, "india_office": True, "remote": False, "ats_type": "custom", "hq": "Bengaluru, India", "india_hq": "Bengaluru"},
     {"name": "Rapido", "career_url": "https://rapido.bike/careers/", "tier": 1, "company_type": "product", "valuation_usd_b": 1.1, "india_office": True, "remote": False, "ats_type": "custom", "hq": "Bengaluru, India", "india_hq": "Bengaluru"},
     # ---- India Unicorns -- Ed-tech ----

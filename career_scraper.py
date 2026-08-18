@@ -120,11 +120,71 @@ def _match_keywords(title: str, keywords: List[str]) -> bool:
     return any(kw.lower() in low for kw in keywords)
 
 
+_LOCATION_ALIASES: Dict[str, List[str]] = {
+    "bengaluru": ["bangalore", "bengaluru"],
+    "bangalore": ["bangalore", "bengaluru"],
+    "delhi":     ["delhi", "new delhi", "ncr", "noida", "gurgaon", "gurugram", "faridabad"],
+    "ncr":       ["delhi", "new delhi", "ncr", "noida", "gurgaon", "gurugram"],
+    "noida":     ["noida", "ncr", "delhi"],
+    "gurgaon":   ["gurgaon", "gurugram", "ncr", "delhi"],
+    "gurugram":  ["gurgaon", "gurugram", "ncr", "delhi"],
+    "mumbai":    ["mumbai", "bombay"],
+    "chennai":   ["chennai", "madras"],
+    "kolkata":   ["kolkata", "calcutta"],
+    "hyderabad": ["hyderabad"],
+    "pune":      ["pune"],
+    "india":     ["india", ", ind", "ind;", "(ind)"],
+    "remote":    ["remote"],
+}
+
+# Indian city names — any of these implies an India-based role
+_INDIA_CITIES = {
+    "bangalore", "bengaluru", "hyderabad", "mumbai", "pune", "chennai",
+    "kolkata", "noida", "gurgaon", "gurugram", "delhi", "new delhi",
+    "ahmedabad", "jaipur", "kochi", "coimbatore", "nagpur",
+}
+
+
 def _match_location(location: str, loc_filter: Optional[str]) -> bool:
-    """Return True if loc_filter is None or appears in the job location."""
+    """
+    Return True if loc_filter matches any part of the job location string.
+    Handles:
+      - Semicolon/semicolon-separated multi-location strings
+      - City aliases (Bengaluru ↔ Bangalore, Delhi ↔ NCR/Gurgaon, etc.)
+      - Country-code abbreviation ", IND" for India
+      - Broad "India" filter matches any Indian city name
+      - Avoids "Indiana, USA" false-positive when filtering by "India"
+    """
     if not loc_filter:
         return True
-    return loc_filter.lower() in location.lower()
+
+    loc_lower = location.lower()
+    filter_lower = loc_filter.lower().strip()
+
+    # Expand filter to aliases
+    candidates = _LOCATION_ALIASES.get(filter_lower, [filter_lower])
+
+    # Split job location on ; and - delimiters for multi-location listings
+    parts = [p.strip() for p in re.split(r"[;]", loc_lower)]
+
+    for candidate in candidates:
+        if candidate == "india":
+            # Word-boundary match to avoid "indiana" false positives
+            if re.search(r"\bindia\b", loc_lower):
+                return True
+            # ", IND" country code (Zscaler format)
+            if ", ind" in loc_lower or " ind;" in loc_lower or "(ind)" in loc_lower:
+                return True
+            # Any recognised Indian city
+            if any(city in loc_lower for city in _INDIA_CITIES):
+                return True
+        else:
+            if candidate in loc_lower:
+                return True
+            if any(candidate in part for part in parts):
+                return True
+
+    return False
 
 
 def _extract_count_from_html(html: str) -> int:
