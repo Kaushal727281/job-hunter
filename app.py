@@ -130,9 +130,12 @@ def _bg_fetch_careers(profile: str, tier_filter, type_filter):
         config = _load_config()
         jobs = fetch_career_sites(config, tier_filter=tier_filter, type_filter=type_filter)
         # career_scraper uses "job_id" key; job_store expects "id"
+        # also backfill apply_link from url so the Apply button renders
         for j in jobs:
             if "job_id" in j and "id" not in j:
                 j["id"] = j.pop("job_id")
+            if j.get("url") and not j.get("apply_link"):
+                j["apply_link"] = j["url"]
         new_ids = job_store.upsert_jobs_return_ids(jobs)
         added = len(new_ids)
         _save_last_fetch_date()
