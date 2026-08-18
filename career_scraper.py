@@ -187,13 +187,18 @@ def _scrape_greenhouse(company: dict, keywords: List[str], location: Optional[st
     # Try to extract token from URL patterns like:
     #   https://boards.greenhouse.io/atlassian
     #   https://boards.greenhouse.io/embed/job_board?for=atlassian
+    explicit_token = company.get("ats_token")
+
     token = None
     m = re.search(r"greenhouse\.io/(?:embed/job_board\?for=)?([A-Za-z0-9_-]+)", career_url)
     if m:
         token = m.group(1).lower().strip()
 
-    candidates = [token] if token else []
-    candidates += _discover_greenhouse_token(company_name)
+    if explicit_token:
+        candidates = [explicit_token]
+    else:
+        candidates = [token] if token else []
+        candidates += _discover_greenhouse_token(company_name)
     candidates = list(dict.fromkeys(candidates))  # dedup, preserve order
 
     jobs = []
@@ -266,15 +271,20 @@ def _scrape_lever(company: dict, keywords: List[str], location: Optional[str],
     company_name = company["name"]
 
     # lever.co/companyslug or jobs.lever.co/companyslug
-    token = None
-    m = re.search(r"lever\.co/([A-Za-z0-9_-]+)", career_url)
-    if m:
-        token = m.group(1).lower().strip()
+    explicit_token = company.get("ats_token")
 
-    # Fallback: derive from company name
-    if not token:
-        slug = re.sub(r"[^a-z0-9]+", "-", company_name.lower()).strip("-")
-        token = slug
+    if explicit_token:
+        token = explicit_token
+    else:
+        token = None
+        m = re.search(r"lever\.co/([A-Za-z0-9_-]+)", career_url)
+        if m:
+            token = m.group(1).lower().strip()
+
+        # Fallback: derive from company name
+        if not token:
+            slug = re.sub(r"[^a-z0-9]+", "-", company_name.lower()).strip("-")
+            token = slug
 
     url = f"https://api.lever.co/v0/postings/{token}?mode=json"
     jobs = []
@@ -574,26 +584,440 @@ def _scrape_successfactors(company: dict, keywords: List[str], location: Optiona
     return jobs  # JS-heavy, return empty list (count-only in validate mode)
 
 
+def _extract_jsonld_jobs(soup: BeautifulSoup, company: dict, career_url: str) -> List[dict]:
+    """Extract Schema.org JobPosting entries from JSON-LD script tags."""
+    jobs = []
+    company_name = company["name"]
+    for script in soup.find_all("script", type="application/ld+json"):
+        try:
+            data = json.loads(script.string or "")
+            items = data if isinstance(data, list) else [data]
+            for item in items:
+                if item.get("@type") != "JobPosting":
+                    continue
+                title = item.get("title", "")
+                job_url = item.get("url", career_url)
+                loc_data = item.get("jobLocation", {})
+                if isinstance(loc_data, list):
+                    loc_data = loc_data[0] if loc_data else {}
+                addr = loc_data.get("address", {}) if isinstance(loc_data, dict) else {}
+                if isinstance(addr, str):
+                    loc = addr
+                else:
+                    loc = ", ".join(filter(None, [
+                        addr.get("addressLocality", ""),
+                        addr.get("addressRegion", ""),
+                        addr.get("addressCountry", ""),
+                    ]))
+                date_posted = (item.get("datePosted") or _now_iso())[:10]
+                description = BeautifulSoup(item.get("description", ""), "html.parser").get_text(" ")[:500]
+                jobs.append({
+                    "job_id": _make_job_id(f"custom:{company_name}", job_url + title),
+                    "title": title,
+                    "company": company_name,
+                    "location": loc,
+                    "url": job_url,
+                    "source": f"custom:{re.sub(r'[^a-z0-9]+', '_', company_name.lower()).strip('_')}",
+                    "date_posted": date_posted,
+                    "description": description,
+                    "tier": company.get("tier", 0),
+                    "company_type": company.get("company_type", ""),
+                })
+        except Exception:
+            continue
+    return jobs
+
+
 def _scrape_custom(company: dict, keywords: List[str], location: Optional[str],
                    sess: requests.Session) -> List[dict]:
     """
-    Custom career pages — best-effort HTML link counting.
-    Returns an empty list (we can count but not reliably parse job dicts without
-    page-specific selectors).
+    Custom career pages — supports dynamic URL construction when url_base/keyword_param
+    are provided, then attempts JSON-LD extraction before falling back to HTML counting.
     """
-    career_url = company.get("career_url", "")
     company_name = company["name"]
+
+    # Build dynamic search URL if structured URL fields are present
+    url_base = company.get("url_base", "")
+    keyword_param = company.get("keyword_param", "")
+    location_param = company.get("location_param", "")
+
+    if url_base and keyword_param:
+        kw_str = " ".join(keywords) if keywords else ""
+        loc_str = location or ""
+        params: Dict[str, str] = {}
+        if kw_str:
+            params[keyword_param] = kw_str
+        if loc_str and location_param:
+            params[location_param] = loc_str
+        # Merge any extra static params the company entry defines
+        for k, v in (company.get("extra_params") or {}).items():
+            params.setdefault(k, v)
+        career_url = url_base + ("?" + urllib.parse.urlencode(params) if params else "")
+    else:
+        career_url = company.get("career_url", "")
+
+    jobs = []
     try:
         resp = sess.get(career_url, timeout=_TIMEOUT)
-        if resp.status_code == 200:
-            soup = BeautifulSoup(resp.text, "html.parser")
-            count = _extract_count_from_html(resp.text)
-            if count == -1:
-                count = _count_job_links(soup)
-            logger.debug(f"  [custom:{company_name}] estimated {count} jobs (HTML)")
+        if resp.status_code != 200:
+            logger.debug(f"  [custom:{company_name}] HTTP {resp.status_code}")
+            return []
+
+        content_type = resp.headers.get("Content-Type", "")
+
+        # If the endpoint returns JSON, try common job-list shapes
+        if "json" in content_type:
+            try:
+                data = resp.json()
+                # Some APIs wrap jobs in a list at top level
+                raw = data if isinstance(data, list) else (
+                    data.get("jobs") or data.get("results") or data.get("data") or []
+                )
+                for j in raw:
+                    if not isinstance(j, dict):
+                        continue
+                    title = j.get("title") or j.get("name") or j.get("jobTitle") or ""
+                    loc = j.get("location") or j.get("city") or j.get("address") or ""
+                    if isinstance(loc, dict):
+                        loc = loc.get("city") or loc.get("name") or ""
+                    job_url = j.get("url") or j.get("link") or j.get("apply_url") or career_url
+                    if not _match_keywords(title, keywords):
+                        continue
+                    if not _match_location(str(loc), location):
+                        continue
+                    jobs.append({
+                        "job_id": _make_job_id(f"custom:{company_name}", job_url + title),
+                        "title": title,
+                        "company": company_name,
+                        "location": str(loc),
+                        "url": job_url,
+                        "source": f"custom:{re.sub(r'[^a-z0-9]+', '_', company_name.lower()).strip('_')}",
+                        "date_posted": (j.get("date_posted") or j.get("posted_at") or _now_iso())[:10],
+                        "description": str(j.get("description") or "")[:500],
+                        "tier": company.get("tier", 0),
+                        "company_type": company.get("company_type", ""),
+                    })
+                if jobs:
+                    return jobs
+            except Exception:
+                pass
+
+        # Try JSON-LD structured data (works on some SSR/SEO-friendly pages)
+        soup = BeautifulSoup(resp.text, "html.parser")
+        jsonld_jobs = _extract_jsonld_jobs(soup, company, career_url)
+        if jsonld_jobs:
+            filtered = [
+                j for j in jsonld_jobs
+                if _match_keywords(j["title"], keywords) and _match_location(j["location"], location)
+            ]
+            logger.debug(f"  [custom:{company_name}] {len(filtered)} jobs via JSON-LD")
+            return filtered
+
+        # Fallback: count only (no structured extraction possible)
+        count = _extract_count_from_html(resp.text)
+        if count == -1:
+            count = _count_job_links(soup)
+        logger.debug(f"  [custom:{company_name}] estimated {count} jobs (HTML, no structured data)")
+
     except Exception as e:
         logger.debug(f"  [custom:{company_name}] error: {e}")
-    return []  # structured job extraction not supported for arbitrary custom pages
+    return []
+
+
+def _scrape_amazon(company: dict, keywords: list = None, location: str = None, sess=None) -> list:
+    """Scrape Amazon India jobs via the public amazon.jobs JSON API."""
+    sess = _make_session()
+    jobs = []
+    limit = 100
+    offset = 0
+    india_terms = {"india", "bengaluru", "bangalore", "hyderabad", "pune", "mumbai",
+                   "chennai", "noida", "gurgaon", "gurugram", "kolkata"}
+    try:
+        while True:
+            params = {
+                "normalized_country_code[]": "IND",
+                "result_limit": limit,
+                "offset": offset,
+            }
+            if keywords:
+                params["category[]"] = "software-development"
+            r = sess.get(
+                "https://www.amazon.jobs/en/search.json",
+                params=params, timeout=_TIMEOUT,
+            )
+            r.raise_for_status()
+            data = r.json()
+            batch = data.get("jobs", [])
+            if not batch:
+                break
+            for j in batch:
+                title = j.get("title", "")
+                city = j.get("city", "")
+                locs = j.get("locations", [])
+                # Parse nested location JSON strings
+                all_cities = [city.lower()]
+                for loc_str in locs:
+                    try:
+                        import json as _json
+                        loc_data = _json.loads(loc_str) if isinstance(loc_str, str) else loc_str
+                        all_cities.append(loc_data.get("city", "").lower())
+                    except Exception:
+                        pass
+                # Filter: must have at least one India city or IND country code
+                country = j.get("country_code", "")
+                is_india = country == "IND" or any(c in india_terms for c in all_cities)
+                if not is_india:
+                    continue
+                if not _match_keywords(title + " " + j.get("description_short", ""), keywords):
+                    continue
+                job_id = str(j.get("id_icims", j.get("id", title)))
+                url = f"https://www.amazon.jobs{j.get('job_path', '')}" if j.get("job_path") else company.get("career_url", "")
+                jobs.append({
+                    "job_id": _make_job_id(f"amazon", job_id),
+                    "title": title,
+                    "company": "Amazon",
+                    "location": f"{city}, India",
+                    "url": url,
+                    "source": "amazon",
+                    "date_posted": _now_iso(),
+                    "description": j.get("description_short", ""),
+                    "tier": company.get("tier", 1),
+                    "company_type": company.get("company_type", "product"),
+                })
+            # Amazon returns max 100 per page; stop if we got fewer than limit
+            if len(batch) < limit:
+                break
+            offset += limit
+            time.sleep(_RATE_SLEEP)
+    except Exception as exc:
+        logger.warning(f"[Amazon] scrape error: {exc}")
+    logger.info(f"[Amazon] => {len(jobs)} jobs matched")
+    return jobs
+
+
+def _scrape_eightfold(company: dict, keywords: List[str], location: Optional[str],
+                      sess: requests.Session) -> List[dict]:
+    """
+    Eightfold.ai Talent Engine — tries the standard /api/5/jobs JSON endpoint,
+    then falls back to dynamic URL construction (same as _scrape_custom).
+    """
+    company_name = company["name"]
+    url_base = company.get("url_base", "")
+    keyword_param = company.get("keyword_param", "keywords")
+    location_param = company.get("location_param", "location")
+    career_url = company.get("career_url", "")
+
+    # Derive the Eightfold API base from url_base (strip /main/jobs suffix)
+    api_host = ""
+    if url_base:
+        parsed = urllib.parse.urlparse(url_base)
+        api_host = f"{parsed.scheme}://{parsed.netloc}"
+
+    kw_str = " ".join(keywords) if keywords else ""
+    loc_str = location or ""
+
+    # Try the /api/5/jobs endpoint (standard Eightfold pattern)
+    if api_host and kw_str:
+        api_url = f"{api_host}/api/5/jobs"
+        params = {"query": kw_str, "pageSize": 20}
+        if loc_str:
+            params["location"] = loc_str
+        try:
+            resp = sess.get(api_url, params=params, timeout=_TIMEOUT)
+            if resp.status_code == 200 and "json" in resp.headers.get("Content-Type", ""):
+                data = resp.json()
+                raw = data.get("positions") or data.get("jobs") or data.get("results") or []
+                jobs = []
+                for j in raw:
+                    title = j.get("name") or j.get("title") or ""
+                    loc = j.get("location") or j.get("city") or ""
+                    if isinstance(loc, dict):
+                        loc = loc.get("name") or loc.get("city") or ""
+                    job_url = j.get("canonicalPositionUrl") or j.get("url") or career_url
+                    if not job_url.startswith("http"):
+                        job_url = api_host + job_url
+                    if not _match_keywords(title, keywords):
+                        continue
+                    if not _match_location(str(loc), location):
+                        continue
+                    jobs.append({
+                        "job_id": _make_job_id(f"eightfold:{company_name}", job_url + title),
+                        "title": title,
+                        "company": company_name,
+                        "location": str(loc),
+                        "url": job_url,
+                        "source": f"eightfold:{re.sub(r'[^a-z0-9]+', '_', company_name.lower()).strip('_')}",
+                        "date_posted": (j.get("publishedDate") or j.get("date") or _now_iso())[:10],
+                        "description": str(j.get("jobDescription") or j.get("description") or "")[:500],
+                        "tier": company.get("tier", 0),
+                        "company_type": company.get("company_type", ""),
+                    })
+                if jobs:
+                    logger.debug(f"  [eightfold:{company_name}] {len(jobs)} jobs via API")
+                    return jobs
+        except Exception as e:
+            logger.debug(f"  [eightfold:{company_name}] API error: {e}")
+
+    # Fall back to dynamic URL with custom scraping
+    return _scrape_custom(company, keywords, location, sess)
+
+
+def _scrape_phenom(company: dict, keywords: List[str], location: Optional[str],
+                   sess: requests.Session) -> List[dict]:
+    """
+    Phenom People Engine — tries /api/jobs or /global/en/api/jobs JSON endpoint,
+    then falls back to dynamic URL construction.
+    """
+    company_name = company["name"]
+    url_base = company.get("url_base", "")
+    career_url = company.get("career_url", "")
+
+    kw_str = " ".join(keywords) if keywords else ""
+    loc_str = location or ""
+
+    if url_base and kw_str:
+        parsed = urllib.parse.urlparse(url_base)
+        host = f"{parsed.scheme}://{parsed.netloc}"
+        # Phenom API patterns to try
+        for api_path in ["/global/en/api/jobs", "/api/jobs", "/api/v1/jobs"]:
+            api_url = host + api_path
+            params: Dict[str, str] = {"keyword": kw_str, "from": "0", "size": "20"}
+            if loc_str:
+                params["location"] = loc_str
+            try:
+                resp = sess.get(api_url, params=params, timeout=_TIMEOUT)
+                if resp.status_code == 200 and "json" in resp.headers.get("Content-Type", ""):
+                    data = resp.json()
+                    raw = data.get("data") or data.get("jobs") or data.get("results") or []
+                    if isinstance(data, list):
+                        raw = data
+                    jobs = []
+                    for j in raw:
+                        if not isinstance(j, dict):
+                            continue
+                        title = j.get("title") or j.get("name") or ""
+                        loc = j.get("city") or j.get("location") or ""
+                        if isinstance(loc, dict):
+                            loc = loc.get("city") or loc.get("name") or ""
+                        job_url = j.get("applyUrl") or j.get("url") or career_url
+                        if not _match_keywords(title, keywords):
+                            continue
+                        if not _match_location(str(loc), location):
+                            continue
+                        jobs.append({
+                            "job_id": _make_job_id(f"phenom:{company_name}", job_url + title),
+                            "title": title,
+                            "company": company_name,
+                            "location": str(loc),
+                            "url": job_url,
+                            "source": f"phenom:{re.sub(r'[^a-z0-9]+', '_', company_name.lower()).strip('_')}",
+                            "date_posted": (j.get("postedDate") or j.get("date_posted") or _now_iso())[:10],
+                            "description": str(j.get("description") or "")[:500],
+                            "tier": company.get("tier", 0),
+                            "company_type": company.get("company_type", ""),
+                        })
+                    if jobs:
+                        logger.debug(f"  [phenom:{company_name}] {len(jobs)} jobs via {api_path}")
+                        return jobs
+            except Exception:
+                continue
+
+    return _scrape_custom(company, keywords, location, sess)
+
+
+def _scrape_radancy(company: dict, keywords: List[str], location: Optional[str],
+                    sess: requests.Session) -> List[dict]:
+    """
+    Radancy / TMP Worldwide — uses dynamic URL (k= keyword, l= location params),
+    then tries HTML parsing for job cards.
+    """
+    company_name = company["name"]
+    url_base = company.get("url_base", "")
+    keyword_param = company.get("keyword_param", "k")
+    location_param = company.get("location_param", "l")
+    career_url = company.get("career_url", "")
+
+    kw_str = " ".join(keywords) if keywords else ""
+    loc_str = location or ""
+
+    if url_base:
+        params: Dict[str, str] = {}
+        if kw_str:
+            params[keyword_param] = kw_str
+        if loc_str and location_param:
+            params[location_param] = loc_str
+        search_url = url_base + ("?" + urllib.parse.urlencode(params) if params else "")
+    else:
+        search_url = career_url
+
+    jobs = []
+    try:
+        resp = sess.get(search_url, timeout=_TIMEOUT)
+        if resp.status_code != 200:
+            return []
+        # Try JSON first
+        if "json" in resp.headers.get("Content-Type", ""):
+            try:
+                data = resp.json()
+                raw = data.get("jobs") or data.get("results") or (data if isinstance(data, list) else [])
+                for j in raw:
+                    title = j.get("title") or j.get("name") or ""
+                    loc = j.get("location") or j.get("city") or ""
+                    job_url = j.get("url") or j.get("apply_url") or search_url
+                    if not _match_keywords(title, keywords):
+                        continue
+                    if not _match_location(str(loc), location):
+                        continue
+                    jobs.append({
+                        "job_id": _make_job_id(f"radancy:{company_name}", job_url + title),
+                        "title": title,
+                        "company": company_name,
+                        "location": str(loc),
+                        "url": job_url,
+                        "source": f"radancy:{re.sub(r'[^a-z0-9]+', '_', company_name.lower()).strip('_')}",
+                        "date_posted": _now_iso()[:10],
+                        "description": str(j.get("description") or "")[:500],
+                        "tier": company.get("tier", 0),
+                        "company_type": company.get("company_type", ""),
+                    })
+                if jobs:
+                    return jobs
+            except Exception:
+                pass
+        # Try HTML — Radancy typically renders job cards with data-attributes
+        soup = BeautifulSoup(resp.text, "html.parser")
+        for card in soup.select("[data-job-title], .job-title, .job-listing-title, .search-result"):
+            title_el = (card.get("data-job-title") or
+                        (card.select_one(".job-title, .position-title") and
+                         card.select_one(".job-title, .position-title").get_text(strip=True)) or
+                        card.get_text(strip=True)[:80])
+            if not title_el or not _match_keywords(str(title_el), keywords):
+                continue
+            loc_el = card.select_one(".job-location, .location")
+            loc = loc_el.get_text(strip=True) if loc_el else ""
+            if not _match_location(loc, location):
+                continue
+            a = card.find("a", href=True) or (card if card.name == "a" else None)
+            href = (a.get("href", "") if a else "") or search_url
+            if href and not href.startswith("http"):
+                parsed = urllib.parse.urlparse(search_url)
+                href = f"{parsed.scheme}://{parsed.netloc}{href}"
+            jobs.append({
+                "job_id": _make_job_id(f"radancy:{company_name}", href + str(title_el)),
+                "title": str(title_el),
+                "company": company_name,
+                "location": loc,
+                "url": href or search_url,
+                "source": f"radancy:{re.sub(r'[^a-z0-9]+', '_', company_name.lower()).strip('_')}",
+                "date_posted": _now_iso()[:10],
+                "description": "",
+                "tier": company.get("tier", 0),
+                "company_type": company.get("company_type", ""),
+            })
+        logger.debug(f"  [radancy:{company_name}] {len(jobs)} jobs from HTML")
+    except Exception as e:
+        logger.debug(f"  [radancy:{company_name}] error: {e}")
+    return jobs
 
 
 # ── Dispatcher ───────────────────────────────────────────────────────────────
@@ -605,6 +1029,10 @@ _SCRAPERS = {
     "icims":          _scrape_icims,
     "successfactors": _scrape_successfactors,
     "smartrecruiters": _scrape_smartrecruiters,
+    "amazon":         _scrape_amazon,
+    "eightfold":      _scrape_eightfold,
+    "phenom":         _scrape_phenom,
+    "radancy":        _scrape_radancy,
     "custom":         _scrape_custom,
 }
 

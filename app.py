@@ -1469,7 +1469,7 @@ def _pdf_to_html(pdf_bytes: bytes) -> str:
 
 
 def _extract_resume_meta(html: str) -> dict:
-    """Extract candidate name, email and phone from resume HTML."""
+    """Extract candidate name, email, phone, and job title/role from resume HTML."""
     soup = BeautifulSoup(html, "html.parser")
 
     # Name — first <h1> or element with class containing 'name'
@@ -1498,7 +1498,28 @@ def _extract_resume_meta(html: str) -> dict:
     if m:
         phone = m.group(1).strip()
 
-    return {"name": name, "email": email, "phone": phone}
+    # Job title / target role — look for summary section or h2 subtitle after name
+    title = ""
+    # 1. summary-text paragraph (matches app resume templates)
+    el = soup.find(class_=re.compile(r"summary.?text|job.?title|current.?role|headline|tagline", re.I))
+    if el:
+        title = el.get_text(strip=True)[:80]
+    # 2. <h2> right after <h1> name (common resume pattern)
+    if not title and h1:
+        sib = h1.find_next_sibling()
+        if sib and sib.name in ("h2", "h3", "p"):
+            text = sib.get_text(strip=True)
+            if 3 < len(text) < 80 and "@" not in text:
+                title = text
+    # 3. First experience job title in the HTML
+    if not title:
+        for el in soup.find_all(class_=re.compile(r"position|job.?title|role.?title|exp.?title", re.I)):
+            text = el.get_text(strip=True)
+            if 3 < len(text) < 80:
+                title = text
+                break
+
+    return {"name": name, "email": email, "phone": phone, "title": title}
 
 
 @app.route("/upload-resume", methods=["POST"])
@@ -1545,6 +1566,9 @@ def upload_resume():
         cfg["candidate"]["name"] = meta["name"]
     if meta["email"]:
         cfg["candidate"]["email"] = meta["email"]
+    # Save extracted job title as the target role for career-site fetching
+    if meta.get("title"):
+        cfg.setdefault("job_search", {})["target_role"] = meta["title"]
     profiles.config_path().write_text(json.dumps(cfg, indent=2), encoding="utf-8")
 
     logger.info(f"Resume imported: {meta['name']} <{meta['email']}>")

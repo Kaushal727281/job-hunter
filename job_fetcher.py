@@ -1264,23 +1264,47 @@ def fetch_career_sites(config: dict, tier_filter: list = None, type_filter: str 
     """
     Scrape jobs directly from company career pages via career_scraper.
 
+    Keywords come from (in priority order):
+      1. config["job_search"]["target_role"]  — role extracted from the user's uploaded resume
+      2. config["job_search"]["queries"]       — manual queries list
+      3. Fallback: ["software engineer"]
+
+    Location comes from config["job_search"]["locations"] (first preferred location),
+    defaulting to "India".
+
     Parameters
     ----------
-    config       : profile config dict (used to pull keyword queries)
-    tier_filter  : list of tier ints to include (e.g. [1] or [1,2]), or None for all
+    config       : profile config dict
+    tier_filter  : list of tier ints to include, e.g. [1] or [1,2], or None for all
     type_filter  : 'product' | 'service' | None for all
-
-    Returns a list of job dicts in the same schema as fetch_jobs().
     """
     import career_scraper  # local module next to job_fetcher.py
 
-    keywords = config.get("job_search", {}).get("queries", [])
-    logger.info(f"[CareerSites] Starting scrape — tier={tier_filter} type={type_filter} keywords={keywords}")
+    js = config.get("job_search", {})
+
+    # --- keywords / role ---
+    target_role = js.get("target_role", "").strip()
+    queries = js.get("queries", [])
+    if target_role:
+        keywords = [target_role]
+    elif queries:
+        keywords = queries
+    else:
+        keywords = ["software engineer"]
+
+    # --- location: use the first preferred location from profile, or "India" ---
+    locations = js.get("locations", [])
+    location = locations[0] if locations else "India"
+
+    logger.info(
+        f"[CareerSites] Starting scrape — tier={tier_filter} type={type_filter} "
+        f"role={keywords} location={location}"
+    )
     jobs = career_scraper.scrape_all_companies(
         tier_filter=tier_filter,
         type_filter=type_filter,
         keywords=keywords,
-        location="India",
+        location=location,
         max_workers=5,
     )
     logger.info(f"[CareerSites] Scraped {len(jobs)} jobs from career sites")
