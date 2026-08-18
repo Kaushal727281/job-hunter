@@ -701,6 +701,29 @@
   </div>
 </div>
 
+<!-- Career preferences modal (shown when profile has no role/location set) -->
+<div id="career-prefs-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:#1e2130;border-radius:12px;padding:28px 32px;width:380px;max-width:94vw;box-shadow:0 8px 32px rgba(0,0,0,0.4)">
+    <h3 style="margin:0 0 6px;color:#e2e8f0;font-size:16px">Set Your Job Preferences</h3>
+    <p style="margin:0 0 20px;color:#94a3b8;font-size:13px">We'll fetch jobs matching your role and location from all tier companies.</p>
+    <label style="display:block;margin-bottom:14px">
+      <span style="font-size:12px;color:#94a3b8;display:block;margin-bottom:4px">Target Role</span>
+      <input id="pref-role" type="text" placeholder="e.g. Lead Software Engineer, DevOps Engineer"
+        style="width:100%;box-sizing:border-box;padding:9px 12px;border-radius:7px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;font-size:14px">
+    </label>
+    <label style="display:block;margin-bottom:20px">
+      <span style="font-size:12px;color:#94a3b8;display:block;margin-bottom:4px">Preferred Location</span>
+      <input id="pref-location" type="text" placeholder="e.g. Bengaluru, Delhi NCR, Remote India"
+        style="width:100%;box-sizing:border-box;padding:9px 12px;border-radius:7px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;font-size:14px">
+    </label>
+    <p style="margin:0 0 16px;font-size:11px;color:#64748b">These will be saved to your profile for future fetches.</p>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button onclick="closePrefsModal()" style="padding:8px 18px;border-radius:7px;border:1px solid #334155;background:none;color:#94a3b8;cursor:pointer;font-size:13px">Cancel</button>
+      <button onclick="submitPrefsAndFetch()" style="padding:8px 18px;border-radius:7px;border:none;background:#6366f1;color:#fff;cursor:pointer;font-size:13px;font-weight:600">Start Fetch</button>
+    </div>
+  </div>
+</div>
+
 <script>
 let fetchTimer = null;
 
@@ -1042,18 +1065,63 @@ document.addEventListener('click', function(e){
     document.getElementById('career-menu').style.display='none';
 });
 let careerTimer = null;
+let _pendingCareerTier = null, _pendingCareerType = null;
+
 function startCareerFetch(tier, type){
   document.getElementById('career-menu').style.display='none';
+  _pendingCareerTier = tier;
+  _pendingCareerType = type;
+  _doCareerFetch(tier, type, null, null);
+}
+
+function _doCareerFetch(tier, type, role, location){
   const btn = document.getElementById('career-btn');
   btn.innerHTML='<span class="spinner"></span>Scraping…';
   btn.disabled=true;
   document.getElementById('career-status-msg').textContent='Starting…';
+  const body = {
+    tier_filter: tier==='all'?null:tier,
+    type_filter: type==='all'?null:type,
+  };
+  if(role)     body.role = role;
+  if(location) body.location = location;
   fetch('/fetch-careers',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({tier_filter: tier==='all'?null:tier, type_filter: type==='all'?null:type})
+    body:JSON.stringify(body)
   }).then(r=>r.json()).then(d=>{
+    if(d.needs_prefs){
+      // Profile has no role/location — show the preferences modal
+      btn.innerHTML='Career Sites ▾'; btn.disabled=false;
+      document.getElementById('career-status-msg').textContent='';
+      document.getElementById('pref-role').value = d.current_role || '';
+      document.getElementById('pref-location').value = d.current_location || '';
+      document.getElementById('career-prefs-overlay').style.display='flex';
+      document.getElementById('pref-role').focus();
+      return;
+    }
     if(!d.ok){ toast('⚠️ '+d.message); btn.innerHTML='Career Sites ▾'; btn.disabled=false; return; }
     pollCareerFetch();
   });
+}
+
+function closePrefsModal(){
+  document.getElementById('career-prefs-overlay').style.display='none';
+}
+
+function submitPrefsAndFetch(){
+  const role     = document.getElementById('pref-role').value.trim();
+  const location = document.getElementById('pref-location').value.trim();
+  if(!role){
+    document.getElementById('pref-role').style.borderColor='#ef4444';
+    document.getElementById('pref-role').focus();
+    return;
+  }
+  if(!location){
+    document.getElementById('pref-location').style.borderColor='#ef4444';
+    document.getElementById('pref-location').focus();
+    return;
+  }
+  closePrefsModal();
+  _doCareerFetch(_pendingCareerTier, _pendingCareerType, role, location);
 }
 function pollCareerFetch(){
   if(careerTimer) clearInterval(careerTimer);

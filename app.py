@@ -118,17 +118,40 @@ def _bg_fetch(profile: str):
         st.update(running=False, message=f"Error: {e}", last_run=None)
 
 
-def _bg_fetch_careers(profile: str, tier_filter, type_filter):
+def _bg_fetch_careers(profile: str, tier_filter, type_filter, role: str = None, location: str = None):
     """Background worker: scrape company career pages and upsert results."""
     profiles.set_active_profile(profile)
     st = _cfs(profile)
     tier_label = f"T{'/'.join(str(t) for t in tier_filter)}" if tier_filter else "All"
     type_label = type_filter or "all"
-    st.update(running=True, message=f"Scraping career sites ({tier_label}, {type_label})…")
+    role_label = role or "(from profile)"
+    loc_label = location or "(from profile)"
+    st.update(running=True, message=f"Scraping {tier_label} {type_label} — role: {role_label}, loc: {loc_label}…")
+
+    # If the user provided role/location via the modal, persist them in config for next time
+    if role or location:
+        try:
+            cfg = _load_config()
+            js = cfg.setdefault("job_search", {})
+            if role:
+                js["target_role"] = role.strip()
+            if location:
+                locs = js.setdefault("locations", [])
+                loc = location.strip()
+                if loc not in locs:
+                    locs.insert(0, loc)
+                elif locs[0] != loc:
+                    locs.remove(loc)
+                    locs.insert(0, loc)
+            profiles.config_path().write_text(json.dumps(cfg, indent=2), encoding="utf-8")
+        except Exception as _e:
+            logger.warning(f"Could not persist career preferences: {_e}")
+
     try:
         from job_fetcher import fetch_career_sites
         config = _load_config()
-        jobs = fetch_career_sites(config, tier_filter=tier_filter, type_filter=type_filter)
+        jobs = fetch_career_sites(config, tier_filter=tier_filter, type_filter=type_filter,
+                                  role=role, location=location)
         # career_scraper uses "job_id" key; job_store expects "id"
         # also backfill apply_link, fetched_date, and decode HTML entities in description
         from html import unescape
@@ -405,11 +428,35 @@ def fetch_careers():
     data = request.get_json(silent=True) or {}
     tier_filter = data.get("tier_filter")   # list[int] or None
     type_filter = data.get("type_filter")   # str or None
-    # Normalise tier_filter: convert JSON numbers to Python ints
+    role     = (data.get("role") or "").strip() or None
+    location = (data.get("location") or "").strip() or None
+
+    # Normalise tier_filter
     if isinstance(tier_filter, list):
         tier_filter = [int(t) for t in tier_filter]
+
+    # If neither role nor location was supplied, check the profile config.
+    # If the profile also has nothing set, ask the UI to show the preferences modal.
+    if not role and not location:
+        cfg = _load_config()
+        js  = cfg.get("job_search", {})
+        has_role = bool(js.get("target_role") or js.get("queries"))
+        has_loc  = bool(js.get("locations"))
+        if not has_role or not has_loc:
+            return jsonify({
+                "ok": False,
+                "needs_prefs": True,
+                "current_role": js.get("target_role") or (js.get("queries") or [""])[0],
+                "current_location": (js.get("locations") or [""])[0],
+                "message": "Please set your target role and preferred location first.",
+            })
+
     profile = profiles.get_active_profile()
-    t = threading.Thread(target=_bg_fetch_careers, args=(profile, tier_filter, type_filter), daemon=True)
+    t = threading.Thread(
+        target=_bg_fetch_careers,
+        args=(profile, tier_filter, type_filter, role, location),
+        daemon=True,
+    )
     t.start()
     return jsonify({"ok": True, "message": "Career-site scrape started"})
 
@@ -1498,24 +1545,26 @@ def _extract_resume_meta(html: str) -> dict:
     if m:
         phone = m.group(1).strip()
 
-    # Job title / target role — look for summary section or h2 subtitle after name
+    # Job title / target role — first job-title element, then h2 subtitle, then summary
     title = ""
-    # 1. summary-text paragraph (matches app resume templates)
-    el = soup.find(class_=re.compile(r"summary.?text|job.?title|current.?role|headline|tagline", re.I))
-    if el:
-        title = el.get_text(strip=True)[:80]
-    # 2. <h2> right after <h1> name (common resume pattern)
+    # 1. First element with class containing 'job-title', 'position', 'role-title' (not summary)
+    for el in soup.find_all(class_=re.compile(r"\bjob.?title\b|\bposition.?title\b|\brole.?title\b", re.I)):
+        text = el.get_text(strip=True)
+        if 3 < len(text) < 80:
+            title = text
+            break
+    # 2. <h2> right after <h1> name (common single-page resume pattern)
     if not title and h1:
         sib = h1.find_next_sibling()
         if sib and sib.name in ("h2", "h3", "p"):
             text = sib.get_text(strip=True)
-            if 3 < len(text) < 80 and "@" not in text:
+            if 3 < len(text) < 80 and "@" not in text and "summary" not in text.lower():
                 title = text
-    # 3. First experience job title in the HTML
+    # 3. First <h2>/<h3> that looks like a job title (not a section header)
     if not title:
-        for el in soup.find_all(class_=re.compile(r"position|job.?title|role.?title|exp.?title", re.I)):
+        for el in soup.find_all(["h2", "h3"]):
             text = el.get_text(strip=True)
-            if 3 < len(text) < 80:
+            if 3 < len(text) < 80 and "summary" not in text.lower() and "experience" not in text.lower():
                 title = text
                 break
 

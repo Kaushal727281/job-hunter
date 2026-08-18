@@ -1260,51 +1260,63 @@ def fetch_jobs(config: dict, limit: int | None = None) -> list[dict]:
 
 # ── Career-site scraper wrapper ──────────────────────────────────────────────
 
-def fetch_career_sites(config: dict, tier_filter: list = None, type_filter: str = None) -> list:
+def fetch_career_sites(config: dict, tier_filter: list = None, type_filter: str = None,
+                       role: str = None, location: str = None) -> list:
     """
     Scrape jobs directly from company career pages via career_scraper.
 
-    Keywords come from (in priority order):
-      1. config["job_search"]["target_role"]  — role extracted from the user's uploaded resume
-      2. config["job_search"]["queries"]       — manual queries list
-      3. Fallback: ["software engineer"]
+    Keywords / role priority:
+      1. explicit `role` param (passed from the UI if user filled the preferences modal)
+      2. config["job_search"]["target_role"]  — extracted from uploaded resume
+      3. config["job_search"]["queries"]       — manual queries list
+      4. Fallback: ["software engineer"]
 
-    Location comes from config["job_search"]["locations"] (first preferred location),
-    defaulting to "India".
+    Location priority:
+      1. explicit `location` param (from preferences modal)
+      2. config["job_search"]["locations"][0]  — first preferred location from profile
+      3. Fallback: "India"
 
     Parameters
     ----------
     config       : profile config dict
     tier_filter  : list of tier ints to include, e.g. [1] or [1,2], or None for all
     type_filter  : 'product' | 'service' | None for all
+    role         : explicit role override (from UI prompt)
+    location     : explicit location override (from UI prompt)
     """
     import career_scraper  # local module next to job_fetcher.py
 
     js = config.get("job_search", {})
 
     # --- keywords / role ---
-    target_role = js.get("target_role", "").strip()
-    queries = js.get("queries", [])
-    if target_role:
-        keywords = [target_role]
-    elif queries:
-        keywords = queries
+    if role and role.strip():
+        keywords = [role.strip()]
     else:
-        keywords = ["software engineer"]
+        target_role = js.get("target_role", "").strip()
+        queries = js.get("queries", [])
+        if target_role:
+            keywords = [target_role]
+        elif queries:
+            keywords = queries
+        else:
+            keywords = ["software engineer"]
 
-    # --- location: use the first preferred location from profile, or "India" ---
-    locations = js.get("locations", [])
-    location = locations[0] if locations else "India"
+    # --- location ---
+    if location and location.strip():
+        loc = location.strip()
+    else:
+        locations = js.get("locations", [])
+        loc = locations[0] if locations else "India"
 
     logger.info(
         f"[CareerSites] Starting scrape — tier={tier_filter} type={type_filter} "
-        f"role={keywords} location={location}"
+        f"role={keywords} location={loc}"
     )
     jobs = career_scraper.scrape_all_companies(
         tier_filter=tier_filter,
         type_filter=type_filter,
         keywords=keywords,
-        location=location,
+        location=loc,
         max_workers=5,
     )
     logger.info(f"[CareerSites] Scraped {len(jobs)} jobs from career sites")
