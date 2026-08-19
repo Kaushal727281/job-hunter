@@ -1242,6 +1242,8 @@ SERVICE_TIER1 += [
     {"name": "Wipro Cybersecurity", "career_url": "https://careers.wipro.com", "tier": 1, "company_type": "service", "valuation_usd_b": 30.0, "india_office": True, "remote": True, "ats_type": "custom", "hq": "Bengaluru, India", "india_hq": "Bengaluru"},
     {"name": "LTIMindtree Digital Engineering", "career_url": "https://www.ltimindtree.com/careers", "tier": 1, "company_type": "service", "valuation_usd_b": 10.0, "india_office": True, "remote": True, "ats_type": "custom", "hq": "Mumbai, India", "india_hq": "Mumbai"},
     {"name": "Mphasis Advanced Analytics", "career_url": "https://careers.mphasis.com", "tier": 1, "company_type": "service", "valuation_usd_b": 4.0, "india_office": True, "remote": False, "ats_type": "taleo", "hq": "Bengaluru, India", "india_hq": "Bengaluru"},
+    # HAR-verified Workday (wd108) — site path confirmed from experity.wd108.myworkdayjobs.com.har
+    {"name": "Experity", "career_url": "https://experity.wd108.myworkdayjobs.com/en-US/Experity_Careers", "tier": 2, "company_type": "product", "valuation_usd_b": 1.0, "india_office": True, "remote": True, "ats_type": "workday", "hq": "Machesney Park, IL, USA", "india_hq": "Bengaluru"},
 ]
 
 # Re-compute the master list and totals after supplements
