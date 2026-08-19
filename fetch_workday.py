@@ -158,14 +158,20 @@ def fetch_workday_company(company: dict, search_text: str, title_filter: list[st
     offset = 0
     total  = None
 
-    # Some companies (e.g. Intel) use appliedFacets.locations with Workday location IDs
-    # instead of relying on location text filtering. Use them when provided.
-    location_ids = company.get("workday_location_ids", [])
+    # Build appliedFacets from company config:
+    #   workday_location_ids  → {"locations": [...]}   e.g. Intel India location ID
+    #   workday_applied_facets → arbitrary facets dict  e.g. Cloudera remoteType
+    location_ids     = company.get("workday_location_ids", [])
+    extra_facets     = company.get("workday_applied_facets", {})
+    applied_facets   = {**extra_facets}
+    if location_ids:
+        applied_facets["locations"] = location_ids
+    use_facets = bool(applied_facets)
 
     while True:
-        if location_ids:
+        if use_facets:
             payload = {
-                "appliedFacets": {"locations": location_ids},
+                "appliedFacets": applied_facets,
                 "limit": 20,
                 "offset": offset,
                 "searchText": search_text,
@@ -208,8 +214,8 @@ def fetch_workday_company(company: dict, search_text: str, title_filter: list[st
             # Title filter (must match at least one keyword)
             if title_filter and not _match_keywords(title, title_filter):
                 continue
-            # Location filter — skip if API already filtered by location_ids
-            if not location_ids and not _match_location(loc, location):
+            # Location filter — skip if API already filtered via appliedFacets
+            if not use_facets and not _match_location(loc, location):
                 continue
 
             ext_path  = jp.get("externalPath", "")
