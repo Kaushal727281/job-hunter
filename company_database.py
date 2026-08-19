@@ -94,8 +94,8 @@ PRODUCT_TIER1 = [
     {"name": "Mastercard", "career_url": "https://mastercard.wd1.myworkdayjobs.com/en-US/CorporateCareers", "tier": 1, "company_type": "product", "valuation_usd_b": 430.0, "india_office": True, "remote": True, "ats_type": "workday", "hq": "Purchase, USA", "india_hq": "Pune"},
     {"name": "Intuit", "career_url": "https://jobs.intuit.com/search-jobs?k=software+engineer&l=India", "tier": 1, "company_type": "product", "valuation_usd_b": 170.0, "india_office": True, "remote": True, "ats_type": "radancy", "hq": "Mountain View, USA", "india_hq": "Bengaluru", "url_base": "https://jobs.intuit.com/search-jobs", "keyword_param": "k", "location_param": "l"},
     # ---- Hardware / Chips / Infrastructure ----
-    # HAR-verified: Intel uses Workday wd1, site path = External
-    {"name": "Intel", "career_url": "https://intel.wd1.myworkdayjobs.com/en-US/External", "tier": 1, "company_type": "product", "valuation_usd_b": 150.0, "india_office": True, "remote": True, "ats_type": "workday", "hq": "Santa Clara, USA", "india_hq": "Bengaluru"},
+    # HAR-verified: Intel wd1/External; India location ID from HAR (India, Bangalore = 49 jobs)
+    {"name": "Intel", "career_url": "https://intel.wd1.myworkdayjobs.com/en-US/External", "tier": 1, "company_type": "product", "valuation_usd_b": 150.0, "india_office": True, "remote": True, "ats_type": "workday", "hq": "Santa Clara, USA", "india_hq": "Bengaluru", "workday_location_ids": ["1e4a4eb3adf101f44070f976bf8184cf"]},
     # HAR-verified: Qualcomm uses Eightfold AI at careers.qualcomm.com, domain=qualcomm.com
     {"name": "Qualcomm", "career_url": "https://careers.qualcomm.com", "tier": 1, "company_type": "product", "valuation_usd_b": 175.0, "india_office": True, "remote": True, "ats_type": "eightfold", "hq": "San Diego, USA", "india_hq": "Hyderabad", "eightfold_domain": "qualcomm.com", "eightfold_host": "careers.qualcomm.com"},
     # HAR-verified: NVIDIA Workday wd5, site path = NVIDIAExternalCareerSite

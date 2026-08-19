@@ -54,6 +54,10 @@ DEFAULT_TITLE_FILTER = [
     "platform engineer",
     "lead engineer",
     "staff engineer",
+    "application development",   # Intel: "Software Application Development Engineer"
+    "development engineer",       # Intel: "Enterprise Application Development Engineer"
+    "AI/ML",                      # Intel: "AI/ML Technologist"
+    "software developer",
 ]
 
 DEFAULT_LOCATION = "India"   # broad filter — accepts Bengaluru, Hyderabad, etc.
@@ -154,13 +158,25 @@ def fetch_workday_company(company: dict, search_text: str, title_filter: list[st
     offset = 0
     total  = None
 
+    # Some companies (e.g. Intel) use appliedFacets.locations with Workday location IDs
+    # instead of relying on location text filtering. Use them when provided.
+    location_ids = company.get("workday_location_ids", [])
+
     while True:
-        payload = {
-            "limit": 20,
-            "offset": offset,
-            "searchText": search_text,   # plain text, no + signs
-            "locations": [],
-        }
+        if location_ids:
+            payload = {
+                "appliedFacets": {"locations": location_ids},
+                "limit": 20,
+                "offset": offset,
+                "searchText": search_text,
+            }
+        else:
+            payload = {
+                "limit": 20,
+                "offset": offset,
+                "searchText": search_text,   # plain text, no + signs
+                "locations": [],
+            }
         try:
             resp = sess.post(
                 api_url,
@@ -189,10 +205,11 @@ def fetch_workday_company(company: dict, search_text: str, title_filter: list[st
             loc   = jp.get("locationsText", "")
             if not title:
                 continue
-            # Title filter (must match at least one keyword) + location filter
+            # Title filter (must match at least one keyword)
             if title_filter and not _match_keywords(title, title_filter):
                 continue
-            if not _match_location(loc, location):
+            # Location filter — skip if API already filtered by location_ids
+            if not location_ids and not _match_location(loc, location):
                 continue
 
             ext_path  = jp.get("externalPath", "")
