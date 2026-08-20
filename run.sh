@@ -1,47 +1,34 @@
 #!/usr/bin/env bash
-# ─────────────────────────────────────────────
-#  Job Hunter — macOS / Linux Start
-#  Run: bash run.sh
-# ─────────────────────────────────────────────
-set -e
-cd "$(dirname "$0")"
+# run.sh — Full job-hunt pipeline: fetch → score → apply
+# Run this daily (or via cron) — no Claude needed.
+#
+# Usage:
+#   ./run.sh              # full pipeline (fetch + score + apply)
+#   ./run.sh --status     # just show dashboard
+#   ./run.sh --dry-run    # see what would be applied, no submissions
+#   ./run.sh --fetch-only # only fetch + score, skip apply
+#   ./run.sh --apply-only # skip fetch, jump straight to apply
+#   ./run.sh --min-score 8 --limit 5
 
-PORT=5000
+set -euo pipefail
 
-ACTIVATE=""
-if [ -f "venv/bin/activate" ]; then
-  ACTIVATE="venv/bin/activate"
-elif [ -f ".venv/bin/activate" ]; then
-  ACTIVATE=".venv/bin/activate"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+# Use the virtualenv python if it exists, else system python3
+if [ -f ".venv/bin/python" ]; then
+    PYTHON=".venv/bin/python"
+elif [ -f "venv/bin/python" ]; then
+    PYTHON="venv/bin/python"
 else
-  echo "[X] Virtual environment not found (looked for venv and .venv)."
-  echo "    Please run setup.sh first."
-  exit 1
+    PYTHON="python3"
 fi
 
-# ── If the port is already running THIS app, kill it and restart ──
-# Only kills it if the process is actually app.py from this folder — never
-# touches an unrelated program that happens to be using the port (e.g.
-# macOS AirPlay Receiver also defaults to 5000).
-EXISTING_PID=$(lsof -ti tcp:$PORT || true)
-if [ -n "$EXISTING_PID" ]; then
-  CMD=$(ps -p "$EXISTING_PID" -o command= 2>/dev/null || true)
-  if echo "$CMD" | grep -q "app.py"; then
-    echo "[!] Port $PORT is already running this app (PID $EXISTING_PID) — restarting it..."
-    kill "$EXISTING_PID"
-    sleep 2
-  else
-    echo "[X] Port $PORT is in use by a different program (PID $EXISTING_PID), not job-hunter:"
-    echo "      $CMD"
-    echo "    Not killing it automatically — stop it yourself or change PORT in app.py."
-    echo "    (On macOS this is often AirPlay Receiver — System Settings > General > AirDrop & Handoff)"
-    exit 1
-  fi
-fi
-
-source "$ACTIVATE"
-echo "[OK] Starting Job Hunter..."
-echo "[OK] Open browser at: http://localhost:$PORT"
-echo "     Press Ctrl+C to stop."
 echo ""
-python app.py
+echo "======================================================"
+echo "  JOB HUNTER PIPELINE  — $(date '+%Y-%m-%d %H:%M:%S')"
+echo "======================================================"
+echo "  Python: $($PYTHON --version)"
+echo ""
+
+exec "$PYTHON" run_pipeline.py "$@"
