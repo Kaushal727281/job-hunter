@@ -27,12 +27,17 @@ Usage:
 import argparse
 import logging
 import os
+import re
+import shutil
 import sys
+import tempfile
 import time
 
 import truststore
 import requests
 import urllib3
+from playwright.sync_api import sync_playwright
+from playwright_stealth import Stealth
 
 truststore.inject_into_ssl()
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -95,7 +100,7 @@ TIMEOUT    = 20
 # ── Greenhouse API helpers ───────────────────────────────────────────────────
 
 def _gh_job_details(board: str, job_id: str, sess: requests.Session) -> dict:
-    """Fetch job details + questions from Greenhouse boards API."""
+    """Fetch job details + questions from Greenhouse boards API (read-only, public)."""
     url = (
         f"https://boards-api.greenhouse.io/v1/boards/{board}/jobs/{job_id}"
         "?questions=true"
@@ -105,6 +110,91 @@ def _gh_job_details(board: str, job_id: str, sess: requests.Session) -> dict:
         logger.warning(f"  Job details {board}/{job_id}: HTTP {r.status_code}")
         return {}
     return r.json()
+
+
+def _settle(page, ms: int = 2000):
+    try:
+        page.wait_for_load_state("networkidle", timeout=ms)
+    except Exception:
+        pass
+    time.sleep(0.5)
+
+
+def _fill_by_label(page, label_text: str, value: str, timeout: int = 4000):
+    """Fill an input field whose visible label contains label_text."""
+    try:
+        # Try: label element -> associated input via for/id
+        label = page.locator(f'label:has-text("{label_text}")').first
+        for_id = label.get_attribute("for")
+        if for_id:
+            page.locator(f"#{for_id}").fill(value)
+            return True
+    except Exception:
+        pass
+    try:
+        # Fallback: input immediately after label in DOM
+        page.locator(
+            f'label:has-text("{label_text}") ~ input, '
+            f'label:has-text("{label_text}") + input'
+        ).first.fill(value)
+        return True
+    except Exception:
+        pass
+    try:
+        # input[name=...] by common field name derived from label
+        fname = label_text.lower().replace(" ", "_").replace("/", "_")
+        page.locator(f'input[name="{fname}"], input[id="{fname}"]').first.fill(value)
+        return True
+    except Exception:
+        pass
+    return False
+
+
+def _answer_label_on_page(page, label_text: str, answer: str):
+    """
+    Given a question label, find its input/select/checkbox/radio on the page
+    and fill it with the answer string.
+    """
+    label_lower = label_text.lower()
+
+    # Try radio / checkbox group (Yes/No type)
+    if answer in ("Yes", "No"):
+        try:
+            # Find label for the answer value
+            radio = page.locator(
+                f'label:has-text("{answer}"):near(:text("{label_text[:40]}"))'
+            ).first
+            radio.click()
+            return
+        except Exception:
+            pass
+        try:
+            # radiogroup under the question label
+            container = page.locator(
+                f'[data-field-label*="{label_text[:30]}"], '
+                f'*:has(> label:has-text("{label_text[:30]}"))'
+            ).first
+            container.locator(f'label:has-text("{answer}"), input[value="{answer}"]').first.click()
+            return
+        except Exception:
+            pass
+
+    # Text / textarea fill
+    try:
+        _fill_by_label(page, label_text[:40], answer)
+        return
+    except Exception:
+        pass
+
+    # Select dropdown
+    try:
+        sel = page.locator(
+            f'label:has-text("{label_text[:40]}") ~ select, '
+            f'label:has-text("{label_text[:40]}") + select'
+        ).first
+        sel.select_option(label=answer)
+    except Exception:
+        pass
 
 
 def _answer_for_question(q: dict) -> str | None:
@@ -180,119 +270,233 @@ def _resume_for_job(job: dict) -> str:
     return PROFILE["resume_pdf"]
 
 
-# ── Apply to one Greenhouse job ──────────────────────────────────────────────
+# ── Apply to one Greenhouse job (Playwright) ─────────────────────────────────
 
-def apply_to_job(job: dict, sess: requests.Session, dry_run: bool = False) -> bool:
+def apply_to_job(job: dict, ctx, sess: requests.Session, dry_run: bool = False) -> bool:
     """
-    Apply to one Greenhouse job via the Application API.
-    Returns True on success.
+    Apply to one Greenhouse job via browser automation (job-boards.greenhouse.io).
+    ctx = Playwright browser context.
+    Returns True on success / reaching confirmation.
     """
-    board  = job.get("gh_board", "")
-    job_id = job.get("gh_job_id", "")
+    board      = job.get("gh_board", "")
+    job_id     = job.get("gh_job_id", "")
+    apply_link = job.get("apply_link", "")
+    resume_pdf = _resume_for_job(job)
 
     if not board or not job_id:
         logger.warning(f"  [{job.get('company')}] Missing gh_board/gh_job_id — skipping")
         return False
-
-    resume_pdf = _resume_for_job(job)
     if not os.path.isfile(resume_pdf):
         logger.warning(f"  [{job.get('company')}] Resume PDF not found: {resume_pdf}")
         return False
 
+    # Prefer job-boards.greenhouse.io canonical URL
+    gh_url = f"https://job-boards.greenhouse.io/{board}/jobs/{job_id}"
+
     print(f"\n{'='*60}")
     print(f"  JOB  : {job['title']} @ {job['company']}")
     print(f"  SCORE: {job.get('fit_score','?')}/10  {job.get('fit_reason','')}")
-    print(f"  LINK : {job.get('apply_link','')}")
-    print(f"  BOARD: {board}  JOB_ID: {job_id}")
+    print(f"  URL  : {gh_url}")
     print(f"{'='*60}")
 
-    # ── Fetch job details + questions ──────────────────────────────────────
-    details = _gh_job_details(board, job_id, sess)
-    if not details:
-        return False
-
-    questions = details.get("questions", [])
-    logger.info(f"  [{job.get('company')}] {len(questions)} application questions")
+    # Fetch question list for dry-run preview
+    details   = _gh_job_details(board, job_id, sess)
+    questions = details.get("questions", []) if details else []
 
     if dry_run:
         for q in questions:
             ans = _answer_for_question(q)
-            print(f"    Q: {q.get('label')!r:50s}  -> {ans!r}")
+            print(f"    Q: {q.get('label')!r:55s}  -> {ans!r}")
         return True
 
-    # ── Build multipart form ───────────────────────────────────────────────
-    # Required base fields
-    form_data = {
-        "first_name": PROFILE["first_name"],
-        "last_name":  PROFILE["last_name"],
-        "email":      PROFILE["email"],
-        "phone":      PROFILE["phone_e164"],
-    }
-
-    # Answer questions
-    for q in questions:
-        fields = q.get("fields", [])
-        for f in fields:
-            fname = f.get("name")
-            if not fname:
-                continue
-            # Resume field — handled via file upload below
-            if f.get("type") == "input_file" or "resume" in (fname or "").lower():
-                continue
-            answer = _answer_for_question(q)
-            if answer is not None:
-                form_data[fname] = answer
-
-    # EEO compliance fields (Greenhouse standard names)
-    form_data["job_application[answers_attributes][0][question_id]"] = ""
-    # These are submitted under the `demographics` key if present
-    for q in questions:
-        label = (q.get("label") or "").lower()
-        fields = q.get("fields", [])
-        for f in fields:
-            fname = f.get("name", "")
-            if "gender" in fname:
-                form_data[fname] = PROFILE["gender"]
-            elif "race" in fname:
-                form_data[fname] = PROFILE["race"]
-            elif "veteran" in fname:
-                form_data[fname] = PROFILE["veteran"]
-            elif "disability" in fname:
-                form_data[fname] = PROFILE["disability"]
-
-    # ── POST application ───────────────────────────────────────────────────
-    post_url = f"https://boards-api.greenhouse.io/v1/applications?token={job_id}"
-    logger.info(f"  Submitting to {post_url}")
+    page = ctx.new_page()
+    Stealth().apply_stealth_sync(page)
 
     try:
-        with open(resume_pdf, "rb") as rf:
-            files = {"resume": (os.path.basename(resume_pdf), rf, "application/pdf")}
-            resp = sess.post(
-                post_url,
-                data=form_data,
-                files=files,
-                timeout=30,
-            )
+        # ── Step 1: Load job page ──────────────────────────────────────────
+        print("[1] Loading job page…")
+        page.goto(gh_url, wait_until="domcontentloaded", timeout=30000)
+        _settle(page, 3000)
 
-        if resp.status_code in (200, 201):
-            print(f"  [SUCCESS] Application submitted for {job['title']} @ {job['company']}")
-            return True
-        else:
-            logger.warning(
-                f"  [{job.get('company')}] HTTP {resp.status_code}: {resp.text[:300]}"
-            )
-            # 422 = validation error (common for questions needing more specific answers)
-            if resp.status_code == 422:
+        # ── Step 2: Click Apply button ─────────────────────────────────────
+        print("[2] Clicking Apply…")
+        for sel in [
+            'a:has-text("Apply for this Job")',
+            'button:has-text("Apply for this Job")',
+            'a:has-text("Apply Now")',
+            'button:has-text("Apply")',
+            '[data-qa="btn-apply"]',
+        ]:
+            try:
+                btn = page.locator(sel).first
+                if btn.is_visible(timeout=4000):
+                    btn.click()
+                    _settle(page, 3000)
+                    break
+            except Exception:
+                pass
+
+        # ── Step 3: Fill standard contact fields ──────────────────────────
+        print("[3] Filling contact info…")
+        # By name attribute (most common in Greenhouse)
+        for field, value in [
+            ("first_name", PROFILE["first_name"]),
+            ("last_name",  PROFILE["last_name"]),
+            ("email",      PROFILE["email"]),
+            ("phone",      PROFILE["phone_e164"]),
+        ]:
+            try:
+                loc = page.locator(f'input[name="{field}"], input[id="{field}"]').first
+                if loc.is_visible(timeout=3000):
+                    loc.fill(value)
+            except Exception:
+                pass
+        # LinkedIn / website by common ids
+        for field, value in [
+            ("linkedin_profile_url", PROFILE["linkedin"]),
+            ("website",              PROFILE["website"]),
+        ]:
+            try:
+                page.locator(
+                    f'input[id="{field}"], input[name="{field}"]'
+                ).first.fill(value)
+            except Exception:
+                pass
+
+        # ── Step 4: Upload resume ──────────────────────────────────────────
+        print("[4] Uploading resume…")
+        try:
+            fi = page.locator('input[type="file"]').first
+            fi.wait_for(state="attached", timeout=10000)
+            fi.set_input_files(resume_pdf)
+            _settle(page, 4000)
+            print("    Resume uploaded.")
+        except Exception as exc:
+            print(f"    [WARN] Resume upload: {exc}")
+
+        # ── Step 5: Answer custom questions ───────────────────────────────
+        print("[5] Answering questions…")
+        for q in questions:
+            label = q.get("label", "")
+            answer = _answer_for_question(q)
+            if answer is None or not label:
+                continue
+            q_type = q.get("type", "")
+            fields = q.get("fields", [])
+            field_name = fields[0].get("name", "") if fields else ""
+
+            try:
+                if q_type in ("boolean", "multi_value_single_select"):
+                    # Radio / select
+                    try:
+                        # Try select
+                        sel = page.locator(f'select[id="{field_name}"], select[name="{field_name}"]').first
+                        sel.select_option(label=answer)
+                    except Exception:
+                        # Try radio label
+                        _answer_label_on_page(page, label, answer)
+                elif q_type == "boolean":
+                    # Checkbox
+                    cb = page.locator(f'input[type="checkbox"][name="{field_name}"]').first
+                    if answer in ("Yes", "1", "true") and not cb.is_checked():
+                        cb.click()
+                else:
+                    # Text input
+                    try:
+                        page.locator(
+                            f'input[id="{field_name}"], input[name="{field_name}"], '
+                            f'textarea[id="{field_name}"], textarea[name="{field_name}"]'
+                        ).first.fill(answer)
+                    except Exception:
+                        _fill_by_label(page, label[:40], answer)
+                time.sleep(0.15)
+            except Exception as exc:
+                logger.debug(f"    Q skip [{label[:30]}]: {exc}")
+
+        # ── Step 6: EEO checkboxes / consent ──────────────────────────────
+        print("[6] Handling consent / EEO…")
+        try:
+            # Check any "I agree" / privacy policy checkboxes
+            for cb in page.locator(
+                'input[type="checkbox"]:visible'
+            ).all():
                 try:
-                    errs = resp.json().get("errors", [])
-                    for e in errs:
-                        print(f"    Validation: {e}")
+                    aria = (cb.get_attribute("aria-label") or "").lower()
+                    name = (cb.get_attribute("name") or "").lower()
+                    if any(k in aria + name for k in ("consent", "agree", "policy", "acknowledge")):
+                        if not cb.is_checked():
+                            cb.click()
+                            time.sleep(0.1)
                 except Exception:
                     pass
-            return False
+        except Exception:
+            pass
+
+        # ── Step 7: Submit ─────────────────────────────────────────────────
+        page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+        time.sleep(1)
+
+        print("\n" + "=" * 60)
+        print(f"  All fields filled. Please review and click Submit")
+        print(f"  in the browser. Waiting up to 10 minutes…")
+        print("=" * 60 + "\n")
+
+        # Try auto-submit
+        submitted = False
+        for sel in [
+            'button[type="submit"]:has-text("Submit")',
+            'button:has-text("Submit Application")',
+            '[data-qa="btn-submit"]',
+            'input[type="submit"]',
+        ]:
+            try:
+                btn = page.locator(sel).first
+                if btn.is_visible(timeout=3000):
+                    btn.click()
+                    _settle(page, 5000)
+                    submitted = True
+                    break
+            except Exception:
+                pass
+
+        # Wait for confirmation (auto-submit or manual)
+        try:
+            page.wait_for_url(
+                re.compile(r"(confirmation|thank|submitted|success)", re.I),
+                timeout=600_000,
+            )
+        except Exception:
+            pass
+
+        final_url = page.url
+        print(f"[RESULT] {final_url}")
+
+        if any(k in final_url.lower() for k in ("confirm", "thank", "submit", "success")):
+            print("[SUCCESS] Application submitted!")
+            page.close()
+            return True
+        # Check for success text on page
+        try:
+            body = page.inner_text("body")[:500]
+            if any(k in body.lower() for k in ("thank you", "application received", "successfully")):
+                print("[SUCCESS] Confirmation text detected.")
+                page.close()
+                return True
+        except Exception:
+            pass
+
+        page.screenshot(path=f"/tmp/gh_apply_{board}_{job_id}.png")
+        print(f"[WARN] Not confirmed — screenshot at /tmp/gh_apply_{board}_{job_id}.png")
+        page.close()
+        return False
 
     except Exception as exc:
-        logger.warning(f"  [{job.get('company')}] POST error: {exc}")
+        print(f"[ERROR] {exc}")
+        try:
+            page.screenshot(path=f"/tmp/gh_error_{board}_{job_id}.png")
+        except Exception:
+            pass
+        page.close()
         return False
 
 
@@ -361,34 +565,62 @@ def main():
         print(f"    board={j.get('gh_board')}  id={j.get('gh_job_id')}")
     print()
 
-    if args.dry_run:
-        sess = requests.Session()
-        sess.headers.update(_HEADERS)
-        sess.verify = False
-        for j in jobs:
-            apply_to_job(j, sess, dry_run=True)
-        return
-
     sess = requests.Session()
     sess.headers.update(_HEADERS)
     sess.verify = False
 
+    if args.dry_run:
+        for j in jobs:
+            apply_to_job(j, None, sess, dry_run=True)
+        return
+
+    # ── Launch Playwright browser with Chrome cookies ──────────────────────
+    chrome_src = os.path.expanduser("~/Library/Application Support/Google/Chrome/Default")
+    tmp = tempfile.mkdtemp(prefix="chrome_gh_apply_")
+    dst = os.path.join(tmp, "Default")
+    os.makedirs(dst, exist_ok=True)
+    for f in ("Cookies", "Cookies-journal"):
+        s = os.path.join(chrome_src, f)
+        if os.path.isfile(s):
+            shutil.copy2(s, os.path.join(dst, f))
+
     applied_ids = []
     skipped     = []
 
-    for j in jobs:
+    with sync_playwright() as pw:
         try:
-            ok = apply_to_job(j, sess)
-            if ok:
-                job_store.mark_applied(j["id"])
-                applied_ids.append(j["id"])
-                print(f"  Marked applied: {j['id']}")
-            else:
+            ctx = pw.chromium.launch_persistent_context(
+                tmp,
+                channel="chrome",
+                headless=False,
+                args=["--disable-blink-features=AutomationControlled"],
+                viewport={"width": 1280, "height": 900},
+            )
+        except Exception:
+            ctx = pw.chromium.launch_persistent_context(
+                tmp,
+                headless=False,
+                args=["--disable-blink-features=AutomationControlled"],
+                viewport={"width": 1280, "height": 900},
+            )
+
+        for j in jobs:
+            try:
+                ok = apply_to_job(j, ctx, sess)
+                if ok:
+                    job_store.mark_applied(j["id"])
+                    applied_ids.append(j["id"])
+                    print(f"  Marked applied: {j['id']}")
+                else:
+                    skipped.append(j)
+            except Exception as exc:
+                logger.warning(f"  [{j.get('company')}] Unexpected error: {exc}")
                 skipped.append(j)
-        except Exception as exc:
-            logger.warning(f"  [{j.get('company')}] Unexpected error: {exc}")
-            skipped.append(j)
-        time.sleep(RATE_SLEEP)
+            time.sleep(RATE_SLEEP)
+
+        ctx.close()
+
+    shutil.rmtree(tmp, ignore_errors=True)
 
     print("\n" + "=" * 60)
     print(f"  Greenhouse apply complete")
