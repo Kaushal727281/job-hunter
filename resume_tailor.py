@@ -1,0 +1,710 @@
+"""
+resume_tailor.py
+Uses LLM (Groq → Gemini fallback) to tailor the base resume for a specific job.
+
+Key rotation: set GROQ_API_KEY, GROQ_API_KEY_2, GROQ_API_KEY_3 … in .env.
+When a key hits its daily limit the next one is used automatically.
+Set GEMINI_API_KEY for a final fallback (1M tokens/day free).
+"""
+
+import re
+import json
+import logging
+import truststore
+from bs4 import BeautifulSoup, NavigableString
+from dotenv import load_dotenv
+
+import profiles
+
+truststore.inject_into_ssl()
+load_dotenv()
+logger = logging.getLogger(__name__)
+
+
+def _candidate_name() -> str:
+    try:
+        return json.loads(profiles.config_path().read_text(encoding="utf-8")).get("candidate", {}).get("name", "The candidate")
+    except Exception:
+        return "The candidate"
+
+
+def _extract_sections(soup: BeautifulSoup) -> dict:
+    """Pull out the text sections we want Groq to rewrite."""
+    def _txt(el): return el.get_text(" ", strip=True) if el else ""
+
+    # Summary
+    summary = _txt(soup.find(class_="summary-text"))
+
+    # Skills — new structure: grouped .skill-group divs with .tag chips
+    skill_groups = []
+    all_skill_tags = []
+    for sg in soup.find_all(class_="skill-group"):
+        label = _txt(sg.find(class_="skill-group-label"))
+        tags  = [_txt(t) for t in sg.find_all(class_="tag") if _txt(t)]
+        if tags:
+            skill_groups.append({"label": label, "tags": tags})
+            all_skill_tags.extend(tags)
+
+    # Fallback: old .skills-text single string
+    skills_flat = ""
+    if not all_skill_tags:
+        skills_el = soup.find(class_="skills-text")
+        if skills_el:
+            skills_flat = _txt(skills_el)
+
+    # Experience bullets — collect all <li> text from each .job block
+    jobs_data = []
+    for job_div in soup.find_all(class_="job"):
+        title_el   = job_div.find(class_="job-title")
+        company_el = job_div.find(class_="job-company")
+        bullets    = [li.get_text(" ", strip=True) for li in job_div.find_all("li")]
+        if bullets:
+            jobs_data.append({
+                "title":   _txt(title_el),
+                "company": _txt(company_el),
+                "bullets": bullets,
+            })
+
+    return {
+        "summary":      summary,
+        "skill_groups": skill_groups,
+        "skills_flat":  skills_flat,
+        "jobs":         jobs_data,
+    }
+
+
+def _apply_sections(soup: BeautifulSoup, modified: dict) -> BeautifulSoup:
+    """Inject Groq's modified text back into the HTML."""
+    # Summary
+    new_summary = modified.get("summary", "")
+    if new_summary:
+        summary_el = soup.find(class_="summary-text")
+        if summary_el:
+            summary_el.clear()
+            summary_el.append(new_summary)
+
+    # New ATS keywords — do NOT inject as a visible sidebar section.
+    # Showing aspirational keywords (AWS, Kubernetes, etc.) that the candidate
+    # doesn't actually have experience with looks dishonest to human reviewers.
+    # Instead they are only used for ATS bolding in the text body (bold_keywords).
+
+    # Old .skills-text fallback
+    new_skills = modified.get("skills", "")
+    if new_skills:
+        skills_el = soup.find(class_="skills-text")
+        if skills_el:
+            skills_el.clear()
+            skills_el.append(new_skills)
+
+    # Experience bullets
+    mod_jobs = modified.get("jobs", [])
+    job_divs = soup.find_all(class_="job")
+    for i, job_div in enumerate(job_divs):
+        if i >= len(mod_jobs):
+            break
+        new_bullets = mod_jobs[i].get("bullets", [])
+        ul = job_div.find("ul")
+        if ul and new_bullets:
+            # Collect original bullets before clearing, so we can restore any the model dropped
+            orig_bullets = [li.get_text(" ", strip=True) for li in ul.find_all("li")]
+            ul.clear()
+            written_texts: list[str] = []
+            for b in new_bullets:
+                li = soup.new_tag("li")
+                li.string = b
+                ul.append(li)
+                written_texts.append(b.strip().lower())
+            # Only restore originals the model clearly dropped AND only up to 6 bullets total
+            # (2-page rule: more than 6 bullets per role overflows the page)
+            import difflib
+            MAX_BULLETS = 6
+            for orig in orig_bullets:
+                if len(written_texts) >= MAX_BULLETS:
+                    break
+                orig_low = orig.strip().lower()
+                if not orig_low:
+                    continue
+                already_covered = any(
+                    difflib.SequenceMatcher(None, orig_low, w).ratio() > 0.5
+                    for w in written_texts
+                )
+                if not already_covered:
+                    li = soup.new_tag("li")
+                    li.string = orig
+                    ul.append(li)
+                    written_texts.append(orig_low)
+
+    return soup
+
+
+def _kw_in_text(kw: str, text: str) -> bool:
+    """
+    Case-insensitive whole-word-ish check.
+    Also checks no-space variant so 'Spring Boot' matches 'springboot' and vice-versa.
+    """
+    if re.search(r'(?i)\b' + re.escape(kw) + r'\b', text):
+        return True
+    # Try removing internal spaces: "Spring Boot" → "SpringBoot" / "springboot"
+    nospace = kw.replace(" ", "")
+    if nospace != kw and re.search(r'(?i)\b' + re.escape(nospace) + r'\b', text):
+        return True
+    # Try inserting space before each internal capital: "SpringBoot" → "Spring Boot"
+    spaced = re.sub(r'([a-z])([A-Z])', r'\1 \2', kw)
+    if spaced != kw and re.search(r'(?i)\b' + re.escape(spaced) + r'\b', text):
+        return True
+    return False
+
+
+# Broad list of tech skills to scan for in any JD
+_TECH_TERMS = [
+    "Java", "Python", "JavaScript", "TypeScript", "Go", "Golang", "Rust", "Kotlin", "Scala",
+    "C++", "C#", "PHP", "Ruby", "Swift",
+    "Spring Boot", "Spring", "Hibernate", "JPA", "Quarkus", "Micronaut", "Vert.x",
+    "Kafka", "Apache Kafka", "RabbitMQ", "ActiveMQ", "Pulsar", "NATS",
+    "Redis", "Elasticsearch", "Solr", "OpenSearch",
+    "AWS", "Azure", "GCP", "Google Cloud",
+    "Docker", "Kubernetes", "Helm", "Terraform", "Ansible", "Puppet",
+    "REST", "REST APIs", "RESTful APIs", "GraphQL", "gRPC", "WebSocket",
+    "MySQL", "PostgreSQL", "MongoDB", "Oracle", "SQL", "NoSQL", "DynamoDB",
+    "Cassandra", "HBase", "Neo4j",
+    "Git", "GitHub", "GitLab", "Bitbucket", "CI/CD", "Jenkins", "GitHub Actions",
+    "Maven", "Gradle", "SBT",
+    "React", "Angular", "Vue", "Next.js", "Node.js", "Express",
+    "microservices", "distributed systems", "event-driven architecture",
+    "Agile", "Scrum", "Kanban", "TDD", "BDD", "JUnit", "Mockito", "TestNG",
+    "Linux", "Unix", "Bash", "Shell scripting",
+    "OpenAPI", "Swagger", "OAuth", "JWT", "SAML",
+    "machine learning", "ML", "AI", "GenAI", "LLM", "NLP",
+    "Prometheus", "Grafana", "Splunk", "Datadog", "ELK",
+    "Spark", "Hadoop", "Flink", "Airflow", "dbt",
+    "gRPC", "Protobuf", "Avro",
+    "Java 8", "Java 11", "Java 17", "Java 21",
+    "multithreading", "concurrency", "reactive programming",
+    "Apache Flink", "Apache Spark",
+    "rate limiting", "metering", "billing", "authorization", "authentication",
+    "pub/sub", "message queue", "event streaming",
+    "Design Patterns", "SOLID", "Clean Architecture", "DDD",
+    "Springboot", "springboot",
+]
+
+
+def _extract_jd_skill_terms(jd_text: str) -> list[str]:
+    """
+    Scan the job description for known tech skill terms.
+    Returns matched terms preserving the canonical casing from _TECH_TERMS.
+    """
+    found = []
+    seen_low: set[str] = set()
+    for term in _TECH_TERMS:
+        tl = term.lower()
+        if tl not in seen_low and _kw_in_text(term, jd_text):
+            found.append(term)
+            seen_low.add(tl)
+    return found
+
+
+def _verify_and_enrich_bold_keywords(
+    candidate_keywords: list[str],
+    jd_text: str,
+    resume_text: str,
+    min_count: int = 7,
+) -> tuple[list[str], list[str]]:
+    """
+    1. Keep only candidates that actually appear in the JD (eliminates AI hallucinations).
+    2. If verified count < min_count:
+       a. First add JD terms already in the resume (free matches the AI missed).
+       b. Then add JD terms NOT in the resume (inject into skills section).
+    Returns (verified_bold, new_injections) where new_injections should go into new_ats_keywords.
+    """
+    jd_terms = _extract_jd_skill_terms(jd_text)
+    jd_terms_low = {t.lower() for t in jd_terms}
+    candidate_low = {k.lower() for k in candidate_keywords}
+
+    # Step 1: filter candidates to only those present in JD
+    verified = [k for k in candidate_keywords if _kw_in_text(k, jd_text)]
+    verified_low = {k.lower() for k in verified}
+
+    new_injections: list[str] = []
+
+    if len(verified) < min_count:
+        # Step 2a: add JD terms already in the resume (no injection needed)
+        for term in jd_terms:
+            if len(verified) >= min_count:
+                break
+            tl = term.lower()
+            if tl not in verified_low and _kw_in_text(term, resume_text):
+                verified.append(term)
+                verified_low.add(tl)
+
+    if len(verified) < min_count:
+        # Step 2b: add JD terms NOT in resume — inject them into the skills section
+        for term in jd_terms:
+            if len(verified) >= min_count:
+                break
+            tl = term.lower()
+            if tl not in verified_low and not _kw_in_text(term, resume_text):
+                verified.append(term)
+                verified_low.add(tl)
+                new_injections.append(term)
+
+    return verified, new_injections
+
+
+def _bold_keywords(soup: BeautifulSoup, keywords: list) -> BeautifulSoup:
+    """
+    Wrap the FIRST occurrence of each keyword (case-insensitive) in a
+    <strong class="ats-kw"> tag. Each keyword is bolded exactly once.
+    Skips style/script/title/existing strong/mark/head/a tags.
+    """
+    if not keywords:
+        return soup
+
+    clean = [k for k in keywords if k and k.strip()]
+    if not clean:
+        return soup
+
+    # Track which keywords have already been bolded (normalised to lowercase)
+    bolded: set[str] = set()
+
+    # Sort longest first so multi-word phrases match before their sub-words
+    kw_sorted = sorted(set(clean), key=len, reverse=True)
+    _SKIP      = {"style", "script", "title", "strong", "b", "mark", "head", "a"}
+    # Only bold inside the main content column (.main), never in the header banner,
+    # sidebar (skills/contact), or any heading/label elements.
+    _SKIP_CSS  = {"banner", "contact-bar", "sidebar", "skill-group", "skill-tags",
+                  "tag", "section-title", "section-title-main", "edu-block",
+                  "edu-degree", "edu-school", "cert-item", "job-title",
+                  "job-company", "job-meta", "project-name", "project-role",
+                  "project-stack", "banner-text", "role", "score-badge"}
+
+    for node in soup.find_all(string=True):
+        parent = node.parent
+        if any(p.name in _SKIP for p in [parent] + list(parent.parents)):
+            continue
+        # Skip nodes whose ancestor has a class in the restricted set
+        ancestor_classes = set()
+        for p in [parent] + list(parent.parents):
+            for c in (p.get("class") or []):
+                ancestor_classes.add(c)
+        if ancestor_classes & _SKIP_CSS:
+            continue
+
+        # Build pattern from keywords not yet bolded
+        remaining = [k for k in kw_sorted if k.lower() not in bolded]
+        if not remaining:
+            break
+
+        pattern = re.compile(
+            r"(?<![A-Za-z0-9])(" + "|".join(re.escape(k) for k in remaining) + r")(?![A-Za-z0-9])",
+            re.IGNORECASE,
+        )
+
+        text = str(node)
+        if not pattern.search(text):
+            continue
+
+        parts = pattern.split(text)
+        if len(parts) == 1:
+            continue
+
+        for part in parts:
+            if not part:
+                continue
+            if pattern.fullmatch(part) and part.lower() not in bolded:
+                tag = soup.new_tag("strong", **{"class": "ats-kw"})
+                tag.string = part
+                node.insert_before(tag)
+                bolded.add(part.lower())   # mark as done — no more bolding for this keyword
+            else:
+                node.insert_before(NavigableString(part))
+        node.extract()
+
+    return soup
+
+
+def _detect_domain(job: dict) -> tuple[str, str]:
+    """
+    Detect the target company's industry domain.
+    Returns (domain_label, emphasis_hint) to inject into the prompt.
+    """
+    company = (job.get("company") or "").lower()
+    desc    = (job.get("description") or "").lower()[:1500]
+    combined = company + " " + desc
+
+    _INSURANCE = ("insurance", "insurer", "underwriting", "claims", "actuarial",
+                  "allianz", "axa", "zurich", "prudential", "aviva", "aig", "cigna",
+                  "metlife", "manulife", "liberty mutual", "chubb", "berkshire",
+                  "policy", "premium", "reinsurance", "lloyds")
+    _BANKING   = ("bank", "banking", "jpmorgan", "goldman", "barclays", "bnp",
+                  "hsbc", "citi", "wells fargo", "morgan stanley", "deutsche",
+                  "credit suisse", "nomura", "ubs", "fidelity", "blackrock",
+                  "payments", "ach", "wire transfer", "swift", "clearing", "settlement",
+                  "visa", "mastercard", "fintech", "neobank", "remittance")
+    _HEALTHCARE= ("health", "healthcare", "hospital", "pharma", "pharmaceutical",
+                  "clinical", "medical", "ehr", "fhir", "hl7", "optum", "epic",
+                  "patient", "doctor", "diagnosis", "lab", "imaging")
+    _ECOMMERCE = ("ecommerce", "e-commerce", "retail", "marketplace", "shopify",
+                  "amazon", "flipkart", "meesho", "logistics", "supply chain",
+                  "inventory", "warehouse", "fulfilment", "catalog", "cart")
+    _TELECOM   = ("telecom", "telco", "telecomm", "network", "5g", "vodafone",
+                  "airtel", "jio", "att", "verizon", "t-mobile", "ericsson", "nokia")
+    _FAANG     = ("google", "meta", "apple", "microsoft", "netflix", "uber",
+                  "airbnb", "stripe", "atlassian", "salesforce", "twilio", "datadog",
+                  "snowflake", "confluent", "hashicorp", "gitlab")
+
+    if any(k in combined for k in _INSURANCE):
+        return (
+            "Insurance",
+            "IMPORTANT: This is an INSURANCE company. The candidate's FICO platform "
+            "is used by global insurers for underwriting automation, claims processing, "
+            "and risk scoring. Emphasize these insurance use-cases in the summary and bullets. "
+            "Use terms like 'underwriting', 'claims', 'risk decisioning', 'insurance automation'."
+        )
+    if any(k in combined for k in _BANKING):
+        return (
+            "Banking / Fintech",
+            "IMPORTANT: This is a BANKING or FINTECH company. Emphasize the candidate's "
+            "FICO platform serving banks for ACH origination, credit scoring, fraud detection, "
+            "and loan decisioning. Use terms like 'payments', 'financial decisioning', "
+            "'transaction processing', 'regulatory compliance'."
+        )
+    if any(k in combined for k in _HEALTHCARE):
+        return (
+            "Healthcare",
+            "IMPORTANT: This is a HEALTHCARE company. Emphasize the candidate's experience "
+            "with high-volume, high-reliability enterprise systems, data security (Spring Security), "
+            "and rules-driven automated workflows — paralleling clinical decision support."
+        )
+    if any(k in combined for k in _ECOMMERCE):
+        return (
+            "E-commerce / Retail",
+            "IMPORTANT: This is an E-COMMERCE or RETAIL company. Emphasize high-throughput "
+            "API design, scalability, event-driven architecture (Kafka), and the TiffinLane "
+            "marketplace project as direct e-commerce experience."
+        )
+    if any(k in combined for k in _TELECOM):
+        return (
+            "Telecom",
+            "IMPORTANT: This is a TELECOM company. Emphasize high-availability distributed "
+            "systems, event-driven Kafka pipelines, REST APIs at scale, and microservices architecture."
+        )
+    if any(k in combined for k in _FAANG):
+        return (
+            "Tech Product (FAANG-style)",
+            "IMPORTANT: This is a top-tier TECH PRODUCT company. Emphasize engineering depth: "
+            "system design, performance tuning, scalable architecture, the Job Hunter AI project, "
+            "and clean engineering practices. Avoid domain-specific jargon."
+        )
+    return (
+        "Tech / Enterprise",
+        "Emphasize enterprise-grade Java engineering, scalability, technical leadership, "
+        "and cross-domain applicability of the FICO platform."
+    )
+
+
+def tailor_resume(job: dict, prev_tips: list[str] | None = None, custom_instructions: str | None = None) -> dict:
+    """
+    Tailors the base resume for the given job.
+    prev_tips: improvement_tips from a previous attempt — injected as extra
+               instructions so the model addresses them on retry.
+    Returns:
+      {
+        "resume_html":      str,   — full modified HTML with bolded keywords
+        "cover_note":       str,   — 3-sentence cover note
+        "match_score":      int,   — 1-10 relevance score
+        "key_matches":      list   — top matching skills/keywords
+        "bold_keywords":    list   — keywords bolded in the resume HTML
+        "new_ats_keywords": list   — new keywords added from JD
+        "improvement_tips": list   — remaining gaps after tailoring
+      }
+    """
+    base_html = profiles.base_resume_path().read_text(encoding="utf-8")
+    soup = BeautifulSoup(base_html, "html.parser")
+    sections = _extract_sections(soup)
+
+    # Build compact text representation for Groq
+    resume_text = f"SUMMARY:\n{sections['summary']}\n\n"
+
+    if sections["skill_groups"]:
+        resume_text += "SKILLS (by category):\n"
+        for sg in sections["skill_groups"]:
+            resume_text += f"  {sg['label']}: {', '.join(sg['tags'])}\n"
+        resume_text += "\n"
+    elif sections["skills_flat"]:
+        resume_text += f"SKILLS:\n{sections['skills_flat']}\n\n"
+
+    for j in sections["jobs"]:
+        resume_text += f"ROLE: {j['title']} @ {j['company']}\n"
+        for b in j["bullets"]:
+            resume_text += f"  • {b}\n"
+        resume_text += "\n"
+
+    candidate_name = _candidate_name()
+    domain_label, domain_hint = _detect_domain(job)
+    logger.info(f"  Detected domain: {domain_label}")
+
+    prompt = f"""You are an expert ATS resume optimizer helping {candidate_name} tailor their resume for a specific job. Your TWO goals:
+1. Maximize ATS keyword match score by weaving JD keywords naturally into the resume.
+2. Keep every claim 100% truthful — never fabricate roles, companies, or technologies not present.
+
+## Target Job
+Title: {job['title']}
+Company: {job['company']} [{domain_label}]
+Location: {job['location']} {'(Remote)' if job.get('is_remote') else ''}
+
+## Company Domain Context
+{domain_hint}
+
+## Job Description
+{job.get('description', '')[:2500]}
+
+## Candidate's Current Resume
+{resume_text}
+{f"""## Previous Attempt — Improvements Required
+A previous tailoring attempt scored below 8/10. You MUST address ALL of the following gaps
+in this attempt by rewriting the relevant bullets to incorporate them naturally:
+{chr(10).join(f"  ✗ {tip}" for tip in prev_tips)}
+
+Mark each addressed tip as implemented by noting it in the improvement_tips response
+(replace its text with "✓ Implemented: <what you did>"). Only list truly remaining gaps
+as plain tips.
+""" if prev_tips else ""}{f"""## Custom Instructions from Candidate
+The candidate has provided the following specific instructions. You MUST follow these as high-priority directives when rewriting the resume:
+{custom_instructions}
+
+""" if custom_instructions else ""}## Instructions
+1. **SUMMARY**: Rewrite as a candidate APPLYING for this role. STRICT RULES:
+   - **MAX 2 sentences, ~40 words total** — tight and punchy, no fluff
+   - NEVER use the phrase "as a [job title] at [company]" — this implies already employed there
+   - NEVER say "at [company]" or "for [company]" at the end of the sentence
+   - DO start with: "[X]+ years of experience in [core skills]..."
+   - DO end with what value the candidate brings, NOT where they are going
+   - MUST reference at least 2 specifics unique to THIS job description below (e.g. if the JD
+     asks for team leadership/mentoring and the candidate's bullets show that, say so explicitly —
+     don't write a generic summary that could apply to any Java role)
+   - If the JD emphasizes people/team responsibilities (leading, mentoring, managing, driving a
+     team's technical decisions) AND the candidate's own bullets below already show this (e.g.
+     "Mentored engineers", "Led development"), you MUST explicitly name that leadership angle in
+     the summary — this is the single highest-value match when the JD asks for it. Only claim it
+     if it is truthfully backed by the candidate's bullets; never invent a leadership claim.
+   - BAD example (generic, could apply to any job — do not imitate this wording): "...seeking a role as Full Stack Engineer at Deutsche Bank"
+   - BAD example (real-sounding but too generic — do not copy this phrasing, it is illustrative only): "...bringing 7 years of enterprise Java expertise and a proven record of delivering scalable solutions."
+   - The example above shows the SHAPE only. Your actual summary must name specific JD-relevant
+     skills/responsibilities from THIS posting, not restate the example's wording.
+
+2. **BOLD_KEYWORDS** — skill/keyword matching (CRITICAL):
+   Step A — Compare the JD skills/technologies to the candidate's resume. List every skill word that appears in BOTH the JD and the resume (exact or close match, e.g. "REST APIs" matches "RESTful APIs").
+   Step B — Count the matches from Step A. If the count is LESS THAN 5, identify additional skill/technology words from the JD that are contextually aligned with what the candidate already does (e.g. JD mentions "Kafka" and candidate works on microservices → add "Kafka"; JD mentions "Agile" → add "Agile"). Add enough to reach at least 5 total.
+   Step C — Return all these words (Step A matches + Step B additions) as the "bold_keywords" array. These will be bolded in the PDF.
+   RULES: Return plain strings — NO asterisks, NO markdown, NO ** wrapping. Example: "Spring Boot" not "**Spring Boot**".
+
+3. **NEW_ATS_KEYWORDS**: From the Step B additions above that are NOT already in the candidate's skills section, return them here too. These will be injected into the resume skills section.
+   - Only include terms contextually aligned with the candidate's background
+   - NEVER invent specific products the candidate has no exposure to
+   Return as a JSON array of short plain strings.
+
+4. **JOBS – bullets**: For each role rewrite bullets following these STRICT RULES:
+   - **MAX 6 bullets per role** — merge, trim, or drop the weakest; keep only the highest-impact ones
+   - **Each bullet max 20 words** — one crisp line: Action verb → what → result/impact. No sub-clauses, no lists within a bullet
+   - Reorder so the most JD-relevant bullets appear first
+   - Weave in JD terminology naturally (e.g. replace "REST services" with "RESTful microservices" if JD uses that phrase)
+   - Never add technologies or responsibilities not actually present
+   - **TARGET: entire resume fits in 2 pages** — be ruthless about brevity
+
+5. **COVER_LETTER**: Write a full professional cover letter (~200 words, 4 paragraphs):
+   - Para 1: Enthusiastic opening — name the specific role + company, hook with a key strength.
+   - Para 2: Why THIS company specifically — research-based reason (product, mission, tech stack).
+   - Para 3: Your top 2-3 relevant achievements from the resume that directly match the JD.
+   - Para 4: Confident closing — express availability, invite for interview, professional sign-off.
+   Address it to "Hiring Manager" at {job['company']}. Do NOT include a date or address block — just the letter body paragraphs separated by blank lines.
+
+6. **COVER_NOTE**: 1-2 sentence teaser (for dashboard preview) summarising why this is a strong match.
+
+7. **IMPROVEMENT_TIPS**: Identify 3-5 specific, actionable gaps between the JD requirements and the TAILORED resume you just wrote (the bullets[] you returned above). Each tip must be a short, direct suggestion (1 sentence max). IMPORTANT: Do NOT suggest adding something that is already present in the bullets you returned. For example, if a bullet you wrote mentions "AWS", do not suggest "Mention AWS explicitly". Only list genuine remaining gaps — things the JD asks for that are NOT covered anywhere in the bullets[] you returned.
+
+Return ONLY valid JSON with this exact structure:
+{{
+  "summary": "<new summary>",
+  "new_ats_keywords": ["keyword1", "keyword2"],
+  "jobs": [
+    {{"title": "<role>", "company": "<co>", "bullets": ["bullet1", "bullet2", ...]}}
+  ],
+  "cover_letter": "<full 4-paragraph cover letter body>",
+  "cover_note": "<1-2 sentence teaser>",
+  "match_score": <1-10>,
+  "key_matches": ["skill1", "skill2", "skill3", "skill4", "skill5"],
+  "bold_keywords": ["Spring Boot", "microservices", "Java 8", "REST APIs", "Kafka"],
+  "improvement_tips": ["tip1", "tip2", "tip3"]
+}}
+
+Return ONLY valid JSON, no markdown fences, no extra text."""
+
+    logger.info(f"Tailoring resume for: {job['title']} at {job['company']} "
+                f"(prompt ~{len(prompt)//4} tokens)")
+
+    from llm_client import chat_complete
+    raw, finish_reason = chat_complete(prompt, max_tokens=6000, temperature=0.5)
+    logger.info(f"  LLM response length: {len(raw)} chars, finish_reason: {finish_reason}")
+
+    # Strip markdown fences if Groq adds them despite instructions
+    if raw.startswith("```"):
+        raw = raw.split("```", 2)[1]
+        if raw.startswith("json"):
+            raw = raw[4:]
+        raw = raw.rsplit("```", 1)[0].strip()
+
+    # Sanitize: replace literal control chars inside JSON string values
+    # (Groq sometimes embeds literal newlines in multi-line cover letters)
+    def _fix_control_chars(s: str) -> str:
+        out, in_str, esc = [], False, False
+        for ch in s:
+            if esc:
+                out.append(ch); esc = False
+            elif ch == '\\':
+                out.append(ch); esc = True
+            elif ch == '"':
+                out.append(ch); in_str = not in_str
+            elif in_str and ch == '\n':
+                out.append('\\n')
+            elif in_str and ch == '\r':
+                out.append('\\r')
+            elif in_str and ch == '\t':
+                out.append('\\t')
+            elif in_str and ord(ch) < 0x20:
+                pass  # drop other control chars inside strings
+            else:
+                out.append(ch)
+        return ''.join(out)
+
+    raw = _fix_control_chars(raw)
+
+    try:
+        result = json.loads(raw)
+    except json.JSONDecodeError as e:
+        logger.error(f"  JSON parse error: {e} — raw tail: {raw[-200:]}")
+        raise
+
+    # Validate required keys
+    for key in ("summary", "jobs", "match_score", "key_matches"):
+        if key not in result:
+            raise ValueError(f"Groq response missing key: {key}")
+    # Normalise any fields that llama may return as lists instead of strings
+    for _f in ("summary", "cover_letter", "cover_note"):
+        if isinstance(result.get(_f), list):
+            result[_f] = "\n".join(str(p) for p in result[_f])
+    result.setdefault("cover_letter", result.get("cover_note", ""))
+    result.setdefault("cover_note", "")
+
+    # Post-process cover letter — remove duplicate salutation / sign-off lines
+    cl = result.get("cover_letter", "")
+    # llama models sometimes return cover_letter as a list of paragraphs — normalise to str
+    if isinstance(cl, list):
+        cl = "\n".join(str(p) for p in cl)
+        result["cover_letter"] = cl
+    if cl:
+        # The cover_letter.html template adds its own "Dear Hiring Manager," salutation
+        # and "Sincerely, <name>" closing — strip ALL such lines from the body so they
+        # never appear twice regardless of how many the model included.
+        candidate_name = _candidate_name()
+        lines = cl.splitlines()
+        clean_lines = []
+        for ln in lines:
+            stripped = ln.strip()
+            # Drop any greeting line
+            if re.match(r"dear\s+hiring\s+manager", stripped, re.I):
+                continue
+            # Drop sign-off words on their own line
+            if re.match(r"(sincerely|regards|best\s+regards|warm\s+regards)[,.]?\s*$", stripped, re.I):
+                continue
+            # Drop trailing name-only lines (candidate name alone on a line)
+            if candidate_name and stripped.lower() == candidate_name.lower():
+                continue
+            clean_lines.append(ln)
+        result["cover_letter"] = "\n".join(clean_lines).strip()
+
+    # Post-process summary — strip "as a [title] at [company]" phrases the model keeps adding
+    company_raw = job.get("company", "").strip()
+    summary = result.get("summary", "")
+    if company_raw and summary:
+        ce = re.escape(company_raw)
+        # Pattern A: exact company name (anywhere — not just at end)
+        summary = re.sub(
+            r",?\s+as\s+(?:an?\s+)?.+?\s+at\s+" + ce + r"[.,]?",
+            ".", summary, flags=re.IGNORECASE,
+        ).strip()
+        # Pattern B: bare "at Company" at end
+        summary = re.sub(
+            r",?\s+at\s+" + ce + r"[.,]?\s*$",
+            ".", summary, flags=re.IGNORECASE,
+        ).strip()
+        # Pattern C: first significant word of company
+        # Catches mismatches like stored "Deutsche Bank AG" vs text "Deutsche Bank"
+        sig_words = [w for w in re.sub(r"[^a-zA-Z0-9 ]", "", company_raw).split()
+                     if len(w) > 3 and w.lower() not in {"the", "and", "pvt", "ltd", "inc", "corp"}]
+        if sig_words:
+            cw = re.escape(sig_words[0])
+            summary = re.sub(
+                r",?\s+as\s+(?:an?\s+)?.+?\s+at\s+" + cw + r"\b[^.!?]*[.,]?",
+                ".", summary, flags=re.IGNORECASE,
+            ).strip()
+        # Pattern D: company-agnostic safety net
+        # Matches "as a Title at Company." where the phrase ends with a period
+        # (followed by a new capital sentence or end of string — not a comma)
+        summary = re.sub(
+            r",?\s+as\s+(?:an?\s+)?[A-Z][\w\s,/]*?\s+at\s+[A-Z]\w+(?:\s+[A-Z]\w+)*[.,]?"
+            r"(?=\s+[A-Z]|\s*$)",
+            ".", summary,
+        ).strip()
+    result["summary"] = summary
+
+    result.setdefault("new_ats_keywords", [])
+    result.setdefault("improvement_tips", [])
+
+    # Strip markdown ** wrapping that local models (llama) sometimes add to keywords
+    def _strip_md(lst):
+        return [re.sub(r"^\*+|\*+$", "", k).strip() for k in lst if k]
+
+    result["new_ats_keywords"]  = _strip_md(result["new_ats_keywords"])
+    result["key_matches"]       = _strip_md(result.get("key_matches", []))
+    result["improvement_tips"]  = _strip_md(result.get("improvement_tips", []))
+
+    # Collect all LLM keyword candidates (bold_keywords + new_ats + key_matches)
+    raw_bold = _strip_md(result.get("bold_keywords") or [])
+    all_candidates = list(dict.fromkeys(raw_bold + result["new_ats_keywords"] + result["key_matches"]))
+
+    # Verify candidates against actual JD text and enrich to reach min 7 matches.
+    # This eliminates AI hallucinations (e.g. "RabbitMQ" bolded when not in JD).
+    jd_text = job.get("description", "")
+    resume_text_plain = soup.get_text(separator=" ")
+    verified_bold, extra_injections = _verify_and_enrich_bold_keywords(
+        all_candidates, jd_text, resume_text_plain, min_count=7
+    )
+
+    # Merge any newly found injection terms into new_ats_keywords
+    if extra_injections:
+        result["new_ats_keywords"] = list(dict.fromkeys(
+            result["new_ats_keywords"] + extra_injections
+        ))
+        logger.info(f"  Injecting {len(extra_injections)} JD skill(s) not in resume: {extra_injections}")
+
+    result["bold_keywords"] = verified_bold[:20]
+
+    # 1. Inject modified text back into the full HTML
+    soup = _apply_sections(soup, result)
+
+    # 2. Bold every verified keyword in the tailored resume
+    soup = _bold_keywords(soup, result["bold_keywords"])
+
+    result["resume_html"] = str(soup)
+
+    # Clean up intermediate keys callers don't need
+    del result["summary"]
+    del result["jobs"]
+
+    logger.info(
+        f"  Match score: {result['match_score']}/10 | "
+        f"Key matches: {', '.join(result['key_matches'])} | "
+        f"New ATS keywords: {result.get('new_ats_keywords', [])} | "
+        f"Bolded: {result.get('bold_keywords', [])}"
+    )
+    return result

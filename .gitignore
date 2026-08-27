@@ -1,0 +1,36 @@
+# Secrets
+.env
+.flask_secret_key
+
+# Claude Code local settings
+.claude/
+
+# Personal data — each install has its own; don't let clones inherit
+# whoever committed last. See config.example.json to bootstrap a new one.
+# profiles/ holds every family member's own config.json/base_resume.html/
+# .env/output — same reasoning, per-person now instead of a single set.
+profiles/
+config.json
+base_resume.html
+base_resume.html.bak
+
+# Runtime data
+seen_jobs.json
+output/
+job_hunter.log
+*.log
+company_type_cache.json
+
+# Backups
+*.bak
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# OS
+.DS_Store
+Thumbs.db

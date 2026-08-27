@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>{{ name }} – Resume</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    @page { margin: 0.38in 0.55in; size: A4; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Source Sans 3', 'Source Sans Pro', 'Segoe UI', Arial, sans-serif;
+      font-size: 10pt;
+      color: #1E293B;
+      background: #FFFFFF;
+      line-height: 1.15;
+    }
+
+    /* ── Header ── */
+    .header { margin-bottom: 11px; padding-bottom: 8px; border-bottom: 2px solid #0EA5E9; }
+    .header h1 {
+      font-family: 'Merriweather', Georgia, serif;
+      font-size: 26pt; font-weight: 700;
+      color: #1E293B; letter-spacing: -0.5px; line-height: 1.1;
+    }
+    .header .role {
+      font-family: 'Merriweather', Georgia, serif;
+      font-size: 11pt; font-weight: 400;
+      color: #0EA5E9; margin-top: 3px; font-style: italic;
+    }
+    .header .tagline {
+      font-size: 9.5pt; color: #64748B;
+      margin-top: 4px; line-height: 1.4;
+    }
+    .contact {
+      display: flex; flex-wrap: wrap; gap: 3px 18px;
+      font-size: 9pt; color: #64748B; margin-top: 5px;
+    }
+    .contact a { color: #0EA5E9; text-decoration: none; }
+
+    /* ── Core Expertise banner ── */
+    .expertise-bar {
+      background: #F1F5F9;
+      border-left: 4px solid #0EA5E9;
+      padding: 5px 10px; margin-bottom: 10px;
+      font-size: 9.5pt; color: #1E293B;
+      display: flex; flex-wrap: wrap; gap: 3px 0;
+    }
+    .expertise-item { padding: 0 10px; border-right: 1px solid #CBD5E1; }
+    .expertise-item:first-child { padding-left: 0; }
+    .expertise-item:last-child { border-right: none; }
+
+    /* ── Section ── */
+    .section { margin-bottom: 10px; }
+    .section:last-child { margin-bottom: 0; }
+    .section-title {
+      font-family: 'Merriweather', Georgia, serif;
+      font-size: 11pt; font-weight: 700;
+      color: #1E293B;
+      border-bottom: 1.5px solid #0EA5E9;
+      padding-bottom: 3px; margin-bottom: 7px;
+    }
+
+    /* ── Summary ── */
+    .summary-text { font-size: 10pt; line-height: 1.45; color: #475569; }
+
+    /* ── Technical Skills ── */
+    .skill-groups { display: flex; flex-direction: column; gap: 4px; }
+    .skill-row { font-size: 9.5pt; line-height: 1.35; }
+    .skill-label { font-weight: 700; color: #1E293B; }
+    .skill-value { color: #475569; }
+
+    /* ── Experience ──
+       Dates/roles are stacked blocks, not flex-positioned to the side —
+       Chrome's PDF text layer doesn't reliably preserve DOM order for
+       flex-positioned "float right" content, which showed up as dates
+       and other fields landing in the wrong section entirely when
+       extracted by an ATS parser. Stacking guarantees linear reading order. */
+    .job { margin-bottom: 9px; }
+    .job:last-child { margin-bottom: 0; }
+    .job-title {
+      font-family: 'Merriweather', Georgia, serif;
+      font-size: 10.5pt; font-weight: 700; color: #1E293B;
+    }
+    .job-company { font-size: 9.5pt; color: #0EA5E9; margin-top: 1px; font-weight: 500; }
+    .job-date { font-size: 9pt; color: #64748B; margin-top: 1px; }
+    ul { margin: 4px 0 0 15px; padding: 0; }
+    li { font-size: 9.5pt; line-height: 1.4; margin-bottom: 3px; color: #475569; }
+    li::marker { color: #0EA5E9; }
+
+    /* ── Projects ── */
+    .project { margin-bottom: 7px; }
+    .project:last-child { margin-bottom: 0; }
+    .project-name {
+      font-family: 'Merriweather', Georgia, serif;
+      font-size: 10pt; font-weight: 700; color: #1E293B;
+    }
+    .project-role { font-size: 9pt; color: #64748B; font-style: italic; }
+    .project-stack { font-size: 9pt; color: #0EA5E9; margin: 4px 0 2px; font-weight: 500; }
+    .project-desc { font-size: 9.5pt; line-height: 1.4; color: #475569; }
+
+    /* ── Education ── */
+    .edu-degree { font-size: 10pt; font-weight: 600; color: #1E293B; }
+    .edu-school { font-size: 9.5pt; color: #64748B; margin-top: 2px; font-style: italic; }
+    .edu-date { font-size: 9pt; color: #64748B; margin-top: 1px; }
+
+    /* ── Certifications ── */
+    .cert-item { font-size: 9.5pt; color: #475569; margin-bottom: 3px; line-height: 1.4; }
+    .cert-item::before { content: "✓  "; color: #0EA5E9; font-weight: 700; }
+
+    /* ── ATS keywords ── */
+    strong { font-weight: 700; }
+    strong.ats-kw { color: #0284C7; font-weight: 700; }
+    .tag.tag-ats { background: #F0F9FF; color: #0284C7; font-weight: 600;
+                   border-radius: 2px; padding: 1px 5px; font-size: 9.5pt; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>{{ name }}</h1>
+  {% if role %}<div class="role">{{ role }}</div>{% endif %}
+  <div class="contact">
+    {% if email %}<a href="mailto:{{ email }}">{{ email }}</a>{% endif %}
+    {% if phone %}<span>{{ phone }}</span>{% endif %}
+    {% if linkedin %}<a href="{{ linkedin }}">{{ linkedin | replace('https://', '') | replace('http://', '') }}</a>{% endif %}
+    {% if github %}<a href="{{ github }}">{{ github | replace('https://', '') | replace('http://', '') }}</a>{% endif %}
+  </div>
+</div>
+
+{% if soft_skills %}
+<div class="expertise-bar">
+  {% for s in soft_skills %}
+  <span class="expertise-item">{{ s | replace('✔ ', '') | replace('✔', '') }}</span>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if summary %}
+<div class="section">
+  <div class="section-title">Executive Summary</div>
+  <div class="summary-text">{{ summary | safe }}</div>
+</div>
+{% endif %}
+
+{% if skill_groups %}
+<div class="section">
+  <div class="section-title">Core Expertise</div>
+  <div class="skill-groups">
+    {% for sg in skill_groups %}
+    <div class="skill-row">
+      {% if sg.label %}<span class="skill-label">{{ sg.label }}: </span>{% endif %}
+      <span class="skill-value">{{ sg.tags | join(' · ') }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if jobs %}
+<div class="section">
+  <div class="section-title">Professional Experience</div>
+  {% for job in jobs %}
+  <div class="job">
+    <div class="job-title">{{ job.title }}</div>
+    {% if job.company %}<div class="job-company">{{ job.company }}</div>{% endif %}
+    {% if job.date %}<div class="job-date">{{ job.date }}</div>{% endif %}
+    {% if job.bullets %}
+    <ul>{% for b in job.bullets %}<li>{{ b | safe }}</li>{% endfor %}</ul>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if projects %}
+<div class="section">
+  <div class="section-title">Key Projects</div>
+  {% for p in projects %}
+  <div class="project">
+    <div class="project-header">
+      <span class="project-name">{{ p.name }}</span>
+      {% if p.role %}<span class="project-role">{{ p.role }}</span>{% endif %}
+    </div>
+    {% if p.stack %}<div class="project-stack">{{ p.stack | join(' · ') }}</div>{% endif %}
+    {% if p.description %}<div class="project-desc">{{ p.description }}</div>{% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if education %}
+<div class="section">
+  <div class="section-title">Education</div>
+  <div class="edu-degree">{{ education.degree }}</div>
+  {% if education.school %}<div class="edu-school">{{ education.school }}</div>{% endif %}
+  {% if education.date %}<div class="edu-date">{{ education.date }}</div>{% endif %}
+</div>
+{% endif %}
+
+{% if certifications %}
+<div class="section">
+  <div class="section-title">Certifications</div>
+  {% for c in certifications %}<div class="cert-item">{{ c }}</div>{% endfor %}
+</div>
+{% endif %}
+
+</body>
+</html>

@@ -1,0 +1,361 @@
+"""
+gmail_checker.py
+Checks Gmail inbox for responses to jobs you've applied for.
+Uses IMAP with your Gmail App Password — no extra API keys needed.
+"""
+
+import imaplib
+import email
+import json
+import os
+import logging
+import re
+from datetime import datetime, timezone
+from email.header import decode_header
+from email.utils import parsedate_to_datetime
+from dotenv import load_dotenv
+
+import profiles
+
+load_dotenv()
+logger = logging.getLogger(__name__)
+
+
+def _get_gmail_address() -> str:
+    """Return Gmail address: the active profile's .env GMAIL_ADDRESS first,
+    then config.json candidate.email."""
+    addr = profiles.get_profile_env().get("GMAIL_ADDRESS") or os.getenv("GMAIL_ADDRESS", "")
+    if addr:
+        return addr
+    try:
+        return json.loads(profiles.config_path().read_text(encoding="utf-8")).get("candidate", {}).get("email", "")
+    except Exception:
+        return ""
+
+
+def _decode_str(raw) -> str:
+    if raw is None:
+        return ""
+    parts = decode_header(raw)
+    result = []
+    for decoded, charset in parts:
+        if isinstance(decoded, bytes):
+            result.append(decoded.decode(charset or "utf-8", errors="replace"))
+        else:
+            result.append(str(decoded))
+    return "".join(result)
+
+
+def _get_body(msg) -> str:
+    """Extract plain-text body snippet from email. Falls back to HTML→text."""
+    plain, html_part = "", ""
+    try:
+        if msg.is_multipart():
+            for part in msg.walk():
+                ct = part.get_content_type()
+                payload = part.get_payload(decode=True)
+                if not payload:
+                    continue
+                text = payload.decode("utf-8", errors="replace")
+                if ct == "text/plain" and not plain:
+                    plain = text[:2000]
+                elif ct == "text/html" and not html_part:
+                    html_part = text[:100_000]   # parse full HTML; truncate text after extraction
+        else:
+            payload = msg.get_payload(decode=True)
+            if payload:
+                plain = payload.decode("utf-8", errors="replace")[:2000]
+    except Exception:
+        pass
+
+    import html as _html
+
+    def _clean(text: str) -> str:
+        """Unescape HTML entities, strip ERB/template artifacts, collapse whitespace."""
+        text = _html.unescape(text)
+        text = re.sub(r'<%.*?%>', '', text, flags=re.DOTALL)   # closed tags
+        text = re.sub(r'<%.*', '', text, flags=re.DOTALL)       # unclosed/truncated tags
+        text = re.sub(r'\s+', ' ', text).strip()
+        return text
+
+    def _html_to_text(raw: str) -> str:
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(raw, "html.parser")
+        for tag in soup(["script", "style", "head"]):
+            tag.decompose()
+        return _clean(soup.get_text(separator=" ", strip=True))
+
+    def _looks_like_html(text: str) -> bool:
+        return bool(re.search(r'<[a-zA-Z][^>]{0,50}>', text))
+
+    if plain and not _looks_like_html(plain):
+        text = _clean(plain)
+        if len(text) > 20:
+            return text[:300]
+
+    # Use HTML part (or plain that is actually HTML markup)
+    source = html_part or (plain if _looks_like_html(plain) else "")
+    if source:
+        text = _html_to_text(source)
+        return text[:300]
+
+    return ""
+
+
+def _imap_since(applied_at: str) -> str:
+    """Convert applied_at ISO string to IMAP SINCE date string (e.g. '16-Jul-2026')."""
+    try:
+        dt = datetime.fromisoformat(applied_at)
+        return dt.strftime("%d-%b-%Y")
+    except Exception:
+        return ""
+
+
+def _email_after_apply(date_str: str, applied_at: str) -> bool:
+    """Return True if the email's date is on or after the day the job was applied."""
+    if not applied_at:
+        return True
+    try:
+        # Compare dates only — applied_at is in local time, email Date header
+        # may be in any timezone. Day-level comparison avoids TZ mismatch bugs.
+        applied_date = datetime.fromisoformat(applied_at).date()
+        email_dt = parsedate_to_datetime(date_str)
+        email_date = email_dt.date()
+        return email_date >= applied_date
+    except Exception:
+        return True
+
+
+def _company_key(company: str) -> str:
+    """First meaningful word of the company name for search."""
+    stop = {"private", "limited", "pvt", "ltd", "inc", "corp", "technologies",
+            "solutions", "services", "consulting", "india", "the", "and"}
+    # Replace (not delete) stripped punctuation so possessives like "Moody's"
+    # split into "Moody s" -> key "Moody", instead of merging into "Moodys"
+    # which won't match how the real company writes its own name in emails.
+    cleaned = re.sub(r"[^a-zA-Z0-9]", " ", company)
+    # Only CamelCase-split multi-word originals (e.g. "JPMorganChase" has no spaces
+    # originally → it is ONE concatenated name worth splitting). Single-token brand
+    # names like "GitLab", "GitHub", "DevOps" must stay intact — splitting them
+    # produces useless fragments ("Git", "Dev") that IMAP won't match.
+    if " " not in company.strip():
+        # Single token: keep as-is, just strip punctuation
+        words = [w for w in cleaned.split() if w.lower() not in stop and len(w) > 2]
+        return words[0] if words else cleaned.strip() or company
+    cleaned = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", cleaned)
+    words = [w for w in cleaned.split() if w.lower() not in stop and len(w) > 2]
+    return words[0] if words else company.split()[0] if company.split() else ""
+
+
+def check_responses(applied_jobs: list[dict]) -> dict:
+    """
+    Scan Gmail inbox for responses to the given applied jobs.
+
+    Searches for emails where FROM or SUBJECT contains the company name,
+    received after the job was marked applied.
+
+    Returns:
+        { job_id: [ {from, subject, snippet, date, msg_id}, ... ] }
+    """
+    addr = _get_gmail_address()
+    pwd  = profiles.get_profile_env().get("GMAIL_APP_PASSWORD") or os.getenv("GMAIL_APP_PASSWORD")
+    if not addr or not pwd:
+        raise EnvironmentError("GMAIL_ADDRESS / GMAIL_APP_PASSWORD not set in .env or config.json")
+
+    if not applied_jobs:
+        return {}
+
+    results: dict[str, list] = {}
+
+    try:
+        mail = imaplib.IMAP4_SSL("imap.gmail.com")
+        mail.login(addr, pwd)
+        mail.select("inbox")
+        logger.info(f"Gmail IMAP connected — checking {len(applied_jobs)} applied jobs")
+
+        for job in applied_jobs:
+            job_id     = job["id"]
+            company    = job.get("company", "")
+
+            applied_at = job.get("applied_at", "")
+            key        = _company_key(company)
+            if not key:
+                continue
+
+            # Only look for emails received on or after the apply date
+            since_date = _imap_since(applied_at)
+            since_clause = f'SINCE "{since_date}" ' if since_date else ""
+            logger.info(f"  Searching for '{company}' responses{f' since {since_date}' if since_date else ''}")
+
+            seen_ids: set = set()
+            responses = []
+
+            # Search by company name in FROM and SUBJECT only.
+            # BODY search is intentionally excluded — it causes false positives from emails
+            # that merely mention the company name in their body (e.g. LinkedIn digest emails
+            # listing "people from Microsoft/FICO searched for you").
+            # NOTE: Gmail IMAP ignores FROM/SUBJECT constraints and does full-text search,
+            # so we must post-validate that the key actually appears in the real header.
+            for search_type, criterion in [
+                ("from", f'{since_clause}FROM "{key}"'),
+                ("subject", f'{since_clause}SUBJECT "{key}"'),
+            ]:
+                try:
+                    status, data = mail.search(None, criterion)
+                    if status != "OK" or not data[0]:
+                        continue
+                    for mid in data[0].split()[-15:]:   # last 15 per criterion
+                        if mid in seen_ids:
+                            continue
+                        seen_ids.add(mid)
+                        status2, raw = mail.fetch(mid, "(RFC822)")
+                        if status2 != "OK":
+                            continue
+                        msg = email.message_from_bytes(raw[0][1])
+                        subject  = _decode_str(msg.get("Subject", ""))
+                        from_addr = _decode_str(msg.get("From", ""))
+                        date_str = msg.get("Date", "")
+                        snippet  = _get_body(msg)
+
+                        # Skip our own sent emails
+                        if addr.lower() in from_addr.lower():
+                            continue
+
+                        # Post-validate: Gmail IMAP does full-text search, not header-only.
+                        # Confirm the company key actually appears in the header it was
+                        # supposed to match, or in the subject (company may reply via
+                        # a 3rd-party ATS like myworkday.com that doesn't include the
+                        # company name in the From address).
+                        key_low = key.lower()
+                        if search_type == "from":
+                            if key_low not in from_addr.lower() and key_low not in subject.lower():
+                                logger.debug(f"  Skipping IMAP false-positive (FROM '{key}'): '{subject[:50]}'")
+                                continue
+                        else:  # subject
+                            if key_low not in subject.lower():
+                                logger.debug(f"  Skipping IMAP false-positive (SUBJECT '{key}'): '{subject[:50]}'")
+                                continue
+
+                        # Skip social/notification emails that aren't job responses
+                        _NOISE_SUBJECTS = (
+                            "add ", "connect with", "people you may know",
+                            "invitation to connect", "viewed your profile",
+                            "endorsed you", "new message from", "follow",
+                            "unsubscribe", "newsletter", "your weekly",
+                        )
+                        _NOISE_SENDERS = (
+                            "messages-noreply@linkedin.com",
+                            "invitations@linkedin.com",
+                            "notifications@linkedin.com",
+                            "jobalerts@linkedin.com",
+                            "jobalerts-noreply@linkedin.com",
+                            "@linkedin.com",  # any LinkedIn sender is a platform alert, not a company reply
+                        )
+                        # Skip clearly non-job emails: security alerts, community/society groups,
+                        # billing/subscription notices, promotional emails
+                        _NOISE_SUBJECTS_EXACT = (
+                            "security alert",
+                            "app password created",
+                            "new sign-in",
+                            "your trial",
+                            "subscription",
+                            "payment method",
+                            "google one",
+                            "google play",
+                            "one api key",
+                            "welcome to",
+                            "verify your",
+                            "confirm your",
+                        )
+                        # Non-company generic sender domains — always noise
+                        _NOISE_SENDERS_DOMAIN_HARD = (
+                            "accounts.google.com",
+                            "google.com",
+                            "googleplay.com",
+                            "openrouter.ai",
+                        )
+                        # noreply/donotreply senders: noise UNLESS the company key is in
+                        # their domain (e.g. donotreply@email.careers.microsoft.com is
+                        # legitimate for a Microsoft search key).
+                        _NOREPLY_PREFIXES = ("noreply@", "no-reply@", "donotreply@",
+                                             "do-not-reply@", "notifications-noreply@")
+                        subj_low = subject.lower()
+                        from_low = from_addr.lower()
+                        if any(s in subj_low for s in _NOISE_SUBJECTS):
+                            continue
+                        if any(s in from_low for s in _NOISE_SENDERS):
+                            continue
+                        if any(s in subj_low for s in _NOISE_SUBJECTS_EXACT):
+                            continue
+                        if any(s in from_low for s in _NOISE_SENDERS_DOMAIN_HARD):
+                            continue
+                        # Reject noreply/donotreply only when the company key is NOT in domain
+                        # AND not in the subject — ATS platforms like Workday send from
+                        # no-reply@myworkday.com but the subject contains the company name.
+                        if any(s in from_low for s in _NOREPLY_PREFIXES):
+                            if key_low not in from_low and key_low not in subj_low:
+                                logger.debug(f"  Skipping noreply from non-company domain: '{from_addr[:60]}'")
+                                continue
+
+                        # Require the email to look job-related:
+                        # subject or snippet must contain at least one job-related keyword
+                        _JOB_KEYWORDS = (
+                            "application", "applicant", "position", "role", "job",
+                            "interview", "opportunity", "hiring", "recruit", "candidate",
+                            "resume", "cv", "offer", "shortlist", "assessment", "screening",
+                            "talent", "career", "engineer", "developer", "software",
+                            "hr ", "human resources", "your profile", "we reviewed",
+                            "thank you for applying", "thank you for your interest",
+                        )
+                        combined_text = (subj_low + " " + snippet.lower())
+                        if not any(kw in combined_text for kw in _JOB_KEYWORDS):
+                            logger.debug(f"  Skipping non-job email: '{subject[:60]}'")
+                            continue
+
+                        # Skip emails received before the job was applied for
+                        if not _email_after_apply(date_str, applied_at):
+                            logger.debug(f"  Skipping pre-apply email: {date_str[:30]} < {applied_at}")
+                            continue
+
+                        # Build a direct Gmail URL using the RFC822 Message-ID header
+                        # Format: https://mail.google.com/mail/u/0/#search/rfc822msgid:<id>
+                        import urllib.parse
+                        # authuser= forces Gmail to open in the correct account
+                        gmail_acct = _get_gmail_address()
+                        authuser = f"?authuser={urllib.parse.quote(gmail_acct)}" if gmail_acct else ""
+                        if subject:
+                            gmail_url = (
+                                f"https://mail.google.com/mail/u/0{authuser}#search/"
+                                + urllib.parse.quote(f'subject:"{subject}"')
+                            )
+                        else:
+                            raw_msg_id = msg.get("Message-ID", "")
+                            clean_msg_id = raw_msg_id.strip().strip("<>")
+                            gmail_url = (
+                                f"https://mail.google.com/mail/u/0{authuser}#search/"
+                                + urllib.parse.quote(f"rfc822msgid:{clean_msg_id}")
+                            )
+
+                        responses.append({
+                            "from":      from_addr,
+                            "subject":   subject,
+                            "snippet":   snippet,
+                            "date":      date_str,
+                            "msg_id":    mid.decode(),
+                            "gmail_url": gmail_url,
+                        })
+                except Exception as e:
+                    logger.debug(f"IMAP search failed [{criterion}]: {e}")
+
+            if responses:
+                logger.info(f"  {company}: {len(responses)} email(s) found")
+                results[job_id] = responses
+
+        mail.logout()
+
+    except imaplib.IMAP4.error as e:
+        logger.error(f"Gmail IMAP login failed: {e}")
+    except Exception as e:
+        logger.error(f"Gmail check error: {e}")
+
+    return results

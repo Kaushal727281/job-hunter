@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>{{ job.title }} – Job Hunter</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f9;color:#1e1e1e;height:100vh;display:flex;flex-direction:column}
+
+    header{background:linear-gradient(135deg,#0d47a1,#1976d2);color:#fff;padding:14px 28px;
+           display:flex;align-items:center;gap:16px;flex-shrink:0}
+    .back{color:#fff;text-decoration:none;font-size:20px;opacity:.8}
+    .back:hover{opacity:1}
+    .header-info{flex:1}
+    .header-info h2{font-size:17px;font-weight:700}
+    .header-info p{font-size:13px;opacity:.85;margin-top:2px}
+    .header-actions{display:flex;gap:8px;align-items:center}
+    /* PDF dropdown */
+    .pdf-split{position:relative;display:inline-flex}
+    .pdf-dropdown{display:none;position:absolute;top:calc(100% + 4px);right:0;
+                  background:#fff;border:1.5px solid #c7d5e8;border-radius:8px;
+                  box-shadow:0 4px 16px rgba(0,0,0,.18);z-index:500;min-width:170px;overflow:hidden}
+    .pdf-split.open .pdf-dropdown{display:block}
+    .pdf-dropdown a{display:block;padding:9px 14px;font-size:12.5px;font-weight:500;
+                    color:#1a237e;text-decoration:none;border-bottom:1px solid #f0f4f9}
+    .pdf-dropdown a:last-child{border-bottom:none}
+    .pdf-dropdown a:hover{background:#e8f0fb}
+    .btn{border:none;padding:8px 16px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;transition:.15s}
+    .btn-white{background:#fff;color:#0d47a1}
+    .btn-white:hover{opacity:.9}
+    .btn-outline{background:transparent;border:1.5px solid rgba(255,255,255,.7);color:#fff}
+    .btn-outline:hover{background:rgba(255,255,255,.1)}
+    .btn-tailor{background:#fff3e0;color:#e65100;border:1.5px solid #ffa000}
+
+    .split{display:grid;grid-template-columns:1fr 1fr;flex:1;min-height:0;overflow:hidden}
+
+    /* ── Left: Job Description ── */
+    .jd-panel{overflow-y:auto;padding:24px 28px;border-right:2px solid #dde4ed;background:#fff}
+    .jd-panel h3{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1.4px;
+                 color:#0d47a1;margin-bottom:16px;border-bottom:2px solid #bbcfe8;padding-bottom:6px}
+    .meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
+    .meta-item{background:#f5f8fc;border-radius:6px;padding:10px 14px}
+    .meta-label{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px}
+    .meta-value{font-size:13.5px;font-weight:600;color:#1a1a1a}
+    .jd-text{font-size:13px;color:#444;line-height:1.85;white-space:pre-wrap}
+    .apply-link{display:inline-block;margin-top:20px;background:#0d47a1;color:#fff;padding:10px 20px;
+                border-radius:7px;text-decoration:none;font-weight:600;font-size:13px}
+    .apply-link:hover{background:#1565c0}
+
+    /* ── Right: Resume ── */
+    .resume-panel{overflow:hidden;display:flex;flex-direction:column;background:#f8f9fb}
+    .resume-toolbar{padding:12px 20px;background:#fff;border-bottom:1px solid #dde4ed;
+                    display:flex;align-items:center;gap:10px;flex-shrink:0}
+    .resume-toolbar span{font-size:13px;font-weight:600;color:#333;flex:1}
+
+    {% set tr = job.tailor_result %}
+    {% if tr %}
+    .score-badge{display:inline-flex;align-items:center;justify-content:center;
+                 width:32px;height:32px;border-radius:50%;font-weight:700;font-size:12px;color:#fff;
+                 background:{% if tr.match_score >= 7 %}#2e7d32{% elif tr.match_score >= 5 %}#f57c00{% else %}#999{% endif %}}
+    {% endif %}
+
+    iframe.resume-frame{flex:1;border:none;width:100%;height:100%}
+
+    /* not-tailored placeholder */
+    .not-tailored{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:40px}
+    .not-tailored h3{font-size:18px;color:#555}
+    .not-tailored p{font-size:13px;color:#888;text-align:center;max-width:320px;line-height:1.6}
+
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .spinner{width:16px;height:16px;border:2.5px solid currentColor;border-top-color:transparent;
+             border-radius:50%;animation:spin .7s linear infinite;display:inline-block;vertical-align:middle;margin-right:6px}
+
+    /* ── Outreach Modal ── */
+    #outreach-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1100;
+                      align-items:center;justify-content:center}
+    #outreach-overlay.open{display:flex}
+    #outreach-modal{background:#fff;border-radius:12px;width:min(600px,95vw);max-height:88vh;
+                    overflow:hidden;box-shadow:0 12px 48px rgba(0,0,0,.28);display:flex;flex-direction:column}
+    #outreach-modal-head{padding:14px 20px;border-bottom:1px solid #eee;display:flex;
+                         align-items:center;justify-content:space-between;flex-shrink:0}
+    #outreach-modal-head h3{font-size:15px;font-weight:700;color:#0d47a1}
+    #outreach-modal-close{border:none;background:none;font-size:20px;cursor:pointer;color:#999}
+    .outreach-tabs{display:flex;border-bottom:1.5px solid #e8edf5;flex-shrink:0}
+    .outreach-tab{flex:1;padding:10px 6px;font-size:12.5px;font-weight:600;border:none;
+                  background:none;cursor:pointer;color:#888;border-bottom:2.5px solid transparent;
+                  transition:.15s;margin-bottom:-1.5px}
+    .outreach-tab.active{color:#0d47a1;border-bottom-color:#0d47a1}
+    .outreach-panel{display:none;padding:16px 20px;overflow-y:auto;flex:1}
+    .outreach-panel.active{display:flex;flex-direction:column;gap:10px}
+    .outreach-label{font-size:11px;font-weight:700;text-transform:uppercase;
+                    letter-spacing:.7px;color:#999;margin-bottom:4px}
+    .outreach-box{background:#f8fafd;border:1.5px solid #dde6f3;border-radius:8px;
+                  padding:12px 14px;font-size:13px;color:#1e1e1e;white-space:pre-wrap;
+                  line-height:1.6;max-height:220px;overflow-y:auto;word-break:break-word}
+    .outreach-char-count{font-size:11px;color:#aaa;text-align:right;margin-top:3px}
+    .outreach-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:2px}
+    .btn-copy{padding:6px 14px;font-size:12px;font-weight:600;border-radius:6px;
+              background:#e8f0fb;color:#0d47a1;border:1.5px solid #c7d5e8;cursor:pointer}
+    .btn-copy:hover{background:#c7d5e8}
+    .btn-copy.copied{background:#e8f5e9;color:#1b5e20;border-color:#a5d6a7}
+    .btn-mailto{padding:6px 14px;font-size:12px;font-weight:600;border-radius:6px;
+                background:#0d47a1;color:#fff;border:none;cursor:pointer;text-decoration:none;display:inline-block}
+    .btn-mailto:hover{background:#1565c0}
+    .hr-email-row{display:flex;align-items:center;justify-content:space-between;gap:8px;
+                  background:#f8fafd;border:1.5px solid #dde6f3;border-radius:7px;padding:9px 13px}
+    .hr-email-addr{font-size:13px;color:#1e1e1e;font-family:monospace}
+    .hr-email-note{font-size:11.5px;color:#aaa;margin-top:8px;line-height:1.5}
+    .hr-verify-badge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;white-space:nowrap}
+    .hr-verify-badge.badge-valid{background:#e3f5e9;color:#1e7e42}
+    .hr-verify-badge.badge-invalid{background:#fbe4e4;color:#b3261e}
+    .hr-verify-badge.badge-catch_all{background:#fff3d6;color:#8a6100}
+    .hr-verify-badge.badge-unknown{background:#eee;color:#777}
+
+    /* Tailor overlay */
+    #tailor-overlay{display:none;position:fixed;inset:0;background:rgba(10,20,60,.72);
+                    z-index:2000;align-items:center;justify-content:center;backdrop-filter:blur(3px)}
+    #tailor-overlay.active{display:flex}
+    .ov-box{background:#fff;border-radius:14px;padding:36px 44px;text-align:center;
+            box-shadow:0 16px 56px rgba(0,0,0,.35);max-width:420px;width:90%}
+    .ov-spinner{width:52px;height:52px;border:5px solid #e3eaf6;border-top-color:#0d47a1;
+                border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 20px}
+    .ov-box h3{font-size:18px;font-weight:700;color:#0d1b4e;margin-bottom:8px}
+    .ov-box p{font-size:13.5px;color:#666;line-height:1.6}
+    .ov-success-icon{font-size:54px;margin-bottom:12px;display:none}
+    .ov-box.done .ov-spinner{display:none}
+    .ov-box.done .ov-success-icon{display:block}
+    .ov-box.done h3{color:#1b5e20}
+  </style>
+</head>
+<body>
+
+<header>
+  <a href="/" class="back">←</a>
+  <div class="header-info">
+    <h2>{{ job.title }}</h2>
+    <p>{{ job.company }}{% if job.location %} · {{ job.location }}{% endif %}{% if job.posted_at %} · {{ job.posted_at }}{% endif %}</p>
+  </div>
+  <div class="header-actions">
+    {% if job.tailor_result %}
+      {% if job.pdf_path %}
+      <div class="pdf-split" id="pdf-split-detail">
+        <button class="btn btn-outline" onclick="togglePdfDropdown()">⬇ PDF ▾</button>
+        <div class="pdf-dropdown">
+          <a href="/pdf/{{ job.id }}" target="_blank" style="font-weight:700;color:#0d47a1">⭐ Original (as previewed)</a>
+          <a href="/pdf/{{ job.id }}/classic"   target="_blank">Classic B&amp;W</a>
+          <a href="/pdf/{{ job.id }}/modern"    target="_blank">Modern Sidebar</a>
+          <a href="/pdf/{{ job.id }}/tech"      target="_blank">Tech / FAANG</a>
+          <a href="/pdf/{{ job.id }}/executive" target="_blank">Executive</a>
+          <a href="/pdf/{{ job.id }}/compact"   target="_blank">Compact</a>
+        </div>
+      </div>
+      {% endif %}
+      <a href="/cover/{{ job.id }}" target="_blank"><button class="btn btn-outline">📝 Cover Letter</button></a>
+      <a href="/diff/{{ job.id }}" target="_blank"><button class="btn btn-outline">🔍 What Changed?</button></a>
+      <button class="btn btn-outline" onclick="openOutreach('{{ job.id }}')">📨 Outreach</button>
+      <button class="btn btn-outline" onclick="toggleInstructionsBar()" id="custom-bar-toggle">✨ Re-tailor ▾</button>
+    {% else %}
+      <button class="btn btn-white" id="tailor-btn" onclick="tailorJob()">✨ Tailor Resume</button>
+    {% endif %}
+    {% if job.apply_link %}
+    <a href="{{ job.apply_link }}" target="_blank" rel="noopener"><button class="btn btn-outline">Apply →</button></a>
+    {% endif %}
+    <a href="/profiles" style="text-decoration:none"><button class="btn btn-outline">👤 Switch Profile</button></a>
+  </div>
+</header>
+
+<!-- Custom Instructions / Tips bar -->
+<div id="instructions-bar" style="display:none;background:#1a237e;border-bottom:2px solid #0d47a1;padding:14px 28px;flex-shrink:0">
+  {% if job.tailor_result and job.tailor_result.improvement_tips %}
+  <div style="margin-bottom:10px">
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.6);margin-bottom:7px">
+      💡 Improvement Tips — click to add to instructions
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">
+      {% for tip in job.tailor_result.improvement_tips %}
+      <button onclick="addTipToInstructions(this)"
+              data-tip="{{ tip | replace('✓ Implemented: ', '') | e }}"
+              style="padding:5px 11px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;border:1.5px solid;
+                     {% if tip.startswith('✓') %}background:rgba(46,125,50,.25);color:#a5d6a7;border-color:rgba(165,214,167,.4)
+                     {% else %}background:rgba(255,255,255,.1);color:#fff;border-color:rgba(255,255,255,.25){% endif %}">
+        {{ tip }}
+      </button>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+  <div style="display:flex;gap:10px;align-items:flex-start">
+    <textarea id="custom-instructions"
+              placeholder="e.g. Highlight specific achievements that demonstrate problem-solving skills, such as reducing release failures or improving system scalability…"
+              style="flex:1;min-height:68px;padding:9px 12px;border:1.5px solid rgba(255,255,255,.3);
+                     border-radius:8px;font-size:13px;color:#fff;line-height:1.6;background:rgba(255,255,255,.1);
+                     font-family:inherit;resize:vertical;outline:none"
+              onfocus="this.style.borderColor='rgba(255,255,255,.7)'"
+              onblur="this.style.borderColor='rgba(255,255,255,.3)'"></textarea>
+    <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
+      <button onclick="tailorWithInstructions()"
+              style="padding:9px 18px;border:none;border-radius:6px;background:#ff6d00;
+                     color:#fff;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">
+        ✨ Apply &amp; Re-tailor
+      </button>
+      <button onclick="tailorJob()"
+              style="padding:7px 18px;border:1.5px solid rgba(255,255,255,.4);border-radius:6px;
+                     background:transparent;color:rgba(255,255,255,.8);font-size:12px;font-weight:600;cursor:pointer">
+        Quick Re-tailor
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="split">
+
+  <!-- Left: Job Description -->
+  <div class="jd-panel">
+    <h3>Job Description</h3>
+    <div class="meta-grid">
+      <div class="meta-item"><div class="meta-label">Source</div><div class="meta-value">{{ job.source }}</div></div>
+      <div class="meta-item"><div class="meta-label">Salary</div><div class="meta-value">{{ job.salary or '—' }}</div></div>
+      {% if job.experience %}
+      <div class="meta-item"><div class="meta-label">Experience</div><div class="meta-value">{{ job.experience }}</div></div>
+      {% endif %}
+      {% if job.tailor_result %}
+      <div class="meta-item">
+        <div class="meta-label">Match Score</div>
+        <div class="meta-value">{{ job.tailor_result.match_score }}/10</div>
+      </div>
+      {% endif %}
+    </div>
+    {% if job.description %}
+    <div class="jd-text">{{ job.description }}</div>
+    {% else %}
+    <p style="color:#999;font-size:13px">Full description not loaded yet — will be fetched when you tailor the resume.</p>
+    {% endif %}
+    {% if job.apply_link %}
+    <a class="apply-link" href="{{ job.apply_link }}" target="_blank" rel="noopener"
+       onclick="markApplied()">Apply on {{ job.source }} →</a>
+    {% endif %}
+
+    <!-- ATS Advisor Panel -->
+    {% if ats_profile or ats_report %}
+    <div style="margin-top:22px;border:1.5px solid #c7d5e8;border-radius:10px;overflow:hidden">
+
+      <!-- Header: company ATS profile -->
+      <div style="background:#e8f0fb;padding:11px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #c7d5e8">
+        <span style="font-size:18px">🤖</span>
+        <div style="flex:1">
+          <div style="font-size:12px;font-weight:700;color:#0d47a1;text-transform:uppercase;letter-spacing:.8px">ATS Advisor</div>
+          <div style="font-size:12px;color:#444;margin-top:1px">
+            <b>{{ ats_profile.label }}</b> &nbsp;·&nbsp; {{ ats_profile.ats_system }}
+          </div>
+        </div>
+        {% if ats_report %}
+        <div style="padding:5px 13px;border-radius:20px;font-size:12px;font-weight:700;
+          {% if ats_report.verdict_color == 'green' %}background:#e8f5e9;color:#2e7d32;border:1.5px solid #a5d6a7
+          {% elif ats_report.verdict_color == 'orange' %}background:#fff3e0;color:#e65100;border:1.5px solid #ffb74d
+          {% else %}background:#ffebee;color:#c62828;border:1.5px solid #ef9a9a{% endif %}">
+          {{ ats_report.verdict }}
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Template recommendation -->
+      <div style="padding:11px 16px;border-bottom:1px solid #eef2f8;background:#fff">
+        <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px">Recommended Template</div>
+        <div style="font-size:13px;font-weight:700;color:#0d47a1;text-transform:capitalize">{{ ats_profile.template }}</div>
+        <div style="font-size:12px;color:#555;margin-top:2px">{{ ats_profile.template_why }}</div>
+      </div>
+
+      {% if ats_report %}
+      <!-- Keyword score bar -->
+      <div style="padding:11px 16px;border-bottom:1px solid #eef2f8;background:#fff">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.7px">Keyword Match</div>
+          <div style="font-size:13px;font-weight:700;
+            {% if ats_report.keyword_score >= 75 %}color:#2e7d32
+            {% elif ats_report.keyword_score >= 50 %}color:#e65100
+            {% else %}color:#c62828{% endif %}">{{ ats_report.keyword_score }}%</div>
+        </div>
+        <div style="background:#e8edf5;border-radius:4px;height:7px;overflow:hidden">
+          <div style="height:100%;border-radius:4px;width:{{ ats_report.keyword_score }}%;
+            {% if ats_report.keyword_score >= 75 %}background:#43a047
+            {% elif ats_report.keyword_score >= 50 %}background:#fb8c00
+            {% else %}background:#e53935{% endif %}"></div>
+        </div>
+        {% if ats_report.keyword_hits %}
+        <div style="margin-top:7px;font-size:11.5px;color:#555">
+          <span style="color:#2e7d32;font-weight:600">✅ Found:</span>
+          {{ ats_report.keyword_hits | join(', ') }}
+        </div>
+        {% endif %}
+        {% if ats_report.keyword_misses %}
+        <div style="margin-top:4px;font-size:11.5px;color:#555">
+          <span style="color:#c62828;font-weight:600">❌ Missing:</span>
+          {{ ats_report.keyword_misses[:8] | join(', ') }}{% if ats_report.keyword_misses|length > 8 %} +{{ ats_report.keyword_misses|length - 8 }} more{% endif %}
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Verdict summary + recommendations -->
+      <div style="padding:11px 16px;background:#fff">
+        <div style="font-size:12px;color:#333;font-weight:500;margin-bottom:8px">{{ ats_report.summary }}</div>
+        {% for rec in ats_report.recommendations %}
+        <div style="font-size:12px;color:#444;margin-bottom:4px;line-height:1.5">{{ rec }}</div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <!-- ATS rules (collapsible) -->
+      <details style="border-top:1px solid #eef2f8">
+        <summary style="padding:10px 16px;font-size:12px;font-weight:600;color:#0d47a1;cursor:pointer;background:#f5f8fc;list-style:none;display:flex;align-items:center;gap:6px">
+          <span>▶</span> {{ ats_profile.label }} ATS Rules ({{ ats_profile.rules|length }})
+        </summary>
+        <div style="padding:10px 16px;background:#fff">
+          {% for rule in ats_profile.rules %}
+          <div style="font-size:12px;color:#333;margin-bottom:5px;line-height:1.5">{{ rule }}</div>
+          {% endfor %}
+          {% if ats_profile.parse_notes %}
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid #eef2f8">
+            <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px">Parser Notes</div>
+            {% for note in ats_profile.parse_notes %}
+            <div style="font-size:11.5px;color:#666;margin-bottom:3px">• {{ note }}</div>
+            {% endfor %}
+          </div>
+          {% endif %}
+        </div>
+      </details>
+    </div>
+    {% endif %}
+
+    <!-- Applied status -->
+    <div style="margin-top:16px;display:flex;align-items:center;gap:10px">
+      <button id="apply-mark-btn" onclick="toggleApplied(this)"
+              data-applied="{{ 'yes' if job.applied_at else 'no' }}"
+              style="{{ 'border:1.5px solid #a5d6a7;background:#e8f5e9;color:#1b5e20' if job.applied_at else 'border:1.5px solid #0d47a1;background:#e8f0fb;color:#0d47a1' }};
+                     padding:7px 16px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">
+        {{ '✓ Applied — click to unmark' if job.applied_at else '✓ Mark as Applied' }}
+      </button>
+    </div>
+
+    <!-- Email responses -->
+    {% if job.email_responses %}
+    <div style="margin-top:20px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;
+                  color:#e65100;margin-bottom:10px">📬 {{ job.email_responses|length }} Email Response(s)</div>
+      {% for r in job.email_responses %}
+      <a href="{{ r.gmail_url }}" target="_blank" rel="noopener"
+         style="display:block;text-decoration:none;color:inherit">
+        <div style="background:#fff8f0;border:1px solid #ffcc80;border-radius:8px;
+                    padding:12px 14px;margin-bottom:10px;cursor:pointer;
+                    transition:box-shadow .2s,transform .15s"
+             onmouseover="this.style.boxShadow='0 4px 14px rgba(230,81,0,.15)';this.style.transform='translateY(-1px)'"
+             onmouseout="this.style.boxShadow='';this.style.transform=''">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+            <div style="font-size:12.5px;font-weight:700;color:#bf360c">
+              {{ r.subject or '(No subject)' }}
+            </div>
+            <span style="flex-shrink:0;background:#e65100;color:#fff;font-size:11px;
+                         font-weight:600;padding:2px 8px;border-radius:10px">
+              Open in Gmail ↗
+            </span>
+          </div>
+          <div style="font-size:11.5px;color:#888;margin:4px 0">
+            From: {{ r.from }} &nbsp;·&nbsp; {{ r.date[:25] if r.date else '' }}
+          </div>
+          <div style="font-size:12.5px;color:#555;line-height:1.6;margin-top:6px;
+                      white-space:pre-wrap">{{ r.snippet }}</div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Right: Resume -->
+  <div class="resume-panel" id="resume-panel">
+    {% if job.tailor_result %}
+    <div class="resume-toolbar">
+      <span>Tailored Resume</span>
+      <div class="score-badge">{{ job.tailor_result.match_score }}</div>
+      {% if job.tailor_result.key_matches %}
+      <span style="font-size:12px;color:#666">{{ job.tailor_result.key_matches | join(', ') }}</span>
+      {% endif %}
+    </div>
+    <iframe class="resume-frame" src="/resume/{{ job.id }}" title="Tailored Resume"></iframe>
+
+    {% elif tailoring %}
+    <div class="not-tailored">
+      <span class="spinner" style="width:32px;height:32px;border-width:4px;color:#0d47a1"></span>
+      <h3>Tailoring in progress…</h3>
+      <p>Groq AI is rewriting your resume for this role. Usually takes 20–30 seconds.</p>
+    </div>
+
+    {% else %}
+    <div class="not-tailored" id="not-tailored-msg">
+      <div style="font-size:48px">📄</div>
+      <h3>Resume not tailored yet</h3>
+      <p>Click "Tailor Resume" to have Groq AI customise your resume for this specific job description.</p>
+      <button class="btn btn-tailor" style="padding:11px 24px;font-size:14px" id="tailor-btn2" onclick="tailorJob()">✨ Tailor Resume</button>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- Outreach Modal -->
+<div id="outreach-overlay" onclick="closeOutreach(event)">
+  <div id="outreach-modal">
+    <div id="outreach-modal-head">
+      <h3 id="outreach-modal-title">📨 Outreach</h3>
+      <button id="outreach-modal-close" onclick="closeOutreach()">✕</button>
+    </div>
+    <div class="outreach-tabs">
+      <button class="outreach-tab active" onclick="switchOutreachTab(0,this)">📣 LinkedIn InMail</button>
+      <button class="outreach-tab" onclick="switchOutreachTab(1,this)">📧 Cold Email</button>
+      <button class="outreach-tab" onclick="switchOutreachTab(2,this)">🏢 HR Emails</button>
+      <button class="outreach-tab" onclick="switchOutreachTab(3,this)">🤝 Referrals</button>
+      <button class="outreach-tab" onclick="switchOutreachTab(4,this)">🎯 Decision-Makers</button>
+    </div>
+    <div class="outreach-panel active" id="outreach-panel-0">
+      <div>
+        <div class="outreach-label">Connection Request Note</div>
+        <div class="outreach-box" id="or-inmail"></div>
+        <div class="outreach-char-count" id="or-inmail-chars"></div>
+      </div>
+      <div class="outreach-actions">
+        <button class="btn-copy" onclick="copyOutreach('or-inmail',this)">📋 Copy</button>
+      </div>
+      <p style="font-size:11.5px;color:#aaa;line-height:1.5">Paste into the LinkedIn connection request note (300 char limit).</p>
+    </div>
+    <div class="outreach-panel" id="outreach-panel-1">
+      <div>
+        <div class="outreach-label">Subject</div>
+        <div class="outreach-box" id="or-subject" style="max-height:50px;padding:8px 14px"></div>
+      </div>
+      <div>
+        <div class="outreach-label">Body</div>
+        <div class="outreach-box" id="or-body"></div>
+      </div>
+      <div class="outreach-actions">
+        <button class="btn-copy" onclick="copyOutreach('or-body',this)">📋 Copy Body</button>
+        <button class="btn-copy" id="or-copy-all" onclick="copyOutreachEmail(this)">📋 Copy All</button>
+        <a class="btn-mailto" id="or-mailto" href="#" target="_blank">✉️ Open in Gmail</a>
+      </div>
+    </div>
+    <div class="outreach-panel" id="outreach-panel-2">
+      <div id="or-hr-list"></div>
+      <div class="hr-email-note" id="or-hr-note"></div>
+      <div class="outreach-actions">
+        <button class="btn-copy" id="or-verify-btn" onclick="verifyHrEmails(this)">🔍 Verify deliverability (free)</button>
+      </div>
+      <p style="font-size:11.5px;color:#aaa;line-height:1.5">
+        Checks with each domain's mail server whether it would accept the address — no email is actually sent.
+      </p>
+    </div>
+    <div class="outreach-panel" id="outreach-panel-3">
+      <div class="outreach-actions" id="or-joburl-actions" style="display:none">
+        <button class="btn-copy" id="or-joburl-btn" onclick="copyJobUrl(this)">📋 Copy Job Link (to share with connection)</button>
+      </div>
+      <div id="or-referral-list"></div>
+      <div class="hr-email-note" id="or-referral-note"></div>
+    </div>
+    <div class="outreach-panel" id="outreach-panel-4">
+      <div id="or-decision-list"></div>
+      <p style="font-size:11.5px;color:#aaa;line-height:1.5;margin-top:8px">
+        These open a prefilled LinkedIn people search in a new tab — you browse and message manually from your own logged-in session (no scraping, no risk to your account).
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- Tailor overlay -->
+<div id="tailor-overlay">
+  <div class="ov-box" id="ov-box">
+    <div class="ov-success-icon">✅</div>
+    <div class="ov-spinner"></div>
+    <h3 id="ov-title">Tailoring Resume…</h3>
+    <p id="ov-msg">Groq AI is rewriting your resume for this role.<br>Usually takes 20–30 seconds.</p>
+  </div>
+</div>
+
+<script>
+function _showTailorOverlay(){
+  document.getElementById('tailor-overlay').classList.add('active');
+  const box=document.getElementById('ov-box');
+  box.classList.remove('done');
+  document.getElementById('ov-title').textContent='Tailoring Resume…';
+  document.getElementById('ov-msg').textContent='Groq AI is rewriting your resume for this role. Usually takes 20–30 seconds.';
+}
+function _showTailorSuccess(){
+  const box=document.getElementById('ov-box');
+  box.classList.add('done');
+  document.getElementById('ov-title').textContent='Resume Tailored!';
+  document.getElementById('ov-msg').textContent='Your resume has been optimised. Loading updated view…';
+}
+function _hideTailorOverlay(){
+  document.getElementById('tailor-overlay').classList.remove('active');
+}
+
+function tailorWithInstructions(){
+  const txt=(document.getElementById('custom-instructions').value||'').trim();
+  tailorJob(txt||null);
+}
+function tailorJob(customInstructions){
+  _showTailorOverlay();
+  const body=customInstructions?JSON.stringify({custom_instructions:customInstructions}):null;
+  fetch('/tailor/{{ job.id }}',{method:'POST',headers:body?{'Content-Type':'application/json'}:{},body:body||undefined}).then(r=>r.json()).then(d=>{
+    const panel=document.getElementById('resume-panel');
+    if(panel){
+      panel.innerHTML=`
+        <div class="not-tailored">
+          <span class="spinner" style="width:32px;height:32px;border-width:4px;color:#0d47a1"></span>
+          <h3>Tailoring in progress…</h3>
+          <p>Groq AI is rewriting your resume. Usually 20–30 seconds.</p>
+        </div>`;
+    }
+    pollTailor();
+  }).catch(()=>{
+    _hideTailorOverlay();
+    alert('Failed to start tailoring — check terminal logs');
+  });
+}
+
+function pollTailor(){
+  const t=setInterval(()=>{
+    fetch('/tailor-status/{{ job.id }}').then(r=>r.json()).then(d=>{
+      if(d.done){
+        clearInterval(t);
+        _showTailorSuccess();
+        setTimeout(()=>{ _hideTailorOverlay(); location.reload(); }, 2200);
+      } else if(!d.running){
+        clearInterval(t);
+        _hideTailorOverlay();
+        const errMsg = d.error || 'Tailoring failed — check terminal logs';
+        alert('❌ ' + errMsg);
+        location.reload();
+      }
+    });
+  }, 3000);
+}
+
+{% if tailoring %}
+_showTailorOverlay();
+pollTailor();
+{% endif %}
+
+function togglePdfDropdown(){
+  const el = document.getElementById('pdf-split-detail');
+  if(el) el.classList.toggle('open');
+}
+function toggleInstructionsBar(){
+  const bar = document.getElementById('instructions-bar');
+  const btn = document.getElementById('custom-bar-toggle');
+  if(!bar) return;
+  const open = bar.style.display !== 'none';
+  bar.style.display = open ? 'none' : 'block';
+  if(btn) btn.textContent = open ? '✨ Re-tailor ▾' : '✨ Re-tailor ▴';
+  if(!open) document.getElementById('custom-instructions').focus();
+}
+function addTipToInstructions(btn){
+  const tip = btn.dataset.tip || '';
+  if(!tip) return;
+  const ta = document.getElementById('custom-instructions');
+  ta.value = ta.value ? ta.value.trimEnd() + '\n' + tip : tip;
+  ta.focus();
+}
+document.addEventListener('click', function(e){
+  if(!e.target.closest('.pdf-split')){
+    const el = document.getElementById('pdf-split-detail');
+    if(el) el.classList.remove('open');
+  }
+});
+
+// ── Outreach Modal ──────────────────────────────────────────────────────────
+let _outreachData = null;
+function openOutreach(jobId){
+  fetch('/outreach/'+jobId).then(r=>r.json()).then(d=>{
+    if(d.error){ alert('⚠️ '+d.error); return; }
+    _outreachData = d;
+    document.getElementById('outreach-modal-title').textContent = `📨 Outreach — ${d.title} @ ${d.company}`;
+    document.getElementById('or-inmail').textContent  = d.linkedin_inmail;
+    document.getElementById('or-inmail-chars').textContent = `${d.linkedin_inmail.length} / 300 characters`;
+    document.getElementById('or-subject').textContent = d.cold_email_subject;
+    document.getElementById('or-body').textContent    = d.cold_email_body;
+    const mailtoEl = document.getElementById('or-mailto');
+    if(d.mailto){ mailtoEl.href=d.mailto; mailtoEl.style.display=''; } else { mailtoEl.style.display='none'; }
+    const list = document.getElementById('or-hr-list');
+    if(d.hr_emails && d.hr_emails.length){
+      list.innerHTML = d.hr_emails.map(em=>
+        `<div class="hr-email-row" data-email="${em}"><span class="hr-email-addr">${em}</span><span class="hr-verify-badge"></span><button class="btn-copy" onclick="copyText('${em}',this)">📋 Copy</button></div>`
+      ).join('');
+      document.getElementById('or-verify-btn').textContent = '🔍 Verify deliverability (free)';
+      document.getElementById('or-verify-btn').disabled = false;
+      document.getElementById('or-hr-note').innerHTML = d.hr_verified
+        ? '✅ Emails found via <strong>Hunter.io</strong> — real addresses from this company domain.'
+        : '⚠️ These are <strong>guessed</strong> addresses. Verify on the company\'s careers page before sending.';
+    } else {
+      list.innerHTML = '<p style="color:#aaa;font-size:13px">Could not determine company domain. Find the HR email on the company\'s careers page.</p>';
+      document.getElementById('or-hr-note').textContent = '';
+    }
+    const joburlActions = document.getElementById('or-joburl-actions');
+    if(d.job_url){
+      joburlActions.style.display = '';
+      document.getElementById('or-joburl-btn').textContent = d.job_url_is_company_site
+        ? '📋 Copy Job Link (company site)'
+        : '📋 Copy Search Link (finds it on their careers site)';
+    } else {
+      joburlActions.style.display = 'none';
+    }
+    const refList = document.getElementById('or-referral-list');
+    if(d.referral_contacts && d.referral_contacts.length){
+      refList.innerHTML = d.referral_contacts.map(c=>`
+        <div class="hr-email-row">
+          <span class="hr-email-addr">
+            ${c.name}${c.position ? ' — '+c.position : ''}
+            ${c.email ? '<br><span style="color:#aaa;font-size:12px">'+c.email+'</span>' : ''}
+          </span>
+          ${c.profile_url ? `<a class="btn-copy" href="${c.profile_url}" target="_blank">🔗 Profile</a>` : ''}
+        </div>`).join('');
+      document.getElementById('or-referral-note').innerHTML =
+        `🤝 Found from your LinkedIn connections — ${d.referral_contacts.length} contact(s) at ${d.company}.`;
+    } else {
+      refList.innerHTML = '<p style="color:#aaa;font-size:13px">No matching connections found at this company.</p>';
+      document.getElementById('or-referral-note').innerHTML =
+        '💡 Export your connections via LinkedIn Settings → Data Privacy → "Get a copy of your data" and save as <code>output/linkedin_connections.csv</code>.';
+    }
+    const decList = document.getElementById('or-decision-list');
+    if(d.decision_maker_links && d.decision_maker_links.length){
+      decList.innerHTML = d.decision_maker_links.map(l=>`
+        <div class="hr-email-row">
+          <span class="hr-email-addr">${l.label}</span>
+          <a class="btn-copy" href="${l.url}" target="_blank">🔎 Search on LinkedIn</a>
+        </div>`).join('');
+    } else {
+      decList.innerHTML = '<p style="color:#aaa;font-size:13px">Could not build search links for this company.</p>';
+    }
+    switchOutreachTab(0, document.querySelector('.outreach-tab'));
+    document.getElementById('outreach-overlay').classList.add('open');
+  }).catch(()=>alert('Failed to load outreach data'));
+}
+function closeOutreach(evt){
+  if(evt && evt.target !== document.getElementById('outreach-overlay') &&
+     evt.target !== document.getElementById('outreach-modal-close')) return;
+  document.getElementById('outreach-overlay').classList.remove('open');
+}
+function switchOutreachTab(idx, btn){
+  document.querySelectorAll('.outreach-tab').forEach((t,i)=>t.classList.toggle('active',i===idx));
+  document.querySelectorAll('.outreach-panel').forEach((p,i)=>p.classList.toggle('active',i===idx));
+}
+function copyJobUrl(btn){
+  if(!_outreachData || !_outreachData.job_url) return;
+  copyText(_outreachData.job_url, btn);
+}
+function copyOutreach(elemId, btn){ copyText(document.getElementById(elemId).textContent, btn); }
+function copyOutreachEmail(btn){
+  if(!_outreachData) return;
+  copyText(`Subject: ${_outreachData.cold_email_subject}\n\n${_outreachData.cold_email_body}`, btn);
+}
+function verifyHrEmails(btn){
+  if(!_outreachData || !_outreachData.hr_emails || !_outreachData.hr_emails.length) return;
+  btn.disabled = true;
+  btn.textContent = '🔍 Checking mail servers…';
+  fetch('/verify-emails', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({emails: _outreachData.hr_emails})
+  }).then(r=>r.json()).then(d=>{
+    btn.disabled = false;
+    btn.textContent = '🔍 Verify deliverability (free)';
+    if(!d.ok){ alert('Verification failed: ' + (d.message||'')); return; }
+    const badges = {
+      valid:     '✅ Valid',
+      invalid:   '❌ Invalid',
+      catch_all: '⚠️ Catch-all (unconfirmed)',
+      unknown:   '❓ Unknown',
+    };
+    document.querySelectorAll('#or-hr-list .hr-email-row').forEach(row=>{
+      const em = row.dataset.email;
+      const res = d.results[em];
+      if(res){
+        const badgeEl = row.querySelector('.hr-verify-badge');
+        badgeEl.textContent = badges[res.status] || res.status;
+        badgeEl.title = res.detail || '';
+        badgeEl.className = 'hr-verify-badge badge-' + res.status;
+      }
+    });
+  }).catch(()=>{
+    btn.disabled = false;
+    btn.textContent = '🔍 Verify deliverability (free)';
+    alert('Verification request failed');
+  });
+}
+function copyText(text, btn){
+  navigator.clipboard.writeText(text).then(()=>{
+    const orig=btn.textContent; btn.textContent='✅ Copied!'; btn.classList.add('copied');
+    setTimeout(()=>{ btn.textContent=orig; btn.classList.remove('copied'); }, 2000);
+  }).catch(()=>alert('Copy failed — select manually'));
+}
+
+function toggleApplied(btn){
+  const applying = btn.dataset.applied !== 'yes';
+  fetch('/apply/{{ job.id }}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({applied:applying})})
+    .then(()=>{
+      if(applying){
+        btn.textContent='✓ Applied — click to unmark';
+        btn.style.cssText='border:1.5px solid #a5d6a7;background:#e8f5e9;color:#1b5e20;padding:7px 16px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer';
+        btn.dataset.applied='yes';
+      } else {
+        btn.textContent='✓ Mark as Applied';
+        btn.style.cssText='border:1.5px solid #0d47a1;background:#e8f0fb;color:#0d47a1;padding:7px 16px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer';
+        btn.dataset.applied='no';
+      }
+    });
+}
+</script>
+</body>
+</html>

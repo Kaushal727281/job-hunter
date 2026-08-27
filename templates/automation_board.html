@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Automation Board — Job Hunter</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f9;color:#1e1e1e;min-height:100vh}
+
+    header{background:linear-gradient(135deg,#0d47a1,#1976d2);color:#fff;padding:20px 32px;
+           display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;
+           box-shadow:0 2px 12px rgba(0,0,0,.18)}
+    header h1{font-size:22px;font-weight:700;letter-spacing:.4px}
+    .btn{border:none;border-radius:6px;padding:9px 18px;font-size:13px;font-weight:600;
+         cursor:pointer;transition:opacity .15s,transform .1s;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+    .btn-white{background:#fff;color:#0d47a1}
+    .btn-white:hover{opacity:.9}
+
+    .summary{display:flex;gap:16px;padding:20px 32px;flex-wrap:wrap}
+    .stat-card{background:#fff;border-radius:12px;padding:18px 24px;flex:1;min-width:160px;
+               box-shadow:0 1px 6px rgba(0,0,0,.08);text-align:center}
+    .stat-num{font-size:36px;font-weight:700;line-height:1}
+    .stat-label{font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:#888;margin-top:6px}
+    .stat-success .stat-num{color:#2e7d32}
+    .stat-failed  .stat-num{color:#c62828}
+    .stat-pending .stat-num{color:#e65100}
+    .stat-total   .stat-num{color:#0d47a1}
+
+    .section{margin:0 32px 28px}
+    .section-title{font-size:15px;font-weight:700;padding:8px 0 12px;border-bottom:2px solid #e3eaf4;
+                   margin-bottom:12px;display:flex;align-items:center;gap:8px}
+    .dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+    .dot-success{background:#2e7d32}.dot-failed{background:#c62828}.dot-pending{background:#e65100}
+
+    table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;
+          overflow:hidden;box-shadow:0 1px 6px rgba(0,0,0,.08)}
+    th{background:#f5f8ff;font-size:11px;text-transform:uppercase;letter-spacing:.8px;
+       color:#666;padding:10px 14px;text-align:left;border-bottom:1px solid #e3eaf4}
+    td{padding:10px 14px;border-bottom:1px solid #f0f4f9;font-size:13px;vertical-align:top}
+    tr:last-child td{border-bottom:none}
+    tr:hover td{background:#fafcff}
+
+    .badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600}
+    .badge-success{background:#e8f5e9;color:#2e7d32}
+    .badge-failed {background:#ffebee;color:#c62828}
+    .badge-pending{background:#fff3e0;color:#e65100}
+
+    .ats-tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;
+             background:#e8eaf6;color:#3949ab;font-weight:600}
+
+    .error-msg{font-size:11px;color:#c62828;max-width:320px;word-break:break-word;
+               background:#ffebee;padding:4px 8px;border-radius:4px;margin-top:4px}
+    .job-link{color:#1976d2;text-decoration:none;font-weight:500}
+    .job-link:hover{text-decoration:underline}
+
+    .company-group{margin-bottom:8px}
+    .company-name{font-weight:700;font-size:13px;color:#0d47a1;margin-bottom:4px}
+    .company-count{background:#e8eaf6;color:#3949ab;font-size:11px;font-weight:600;
+                   padding:2px 7px;border-radius:10px;margin-left:6px}
+
+    .empty{color:#aaa;font-size:13px;padding:24px;text-align:center}
+    .refresh-note{font-size:11px;color:#aaa;margin-left:auto}
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🤖 Automation Board</h1>
+  <div style="display:flex;gap:10px;align-items:center">
+    <span id="last-refresh" style="font-size:12px;opacity:.75"></span>
+    <a href="/" class="btn btn-white">← Back to Jobs</a>
+  </div>
+</header>
+
+<!-- Summary stats -->
+<div class="summary">
+  <div class="stat-card stat-success">
+    <div class="stat-num" id="cnt-success">{{ applied|length }}</div>
+    <div class="stat-label">Applied</div>
+  </div>
+  <div class="stat-card stat-failed">
+    <div class="stat-num" id="cnt-failed">{{ failed|length }}</div>
+    <div class="stat-label">Failed</div>
+  </div>
+  <div class="stat-card stat-pending">
+    <div class="stat-num" id="cnt-pending">{{ pending|length }}</div>
+    <div class="stat-label">Pending (old)</div>
+  </div>
+  <div class="stat-card stat-total">
+    <div class="stat-num" id="cnt-total">{{ (applied|length) + (failed|length) + (pending|length) }}</div>
+    <div class="stat-label">Total Attempts</div>
+  </div>
+</div>
+
+<!-- Applied by company -->
+{% if by_company %}
+<div class="section">
+  <div class="section-title"><span class="dot dot-success"></span> Applied — by Company</div>
+  {% for company, jobs in by_company.items()|sort %}
+  <div class="company-group">
+    <div class="company-name">{{ company }} <span class="company-count">{{ jobs|length }}</span></div>
+    <table>
+      <thead>
+        <tr>
+          <th>Job Title</th>
+          <th>ATS</th>
+          <th>Score</th>
+          <th>Applied At</th>
+          <th>Link</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for j in jobs %}
+        <tr>
+          <td>{{ j.title }}</td>
+          <td><span class="ats-tag">{{ j.ats_type }}</span></td>
+          <td>{{ j.fit_score or '—' }}/10</td>
+          <td style="white-space:nowrap">{{ (j.applied_at or '')[:16] }}</td>
+          <td>
+            {% if j.apply_link %}
+            <a class="job-link" href="{{ j.apply_link }}" target="_blank">View ↗</a>
+            {% else %}—{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Failed -->
+{% if failed %}
+<div class="section">
+  <div class="section-title"><span class="dot dot-failed"></span> Failed Applications</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Job Title</th>
+        <th>Company</th>
+        <th>ATS</th>
+        <th>Score</th>
+        <th>Error / Reason</th>
+        <th>Link</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for j in failed %}
+      <tr>
+        <td>{{ j.title }}</td>
+        <td>{{ j.company }}</td>
+        <td><span class="ats-tag">{{ j.ats_type }}</span></td>
+        <td>{{ j.fit_score or '—' }}/10</td>
+        <td>
+          <div class="error-msg">{{ j.apply_error or 'Unknown error' }}</div>
+        </td>
+        <td>
+          {% if j.apply_link %}
+          <a class="job-link" href="{{ j.apply_link }}" target="_blank">Retry ↗</a>
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<!-- Pending (applied_at set but no apply_status) — legacy entries -->
+{% if pending %}
+<div class="section">
+  <div class="section-title"><span class="dot dot-pending"></span> Pending / Legacy Applied</div>
+  <table>
+    <thead>
+      <tr><th>Job Title</th><th>Company</th><th>ATS</th><th>Applied At</th><th>Link</th></tr>
+    </thead>
+    <tbody>
+      {% for j in pending %}
+      <tr>
+        <td>{{ j.title }}</td>
+        <td>{{ j.company }}</td>
+        <td><span class="ats-tag">{{ j.ats_type }}</span></td>
+        <td style="white-space:nowrap">{{ (j.applied_at or '')[:16] }}</td>
+        <td>
+          {% if j.apply_link %}<a class="job-link" href="{{ j.apply_link }}" target="_blank">View ↗</a>
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if not applied and not failed and not pending %}
+<div class="empty">No automation activity yet. Run <code>./run.sh</code> to start applying.</div>
+{% endif %}
+
+<script>
+  // Auto-refresh stats every 15s
+  function refresh() {
+    fetch('/api/automation-board')
+      .then(r => r.json())
+      .then(d => {
+        document.getElementById('cnt-success').textContent = d.applied.length;
+        document.getElementById('cnt-failed').textContent  = d.failed.length;
+        document.getElementById('cnt-pending').textContent = d.pending.length;
+        document.getElementById('cnt-total').textContent   = d.applied.length + d.failed.length + d.pending.length;
+        document.getElementById('last-refresh').textContent = 'Updated ' + new Date().toLocaleTimeString();
+      });
+  }
+  setInterval(refresh, 15000);
+  refresh();
+</script>
+</body>
+</html>

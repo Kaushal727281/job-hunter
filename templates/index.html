@@ -1,0 +1,1448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Job Hunter</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f9;color:#1e1e1e;min-height:100vh}
+
+    /* ── Header ── */
+    header{background:linear-gradient(135deg,#0d47a1,#1976d2);color:#fff;padding:20px 32px;
+           display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;
+           box-shadow:0 2px 12px rgba(0,0,0,0.18)}
+    header h1{font-size:22px;font-weight:700;letter-spacing:.4px}
+    header h1 span{opacity:.75;font-weight:400;font-size:16px;margin-left:10px}
+    .header-right{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .btn{border:none;border-radius:6px;padding:9px 18px;font-size:13px;font-weight:600;
+         cursor:pointer;transition:opacity .15s,transform .1s}
+    .btn:active{transform:scale(.97)}
+    .btn-white{background:#fff;color:#0d47a1}
+    .btn-white:hover{opacity:.9}
+    .btn-outline{background:transparent;border:1.5px solid rgba(255,255,255,.7);color:#fff}
+    .btn-outline:hover{background:rgba(255,255,255,.1)}
+    #status-msg{font-size:13px;opacity:.85}
+
+    /* ── Filters ── */
+    .toolbar{padding:10px 32px;display:flex;gap:6px 8px;align-items:center;flex-wrap:wrap;
+             border-bottom:1px solid #dde4ed;background:#fff;row-gap:8px}
+    .filter-group{display:flex;align-items:center;gap:5px}
+    .filter-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;
+                  color:#999;margin-right:2px;white-space:nowrap}
+    .toolbar-divider{width:1px;height:24px;background:#dde4ed;margin:0 4px}
+    .filter-btn{border:1.5px solid #c7d5e8;background:#fff;color:#555;border-radius:20px;
+                padding:5px 13px;font-size:12px;font-weight:500;cursor:pointer;transition:.15s}
+    .filter-btn.active,.filter-btn:hover{background:#0d47a1;border-color:#0d47a1;color:#fff}
+    .search-box{margin-left:auto;border:1.5px solid #c7d5e8;border-radius:6px;padding:6px 12px;
+                font-size:13px;width:200px;outline:none}
+    .search-box:focus{border-color:#1976d2}
+
+    /* ── Grid ── */
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));
+          gap:18px;padding:24px 32px}
+
+    /* ── Job Card ── */
+    .card{background:#fff;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.07);
+          border:1px solid #e8edf5;display:flex;flex-direction:column;
+          transition:box-shadow .2s,transform .2s;position:relative}
+    .card-top-right{position:absolute;top:8px;right:10px;display:flex;flex-direction:column;
+          align-items:flex-end;gap:2px}
+    .card-date{font-size:11px;color:#aaa}
+    .btn-card-remove{background:none;border:none;color:#ccc;font-size:15px;cursor:pointer;
+          line-height:1;padding:1px 4px;border-radius:4px;transition:.15s;align-self:flex-end}
+    .btn-card-remove:hover{color:#c62828;background:#ffebee}
+    .card:hover{box-shadow:0 6px 20px rgba(13,71,161,.12);transform:translateY(-2px)}
+
+    .card-header{padding:16px 18px 10px;border-bottom:1px solid #f0f4f9}
+    .card-source{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;
+                 color:#888;margin-bottom:6px;display:flex;align-items:center;
+                 gap:6px;flex-wrap:wrap;padding-right:64px}
+    .badge-naukri{background:#ffe0e0;color:#c62828;padding:2px 7px;border-radius:10px}
+    .badge-linkedin{background:#e3f2fd;color:#1565c0;padding:2px 7px;border-radius:10px}
+    .badge-indeed{background:#f3e5f5;color:#6a1b9a;padding:2px 7px;border-radius:10px}
+    .badge-remoteok{background:#e0f2f1;color:#00695c;padding:2px 7px;border-radius:10px}
+    .badge-instahyre{background:#fff8e1;color:#f57f17;padding:2px 7px;border-radius:10px}
+    .badge-ziprecruiter{background:#e8eaf6;color:#283593;padding:2px 7px;border-radius:10px}
+    .badge-hnjobs{background:#fff3e0;color:#bf360c;padding:2px 7px;border-radius:10px}
+    .badge-shine{background:#fce4ec;color:#880e4f;padding:2px 7px;border-radius:10px}
+    .badge-remote{background:#e8f5e9;color:#2e7d32;padding:2px 7px;border-radius:10px}
+    .badge-applied{background:#e8f5e9;color:#1b5e20;padding:2px 7px;border-radius:10px;font-weight:700}
+    .badge-rejected{background:#fce4ec;color:#b71c1c;padding:2px 7px;border-radius:10px;font-weight:700}
+    .badge-interview{background:#e3f2fd;color:#0d47a1;padding:2px 7px;border-radius:10px;font-weight:700}
+    .status-select{border-radius:6px;border:1.5px solid #c7d5e8;background:#fff;color:#555;
+                   font-size:12px;font-weight:600;padding:4px 8px;cursor:pointer;outline:none}
+    .status-select:hover{border-color:#0d47a1}
+    .status-select[data-val="applied"]  {background:#e8f5e9;color:#1b5e20;border-color:#a5d6a7}
+    .status-select[data-val="interview"]{background:#e3f2fd;color:#0d47a1;border-color:#90caf9}
+    .status-select[data-val="rejected"] {background:#fce4ec;color:#b71c1c;border-color:#ef9a9a}
+    .badge-responded{background:#fff3e0;color:#e65100;padding:2px 7px;border-radius:10px;font-weight:700}
+    .badge-product{background:#e3f2fd;color:#0d47a1;padding:2px 7px;border-radius:10px;font-weight:600;font-size:11px}
+    .badge-service{background:#f3e5f5;color:#6a1b9a;padding:2px 7px;border-radius:10px;font-weight:600;font-size:11px}
+    .badge-greenhouse{background:#e8f5e9;color:#1b5e20;padding:2px 7px;border-radius:10px}
+    .badge-lever{background:#e8f5e9;color:#1b5e20;padding:2px 7px;border-radius:10px}
+    .badge-workday{background:#fff8e1;color:#f57f17;padding:2px 7px;border-radius:10px}
+    .badge-tier1{background:#e8f5e9;color:#1b5e20;padding:2px 6px;border-radius:10px;font-size:10px;font-weight:700}
+    .badge-tier2{background:#e3f2fd;color:#1565c0;padding:2px 6px;border-radius:10px;font-size:10px;font-weight:700}
+    .badge-tier3{background:#fff3e0;color:#e65100;padding:2px 6px;border-radius:10px;font-size:10px;font-weight:700}
+    .career-opt{display:block;width:100%;text-align:left;border:none;background:none;padding:7px 12px;
+                font-size:13px;cursor:pointer;border-radius:5px;color:#1e1e1e}
+    .career-opt:hover{background:#e8f0fb;color:#0d47a1}
+    .card-title{font-size:15px;font-weight:700;color:#0d47a1;line-height:1.3;margin-bottom:3px}
+    .card-company{font-size:13px;font-weight:600;color:#333}
+    .card-meta{font-size:12px;color:#777;margin-top:3px}
+
+    .card-body{padding:12px 18px;flex:1}
+    .tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+    .tag{background:#e8f0fb;color:#1565c0;border-radius:4px;padding:2px 8px;font-size:11.5px;font-weight:500}
+
+    .score-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+    .score-badge{display:inline-flex;align-items:center;justify-content:center;
+                 width:38px;height:38px;border-radius:50%;font-weight:700;font-size:13px;color:#fff}
+    .score-high{background:#2e7d32}
+    .score-mid{background:#f57c00}
+    .score-low{background:#bbb}
+    .score-label{font-size:12px;color:#666}
+
+    .cover-note{font-size:12px;color:#555;line-height:1.6;background:#f9fafb;
+                border-left:3px solid #1976d2;padding:8px 10px;border-radius:0 4px 4px 0;
+                margin-top:8px}
+
+    .card-footer{padding:12px 18px;border-top:1px solid #f0f4f9;display:flex;gap:8px;flex-wrap:wrap;overflow:visible}
+    .btn-sm{padding:7px 14px;font-size:12.5px;border-radius:6px;border:none;cursor:pointer;
+            font-weight:600;transition:.15s}
+    .btn-primary{background:#0d47a1;color:#fff}
+    .btn-primary:hover{background:#1565c0}
+    .btn-secondary{background:#e8f0fb;color:#0d47a1}
+    .btn-secondary:hover{background:#c7d5e8}
+    .btn-apply{background:#fff;border:1.5px solid #0d47a1;color:#0d47a1}
+    .btn-apply:hover{background:#f0f4ff}
+    .btn-tailor{background:#fff3e0;color:#e65100;border:1.5px solid #ffcc02}
+    .btn-tailor:hover{background:#ffe0b2}
+    .btn-disabled{opacity:.45;cursor:not-allowed}
+    a.btn-sm{text-decoration:none;display:inline-block}
+
+    /* ── PDF Dropdown Button ── */
+    .pdf-split{position:relative;display:inline-flex}
+    .pdf-dropdown{display:none;position:absolute;bottom:calc(100% + 4px);left:0;
+                  background:#fff;border:1.5px solid #c7d5e8;border-radius:8px;
+                  box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:500;min-width:170px;overflow:hidden}
+    .pdf-split.open .pdf-dropdown{display:block}
+    .pdf-dropdown a{display:block;padding:9px 14px;font-size:12.5px;font-weight:500;
+                    color:#1a237e;text-decoration:none;border-bottom:1px solid #f0f4f9}
+    .pdf-dropdown a:last-child{border-bottom:none}
+    .pdf-dropdown a:hover{background:#e8f0fb}
+
+    /* ── Tailor Overlay ── */
+    #tailor-overlay{display:none;position:fixed;inset:0;background:rgba(10,20,60,.72);
+                    z-index:2000;align-items:center;justify-content:center;backdrop-filter:blur(3px)}
+    #tailor-overlay.active{display:flex}
+    #tailor-overlay-box{background:#fff;border-radius:14px;padding:36px 44px;text-align:center;
+                        box-shadow:0 16px 56px rgba(0,0,0,.35);max-width:420px;width:90%}
+    #tailor-overlay-box .ov-spinner{width:52px;height:52px;border:5px solid #e3eaf6;
+                                    border-top-color:#0d47a1;border-radius:50%;
+                                    animation:spin .8s linear infinite;margin:0 auto 20px}
+    #tailor-overlay-box h3{font-size:18px;font-weight:700;color:#0d1b4e;margin-bottom:8px}
+    #tailor-overlay-box p{font-size:13.5px;color:#666;line-height:1.6}
+    #tailor-overlay-box .ov-success{font-size:54px;margin-bottom:12px;display:none}
+    #tailor-overlay-box.done .ov-spinner{display:none}
+    #tailor-overlay-box.done .ov-success{display:block}
+    #tailor-overlay-box.done h3{color:#1b5e20}
+
+    /* ── Empty state ── */
+    .empty{text-align:center;padding:64px 32px;color:#888}
+    .empty h2{font-size:20px;margin-bottom:10px;color:#555}
+    .empty p{font-size:14px;margin-bottom:24px}
+
+    /* ── Spinner ── */
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .spinner{width:16px;height:16px;border:2.5px solid #fff;border-top-color:transparent;
+             border-radius:50%;animation:spin .7s linear infinite;display:inline-block;vertical-align:middle;margin-right:6px}
+    .spinner-dark{border-color:#0d47a1;border-top-color:transparent}
+
+    /* ── Toast ── */
+    #toast{position:fixed;bottom:24px;right:24px;background:#323232;color:#fff;padding:12px 20px;
+           border-radius:8px;font-size:13px;opacity:0;transition:opacity .3s;z-index:999;pointer-events:none}
+    #toast.show{opacity:1}
+
+    /* ── Settings Modal ── */
+    #settings-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1100;
+                      align-items:center;justify-content:center}
+    #settings-overlay.open{display:flex}
+    #settings-modal{background:#fff;border-radius:12px;width:min(520px,94vw);max-height:88vh;
+                    overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.25);display:flex;flex-direction:column}
+    #settings-modal h2{font-size:16px;font-weight:700;color:#0d47a1;padding:18px 22px 0}
+    .settings-section{padding:14px 22px;border-bottom:1px solid #eef0f4}
+    .settings-section h3{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;
+                         color:#999;margin-bottom:10px}
+    .settings-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+    .settings-row label{font-size:13px;color:#444;min-width:90px}
+    .settings-row input{flex:1;border:1.5px solid #c7d5e8;border-radius:6px;padding:7px 10px;font-size:13px;outline:none}
+    .settings-row input:focus{border-color:#1976d2}
+    .settings-actions{padding:14px 22px;display:flex;gap:10px;justify-content:flex-end}
+    .btn-settings-save{background:#0d47a1;color:#fff;border:none;border-radius:6px;
+                       padding:9px 22px;font-size:13px;font-weight:600;cursor:pointer}
+    .btn-settings-cancel{background:#f0f4f9;color:#555;border:1.5px solid #c7d5e8;border-radius:6px;
+                         padding:9px 18px;font-size:13px;cursor:pointer}
+    .upload-zone{border:2px dashed #c7d5e8;border-radius:8px;padding:18px;text-align:center;
+                 cursor:pointer;transition:.2s;background:#fafcff}
+    .upload-zone:hover{border-color:#1976d2;background:#f0f4ff}
+    .upload-zone p{font-size:13px;color:#888;margin-top:6px}
+    .upload-zone strong{color:#0d47a1}
+    #resume-upload-input{display:none}
+    .upload-meta{background:#e8f5e9;border:1px solid #a5d6a7;border-radius:8px;
+                 padding:12px 15px;font-size:13px;color:#2e7d32;margin-top:10px;display:none}
+    .upload-meta strong{display:block;font-size:14px;margin-bottom:2px}
+    .no-struct-warn{background:#fff3e0;border:1px solid #ffcc80;border-radius:6px;
+                    padding:10px 14px;font-size:12px;color:#e65100;margin-top:8px;display:none}
+    .current-resume-info{background:#f0f4ff;border-radius:8px;padding:12px 15px;font-size:13px}
+    .current-resume-info strong{color:#0d47a1}
+
+    /* ── Outreach Modal ── */
+    #outreach-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1100;
+                      align-items:center;justify-content:center}
+    #outreach-overlay.open{display:flex}
+    #outreach-modal{background:#fff;border-radius:12px;width:min(600px,95vw);max-height:88vh;
+                    overflow:hidden;box-shadow:0 12px 48px rgba(0,0,0,.28);
+                    display:flex;flex-direction:column}
+    #outreach-modal-head{padding:14px 20px;border-bottom:1px solid #eee;display:flex;
+                         align-items:center;justify-content:space-between;flex-shrink:0}
+    #outreach-modal-head h3{font-size:15px;font-weight:700;color:#0d47a1}
+    #outreach-modal-close{border:none;background:none;font-size:20px;cursor:pointer;color:#999}
+    .outreach-tabs{display:flex;border-bottom:1.5px solid #e8edf5;flex-shrink:0}
+    .outreach-tab{flex:1;padding:10px 6px;font-size:12.5px;font-weight:600;border:none;
+                  background:none;cursor:pointer;color:#888;border-bottom:2.5px solid transparent;
+                  transition:.15s;margin-bottom:-1.5px}
+    .outreach-tab.active{color:#0d47a1;border-bottom-color:#0d47a1}
+    .outreach-panel{display:none;padding:16px 20px;overflow-y:auto;flex:1}
+    .outreach-panel.active{display:flex;flex-direction:column;gap:10px}
+    .outreach-label{font-size:11px;font-weight:700;text-transform:uppercase;
+                    letter-spacing:.7px;color:#999;margin-bottom:4px}
+    .outreach-box{background:#f8fafd;border:1.5px solid #dde6f3;border-radius:8px;
+                  padding:12px 14px;font-size:13px;color:#1e1e1e;white-space:pre-wrap;
+                  line-height:1.6;max-height:220px;overflow-y:auto;word-break:break-word}
+    .outreach-char-count{font-size:11px;color:#aaa;text-align:right;margin-top:3px}
+    .outreach-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:2px}
+    .btn-copy{padding:6px 14px;font-size:12px;font-weight:600;border-radius:6px;
+              background:#e8f0fb;color:#0d47a1;border:1.5px solid #c7d5e8;cursor:pointer}
+    .btn-copy:hover{background:#c7d5e8}
+    .btn-copy.copied{background:#e8f5e9;color:#1b5e20;border-color:#a5d6a7}
+    .btn-mailto{padding:6px 14px;font-size:12px;font-weight:600;border-radius:6px;
+                background:#0d47a1;color:#fff;border:none;cursor:pointer;text-decoration:none;display:inline-block}
+    .btn-mailto:hover{background:#1565c0}
+    .hr-email-row{display:flex;align-items:center;justify-content:space-between;gap:8px;
+                  background:#f8fafd;border:1.5px solid #dde6f3;border-radius:7px;padding:9px 13px}
+    .hr-email-addr{font-size:13px;color:#1e1e1e;font-family:monospace}
+    .hr-email-note{font-size:11.5px;color:#aaa;margin-top:8px;line-height:1.5}
+    .hr-verify-badge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;white-space:nowrap}
+    .hr-verify-badge.badge-valid{background:#e3f5e9;color:#1e7e42}
+    .hr-verify-badge.badge-invalid{background:#fbe4e4;color:#b3261e}
+    .hr-verify-badge.badge-catch_all{background:#fff3d6;color:#8a6100}
+    .hr-verify-badge.badge-unknown{background:#eee;color:#777}
+
+    /* ── Response Modal ── */
+    #resp-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;
+                         align-items:center;justify-content:center}
+    #resp-modal-overlay.open{display:flex}
+    #resp-modal{background:#fff;border-radius:12px;width:min(560px,92vw);max-height:80vh;
+                overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.25);display:flex;flex-direction:column}
+    #resp-modal-head{padding:16px 20px;border-bottom:1px solid #eee;display:flex;
+                     align-items:center;justify-content:space-between;flex-shrink:0}
+    #resp-modal-head h3{font-size:15px;font-weight:700;color:#0d47a1}
+    #resp-modal-close{border:none;background:none;font-size:20px;cursor:pointer;color:#999;line-height:1}
+    #resp-modal-body{padding:16px 20px;display:flex;flex-direction:column;gap:12px}
+    .resp-card{background:#fff8f0;border:1px solid #ffcc80;border-radius:8px;padding:13px 15px}
+    .resp-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:5px}
+    .resp-subject{font-size:13px;font-weight:700;color:#bf360c}
+    .resp-open{flex-shrink:0;background:#e65100;color:#fff;font-size:11px;font-weight:600;
+               padding:3px 10px;border-radius:10px;text-decoration:none}
+    .resp-meta{font-size:11.5px;color:#888;margin-bottom:6px}
+    .resp-snippet{font-size:12.5px;color:#444;line-height:1.6}
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🎯 Job Hunter <span id="header-name">— {{ config.candidate.name }}</span></h1>
+  <div class="header-right">
+    <span id="status-msg">{{ status.message }}{% if status.last_run and not status.running %} · Last fetch: {{ status.last_run }}{% endif %}</span>
+    <a href="/automation-board" class="btn btn-outline">🤖 Automation Board</a>
+    <button class="btn btn-white" id="fetch-btn" onclick="startFetch()">Fetch New Jobs</button>
+    <div class="career-fetch-wrap" style="position:relative;display:inline-block">
+      <button class="btn btn-outline" id="career-btn" onclick="toggleCareerMenu()">Career Sites ▾</button>
+      <div id="career-menu" style="display:none;position:absolute;right:0;top:40px;background:#fff;
+           border:1.5px solid #c7d5e8;border-radius:8px;padding:8px;min-width:200px;z-index:100;
+           box-shadow:0 4px 16px rgba(0,0,0,0.12)">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#999;padding:4px 8px 8px">Fetch from career sites</div>
+        <button class="career-opt" onclick="startCareerFetch('all','all')">All Companies</button>
+        <button class="career-opt" onclick="startCareerFetch([1],'all')">Tier 1 Only (&gt;$1B)</button>
+        <button class="career-opt" onclick="startCareerFetch([1,2],'all')">Tier 1 + 2</button>
+        <button class="career-opt" onclick="startCareerFetch('all','product')">Product Only</button>
+        <button class="career-opt" onclick="startCareerFetch('all','service')">Service Only</button>
+        <button class="career-opt" onclick="startCareerFetch([1],'product')">T1 Product</button>
+        <button class="career-opt" onclick="startCareerFetch([1],'service')">T1 Service</button>
+      </div>
+      <span id="career-status-msg" style="font-size:12px;color:rgba(255,255,255,0.8);margin-left:8px"></span>
+    </div>
+    <button class="btn btn-outline" id="resp-btn" onclick="checkResponses()">📬 Check Responses</button>
+    <button class="btn btn-outline" onclick="openSettings()">⚙️ Settings</button>
+    <button class="btn btn-outline" onclick="if(confirm('Clear all jobs?')) clearAll()">Clear All</button>
+    <a class="btn btn-outline" href="/profiles" style="text-decoration:none">👤 Switch Profile</a>
+  </div>
+</header>
+
+<div class="toolbar">
+  <!-- Source filter -->
+  <div class="filter-group">
+    <span class="filter-label">Source</span>
+    <button class="filter-btn active" data-filter="source" data-val="all"              onclick="applyFilters(this,'source')">All</button>
+    <button class="filter-btn"        data-filter="source" data-val="LinkedIn"         onclick="applyFilters(this,'source')">LinkedIn ({{ jobs|selectattr('source','eq','LinkedIn')|list|length }})</button>
+    <button class="filter-btn"        data-filter="source" data-val="Shine"            onclick="applyFilters(this,'source')">Shine ({{ jobs|selectattr('source','eq','Shine')|list|length }})</button>
+    <button class="filter-btn"        data-filter="source" data-val="Glassdoor"        onclick="applyFilters(this,'source')">Glassdoor ({{ jobs|selectattr('source','eq','Glassdoor')|list|length }})</button>
+    <button class="filter-btn"        data-filter="source" data-val="RemoteOK"         onclick="applyFilters(this,'source')">RemoteOK ({{ jobs|selectattr('source','eq','RemoteOK')|list|length }})</button>
+    <button class="filter-btn"        data-filter="source" data-val="WeWorkRemotely"   onclick="applyFilters(this,'source')">WWR ({{ jobs|selectattr('source','eq','WeWorkRemotely')|list|length }})</button>
+    <button class="filter-btn"        data-filter="source" data-val="HNJobs"           onclick="applyFilters(this,'source')">HN Jobs ({{ jobs|selectattr('source','eq','HNJobs')|list|length }})</button>
+    <button class="filter-btn"        data-filter="source" data-val="Indeed"           onclick="applyFilters(this,'source')">Indeed ({{ jobs|selectattr('source','eq','Indeed')|list|length }})</button>
+    <button class="filter-btn"        data-filter="source" data-val="career_site"      onclick="applyFilters(this,'source')">Career Sites</button>
+  </div>
+
+  <div class="toolbar-divider"></div>
+
+  <!-- Tier filter -->
+  <div class="filter-group">
+    <span class="filter-label">Tier</span>
+    <button class="filter-btn active" data-filter="tier" data-val="all" onclick="applyFilters(this,'tier')">All</button>
+    <button class="filter-btn"        data-filter="tier" data-val="1"   onclick="applyFilters(this,'tier')">T1</button>
+    <button class="filter-btn"        data-filter="tier" data-val="2"   onclick="applyFilters(this,'tier')">T2</button>
+    <button class="filter-btn"        data-filter="tier" data-val="3"   onclick="applyFilters(this,'tier')">T3</button>
+  </div>
+
+  <div class="toolbar-divider"></div>
+
+  <!-- Location filter -->
+  <div class="filter-group">
+    <span class="filter-label">Location</span>
+    <button class="filter-btn active" data-filter="loc" data-val="all"         onclick="applyFilters(this,'loc')">All</button>
+    <button class="filter-btn"        data-filter="loc" data-val="bengaluru"   onclick="applyFilters(this,'loc')">Bengaluru</button>
+    <button class="filter-btn"        data-filter="loc" data-val="delhi"       onclick="applyFilters(this,'loc')">Delhi NCR</button>
+    <button class="filter-btn"        data-filter="loc" data-val="remote"      onclick="applyFilters(this,'loc')">Remote</button>
+  </div>
+
+  <div class="toolbar-divider"></div>
+
+  <!-- Role filter -->
+  <div class="filter-group">
+    <span class="filter-label">Role</span>
+    <button class="filter-btn active" data-filter="role" data-val="all"      onclick="applyFilters(this,'role')">All</button>
+    <button class="filter-btn"        data-filter="role" data-val="java"     onclick="applyFilters(this,'role')">Java</button>
+    <button class="filter-btn"        data-filter="role" data-val="data"     onclick="applyFilters(this,'role')">Data</button>
+    <button class="filter-btn"        data-filter="role" data-val="devops"   onclick="applyFilters(this,'role')">DevOps</button>
+    <button class="filter-btn"        data-filter="role" data-val="fullstack" onclick="applyFilters(this,'role')">Full Stack</button>
+    <button class="filter-btn"        data-filter="role" data-val="cloud"    onclick="applyFilters(this,'role')">Cloud</button>
+  </div>
+
+  <div class="toolbar-divider"></div>
+
+  <!-- Experience filter -->
+  <div class="filter-group">
+    <span class="filter-label">Exp</span>
+    <button class="filter-btn active" data-filter="exp" data-val="all"   onclick="applyFilters(this,'exp')">All</button>
+    <button class="filter-btn"        data-filter="exp" data-val="0-2"   onclick="applyFilters(this,'exp')">0–2 yrs</button>
+    <button class="filter-btn"        data-filter="exp" data-val="2-4"   onclick="applyFilters(this,'exp')">2–4 yrs</button>
+    <button class="filter-btn"        data-filter="exp" data-val="4-6"   onclick="applyFilters(this,'exp')">4–6 yrs</button>
+    <button class="filter-btn"        data-filter="exp" data-val="6-8"   onclick="applyFilters(this,'exp')">6–8 yrs</button>
+    <button class="filter-btn"        data-filter="exp" data-val="8-10"  onclick="applyFilters(this,'exp')">8–10 yrs</button>
+    <button class="filter-btn"        data-filter="exp" data-val="10-12" onclick="applyFilters(this,'exp')">10–12 yrs</button>
+    <button class="filter-btn"        data-filter="exp" data-val="12-14" onclick="applyFilters(this,'exp')">12–14 yrs</button>
+    <button class="filter-btn"        data-filter="exp" data-val="14+"   onclick="applyFilters(this,'exp')">14+ yrs</button>
+  </div>
+
+  <div class="toolbar-divider"></div>
+
+  <!-- Status filter -->
+  <div class="filter-group">
+    <span class="filter-label">Status</span>
+    <button class="filter-btn active" data-filter="status" data-val="all"       onclick="applyFilters(this,'status')">All ({{ jobs|rejectattr('applied_at')|list|length }})</button>
+    <button class="filter-btn"        data-filter="status" data-val="tailored"  onclick="applyFilters(this,'status')">Tailored ({{ jobs|selectattr('tailor_result')|rejectattr('applied_at')|list|length }})</button>
+    <button class="filter-btn"        data-filter="status" data-val="applied"   onclick="applyFilters(this,'status')">Applied ({{ jobs|selectattr('applied_at')|rejectattr('job_status','eq','interview')|rejectattr('job_status','eq','rejected')|list|length }})</button>
+    <button class="filter-btn"        data-filter="status" data-val="interview" onclick="applyFilters(this,'status')">🟢 Interview ({{ jobs|selectattr('job_status','eq','interview')|list|length }})</button>
+    <button class="filter-btn"        data-filter="status" data-val="rejected"  onclick="applyFilters(this,'status')">🔴 Rejected ({{ jobs|selectattr('job_status','eq','rejected')|list|length }})</button>
+    <button class="filter-btn"        data-filter="status" data-val="responded" onclick="applyFilters(this,'status')">Responded ({{ jobs|selectattr('email_responses')|list|length }})</button>
+  </div>
+
+  <div class="toolbar-divider"></div>
+
+  <!-- Company Type filter -->
+  <div class="filter-group">
+    <span class="filter-label">Company</span>
+    <button class="filter-btn active" data-filter="cotype" data-val="all"     onclick="applyFilters(this,'cotype')">All</button>
+    <button class="filter-btn"        data-filter="cotype" data-val="Product" onclick="applyFilters(this,'cotype')">🏭 Product ({{ jobs|selectattr('company_type','eq','Product')|list|length }})</button>
+    <button class="filter-btn"        data-filter="cotype" data-val="Service" onclick="applyFilters(this,'cotype')">🔧 Service ({{ jobs|selectattr('company_type','eq','Service')|list|length }})</button>
+  </div>
+
+  <input class="search-box" id="search" type="text" placeholder="Search role, company…" oninput="applyFilters()"/>
+</div>
+
+{% if jobs %}
+<div class="grid" id="job-grid">
+  {% for job in jobs %}
+  {% set tr = job.tailor_result %}
+  {% set score = tr.match_score if tr else 0 %}
+  {% set fit = job.fit_score if job.fit_score else 0 %}
+  <div class="card" id="card-{{ job.id }}"
+       data-source="{{ job.source }}"
+       data-tailored="{{ 'yes' if tr else 'no' }}"
+       data-applied="{{ 'yes' if job.applied_at else 'no' }}"
+       data-jobstatus="{{ job.job_status or '' }}"
+       data-responded="{{ 'yes' if job.email_responses else 'no' }}"
+       data-loc="{{ job.location|lower }}"
+       data-expmin="{{ job.experience|expmin }}"
+       data-text="{{ (job.title + ' ' + job.company + ' ' + job.location)|lower }}"
+       data-responses="{{ job.email_responses | tojson | forceescape if job.email_responses else '[]' }}"
+       data-companytype="{{ job.company_type or 'Unknown' }}"
+       data-tier="{{ job.tier or '' }}"
+       data-fitscore="{{ score if score else fit }}">
+
+    <div class="card-top-right">
+      <span class="card-date">{{ job.fetched_date }}</span>
+      <button class="btn-card-remove" title="Remove this job" onclick="removeJob('{{ job.id }}', this)">×</button>
+    </div>
+
+    <div class="card-header">
+      <div class="card-source">
+        <span class="badge-{{ job.source.split(':')[0]|lower }}">{{ job.source }}</span>
+        {% if job.company_type == 'Product' %}<span class="badge-product">🏭 Product</span>{% endif %}
+        {% if job.company_type == 'Service' %}<span class="badge-service">🔧 Service</span>{% endif %}
+        {% if job.tier %}<span class="badge-tier{{ job.tier }}" title="Tier {{ job.tier }} company">T{{ job.tier }}</span>{% endif %}
+        {% if job.is_remote %}<span class="badge-remote">Remote</span>{% endif %}
+        {% if job.applied_at %}<span class="badge-applied">✓ Applied</span>{% endif %}
+        {% if job.job_status == 'rejected' %}<span class="badge-rejected">🔴 Rejected</span>{% endif %}
+        {% if job.job_status == 'interview' %}<span class="badge-interview">🟢 Interview</span>{% endif %}
+        {% if job.email_responses %}<span class="badge-responded" style="cursor:pointer" onclick="showResponses(event,'{{ job.id }}')">📬 {{ job.email_responses|length }} Response{{ 's' if job.email_responses|length > 1 else '' }}</span>{% endif %}
+      </div>
+      <div class="card-title">{{ job.title }}</div>
+      <div class="card-company">{{ job.company }}</div>
+      <div class="card-meta">
+        📍 {{ job.location or '—' }}
+        {% if job.experience %} &nbsp;·&nbsp; 🧑‍💼 {{ job.experience }}{% endif %}
+        {% if job.salary and job.salary != 'Not disclosed' %} &nbsp;·&nbsp; 💰 {{ job.salary }}
+        {% elif job.salary_estimate %} &nbsp;·&nbsp; 💰 {{ job.salary_estimate }}{% endif %}
+      </div>
+      {% if job.company_rating %}
+      <div style="margin-top:5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        <span style="font-size:12px;color:#f57c00;font-weight:700">
+          {{ '★' * (job.company_rating | int) }}{{ '☆' * (5 - job.company_rating | int) }}
+          {{ "%.1f"|format(job.company_rating) }}
+        </span>
+        {% if job.company_tags %}
+        <span style="font-size:11px;color:#888">{{ job.company_tags }}</span>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="card-body">
+      {% if tr %}
+        <div class="score-row">
+          <div class="score-badge {% if score >= 7 %}score-high{% elif score >= 5 %}score-mid{% else %}score-low{% endif %}">
+            {{ score }}
+          </div>
+          <div class="score-label">Match score<br><strong>{{ score }}/10</strong>
+            {% if tr.layout_suggestion %}
+            <br><span style="font-size:10px;color:#888">Suggested layout: <strong style="color:#0d47a1">{{ tr.layout_suggestion|title }}</strong></span>
+            {% endif %}
+          </div>
+        </div>
+        {% if tr.key_matches %}
+        <div class="tags">
+          {% for k in tr.key_matches %}<span class="tag">{{ k }}</span>{% endfor %}
+        </div>
+        {% endif %}
+        {% if tr.cover_note %}
+        <div class="cover-note">{{ tr.cover_note }}</div>
+        {% endif %}
+        {% if tr.improvement_tips %}
+        {% set n_done = namespace(v=0) %}
+        {% for tip in tr.improvement_tips %}{% if tip[:1] == '✓' %}{% set n_done.v = n_done.v + 1 %}{% endif %}{% endfor %}
+        {% set n_todo = tr.improvement_tips | length - n_done.v %}
+        <details class="tips-box" style="margin-top:8px">
+          <summary style="font-size:11.5px;font-weight:700;cursor:pointer;user-select:none;list-style:none;display:flex;align-items:center;gap:6px">
+            {% if n_todo == 0 %}
+              <span style="color:#2e7d32">✅ All tips implemented</span>
+            {% else %}
+              <span style="color:#e65100">💡</span>
+              <span style="color:#2e7d32">{{ n_done.v }} done</span>
+              <span style="color:#aaa">·</span>
+              <span style="color:#c62828">{{ n_todo }} to fix</span>
+            {% endif %}
+          </summary>
+          <ul style="margin:6px 0 0 4px;padding-left:0;list-style:none;font-size:11.5px;line-height:1.8">
+            {% for tip in tr.improvement_tips %}
+              {% if tip.startswith('✓') %}
+              <li style="color:#2e7d32;display:flex;gap:6px;align-items:flex-start">
+                <span style="flex-shrink:0;font-size:13px">✅</span>
+                <span>{{ tip[1:].lstrip(' Implemented:').strip() }}</span>
+              </li>
+              {% else %}
+              <li style="color:#c62828;display:flex;gap:6px;align-items:flex-start">
+                <span style="flex-shrink:0;font-size:13px">❌</span>
+                <span style="color:#555">{{ tip }}</span>
+              </li>
+              {% endif %}
+            {% endfor %}
+          </ul>
+        </details>
+        {% endif %}
+      {% else %}
+        {% if fit %}
+        <div class="score-row">
+          <div class="score-badge {% if fit >= 7 %}score-high{% elif fit >= 5 %}score-mid{% else %}score-low{% endif %}">
+            {{ fit }}
+          </div>
+          <div class="score-label">Fit score<br><strong>{{ fit }}/10</strong></div>
+        </div>
+        {% if job.fit_reason %}
+        <div class="cover-note" style="font-size:11.5px;color:#555">{{ job.fit_reason }}</div>
+        {% endif %}
+        {% elif job.tags %}
+        <div class="tags">
+          {% for t in job.tags[:6] %}<span class="tag">{{ t }}</span>{% endfor %}
+        </div>
+        {% endif %}
+        <div style="font-size:12px;color:#999;margin-top:8px">Resume not tailored yet</div>
+      {% endif %}
+    </div>
+
+    <div class="card-footer">
+      {% if tr %}
+        <button class="btn-sm btn-primary" onclick="window.location='/job/{{ job.id }}'">📄 View Resume</button>
+        <a href="/cover/{{ job.id }}" target="_blank" class="btn-sm" style="background:#e8f5e9;color:#1b5e20;border:1.5px solid #a5d6a7">📝 Cover Letter</a>
+        <button class="btn-sm" style="background:#fce4ec;color:#880e4f;border:1.5px solid #f48fb1" onclick="openOutreach('{{ job.id }}')">📨 Outreach</button>
+      {% else %}
+        <button class="btn-sm btn-tailor" id="tailor-btn-{{ job.id }}" onclick="tailorJob('{{ job.id }}')">✨ Tailor Resume</button>
+      {% endif %}
+      {% if job.apply_link %}
+      <a href="{{ job.apply_link }}" target="_blank" rel="noopener">
+        <button class="btn-sm btn-apply">Apply →</button>
+      </a>
+      {% endif %}
+      <select class="status-select" id="status-select-{{ job.id }}"
+              data-val="{{ 'applied' if job.applied_at and not job.job_status else (job.job_status or '') }}"
+              onchange="setJobStatus('{{ job.id }}', this.value, this)">
+        <option value="">— Track Status —</option>
+        <option value="applied"   {% if job.applied_at and not job.job_status %}selected{% endif %}>✓ Applied</option>
+        <option value="interview" {% if job.job_status == 'interview' %}selected{% endif %}>🟢 Interview</option>
+        <option value="rejected"  {% if job.job_status == 'rejected'  %}selected{% endif %}>🔴 Rejected</option>
+      </select>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="empty">
+{% if not has_resume %}
+  <div id="no-resume-banner" style="background:#fff3e0;border:1px solid #ffb74d;border-radius:10px;padding:20px 28px;max-width:460px;margin:0 auto 28px;text-align:left">
+    <div style="font-size:22px;margin-bottom:8px">📄 Upload your resume first</div>
+    <p style="margin:0 0 14px;font-size:14px;color:#5d4037">Job Hunter needs your resume to know what roles to search for. Without it, no searches will run.</p>
+    <button class="btn btn-white" style="background:#e65100;color:#fff;padding:10px 22px;border-radius:8px;font-size:14px;border:none;cursor:pointer" onclick="document.getElementById('settings-overlay').classList.add('open')">Upload Resume →</button>
+  </div>
+{% endif %}
+  <h2>No jobs yet</h2>
+  <p id="empty-hint">{% if has_resume %}Click <strong>Fetch New Jobs</strong> to scrape LinkedIn + Shine{% else %}After uploading your resume, fetch jobs{% endif %}</p>
+  <button id="empty-fetch-btn" class="btn btn-white" style="background:#0d47a1;color:#fff;padding:11px 24px;border-radius:8px;font-size:14px;border:none;cursor:pointer;{% if not has_resume %}display:none{% endif %}" onclick="startFetch()">Fetch Now</button>
+</div>
+{% endif %}
+
+<div id="toast"></div>
+
+<!-- Outreach Modal -->
+<div id="outreach-overlay" onclick="closeOutreach(event)">
+  <div id="outreach-modal">
+    <div id="outreach-modal-head">
+      <h3 id="outreach-modal-title">📨 Outreach</h3>
+      <button id="outreach-modal-close" onclick="closeOutreach()">✕</button>
+    </div>
+    <div class="outreach-tabs">
+      <button class="outreach-tab active" onclick="switchOutreachTab(0,this)">📣 LinkedIn InMail</button>
+      <button class="outreach-tab" onclick="switchOutreachTab(1,this)">📧 Cold Email</button>
+      <button class="outreach-tab" onclick="switchOutreachTab(2,this)">🏢 HR Emails</button>
+      <button class="outreach-tab" onclick="switchOutreachTab(3,this)">🤝 Referrals</button>
+      <button class="outreach-tab" onclick="switchOutreachTab(4,this)">🎯 Decision-Makers</button>
+    </div>
+    <!-- Tab 0: LinkedIn InMail -->
+    <div class="outreach-panel active" id="outreach-panel-0">
+      <div>
+        <div class="outreach-label">Connection Request Note</div>
+        <div class="outreach-box" id="or-inmail"></div>
+        <div class="outreach-char-count" id="or-inmail-chars"></div>
+      </div>
+      <div class="outreach-actions">
+        <button class="btn-copy" onclick="copyOutreach('or-inmail',this)">📋 Copy</button>
+      </div>
+      <p style="font-size:11.5px;color:#aaa;line-height:1.5">
+        Paste this into the LinkedIn connection request note (300 char limit). Keep it brief — longer notes are ignored.
+      </p>
+    </div>
+    <!-- Tab 1: Cold Email -->
+    <div class="outreach-panel" id="outreach-panel-1">
+      <div>
+        <div class="outreach-label">Subject</div>
+        <div class="outreach-box" id="or-subject" style="max-height:50px;padding:8px 14px"></div>
+      </div>
+      <div>
+        <div class="outreach-label">Body</div>
+        <div class="outreach-box" id="or-body"></div>
+      </div>
+      <div class="outreach-actions">
+        <button class="btn-copy" onclick="copyOutreach('or-body',this)">📋 Copy Body</button>
+        <button class="btn-copy" id="or-copy-all" onclick="copyOutreachEmail(this)">📋 Copy All</button>
+        <a class="btn-mailto" id="or-mailto" href="#" target="_blank">✉️ Open in Gmail</a>
+      </div>
+    </div>
+    <!-- Tab 2: HR Emails -->
+    <div class="outreach-panel" id="outreach-panel-2">
+      <div id="or-hr-list"></div>
+      <div class="hr-email-note" id="or-hr-note"></div>
+      <div class="outreach-actions">
+        <button class="btn-copy" id="or-verify-btn" onclick="verifyHrEmails(this)">🔍 Verify deliverability (free)</button>
+      </div>
+      <p style="font-size:11.5px;color:#aaa;line-height:1.5">
+        Checks with each domain's mail server whether it would accept the address — no email is actually sent. Some networks may return "unknown" if port 25 is blocked.
+      </p>
+    </div>
+    <!-- Tab 3: Referrals -->
+    <div class="outreach-panel" id="outreach-panel-3">
+      <div class="outreach-actions" id="or-joburl-actions" style="display:none">
+        <button class="btn-copy" id="or-joburl-btn" onclick="copyJobUrl(this)">📋 Copy Job Link (to share with connection)</button>
+      </div>
+      <div id="or-referral-list"></div>
+      <div class="hr-email-note" id="or-referral-note"></div>
+    </div>
+    <!-- Tab 4: Decision-Makers -->
+    <div class="outreach-panel" id="outreach-panel-4">
+      <div id="or-decision-list"></div>
+      <p style="font-size:11.5px;color:#aaa;line-height:1.5;margin-top:8px">
+        These open a prefilled LinkedIn people search in a new tab — you browse and message manually from your own logged-in session (no scraping, no risk to your account).
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- Tailor Overlay -->
+<div id="tailor-overlay">
+  <div id="tailor-overlay-box">
+    <div class="ov-spinner"></div>
+    <div class="ov-success">✅</div>
+    <h3 id="ov-title">Tailoring Resume…</h3>
+    <p id="ov-msg">AI is analysing the job description and rewriting your resume.<br>This usually takes 20–60 seconds. Retrying if score &lt; 8.</p>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div id="settings-overlay" onclick="closeSettings(event)">
+  <div id="settings-modal">
+    <h2>⚙️ Settings &amp; Resume Import</h2>
+
+    <div class="settings-section">
+      <h3>Your Profile</h3>
+      <div class="settings-row">
+        <label>Name</label>
+        <input id="s-name" type="text" placeholder="Full name" value="{{ config.candidate.name }}"/>
+      </div>
+      <div class="settings-row">
+        <label>Email</label>
+        <input id="s-email" type="email" placeholder="your@gmail.com" value="{{ config.candidate.email }}"/>
+      </div>
+      <div class="settings-row">
+        <label>Experience</label>
+        <input id="s-exp" type="number" min="0" max="40" placeholder="Years" value="{{ config.candidate.total_experience_years }}"/>
+      </div>
+      <p style="font-size:11.5px;color:#999;margin-top:6px">
+        Email is used as the Gmail sender identity for response tracking.
+      </p>
+    </div>
+
+    <div class="settings-section">
+      <h3>Resume (HTML)</h3>
+      <div class="current-resume-info" id="current-resume-info">
+        <strong>Current resume:</strong> {{ config.candidate.name }}
+        — <a href="/resume-base" target="_blank" style="color:#0d47a1">Preview</a>
+      </div>
+      <div style="margin-top:12px">
+        <div class="upload-zone" onclick="document.getElementById('resume-upload-input').click()">
+          <div style="font-size:28px">📄</div>
+          <strong>Click to upload your resume</strong>
+          <p>Supports <b>.html</b> (best quality) and <b>.pdf</b> (auto-converted)</p>
+        </div>
+        <input type="file" id="resume-upload-input" accept=".html,.htm,.pdf" onchange="uploadResume(this)"/>
+        <div class="upload-meta" id="upload-meta"></div>
+        <div class="no-struct-warn" id="no-struct-warn">
+          ⚠️ This resume doesn't use the standard CSS classes (<code>summary-text</code>, <code>.job</code> divs).
+          Tailoring will still work but bullet-level rewriting may be limited.
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-actions">
+      <button class="btn-settings-cancel" onclick="closeSettings()">Cancel</button>
+      <button class="btn-settings-save" onclick="saveSettings()">Save Profile</button>
+    </div>
+  </div>
+</div>
+
+<!-- Response Modal -->
+<div id="resp-modal-overlay" onclick="closeRespModal(event)">
+  <div id="resp-modal">
+    <div id="resp-modal-head">
+      <h3 id="resp-modal-title">Email Responses</h3>
+      <button id="resp-modal-close" onclick="closeRespModal()">✕</button>
+    </div>
+    <div id="resp-modal-body"></div>
+  </div>
+</div>
+
+<!-- Career preferences modal (shown when profile has no role/location set) -->
+<div id="career-prefs-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:#1e2130;border-radius:12px;padding:28px 32px;width:380px;max-width:94vw;box-shadow:0 8px 32px rgba(0,0,0,0.4)">
+    <h3 style="margin:0 0 6px;color:#e2e8f0;font-size:16px">Set Your Job Preferences</h3>
+    <p style="margin:0 0 20px;color:#94a3b8;font-size:13px">We'll fetch jobs matching your role and location from all tier companies.</p>
+    <label style="display:block;margin-bottom:14px">
+      <span style="font-size:12px;color:#94a3b8;display:block;margin-bottom:4px">Target Role</span>
+      <input id="pref-role" type="text" placeholder="e.g. Lead Software Engineer, DevOps Engineer"
+        style="width:100%;box-sizing:border-box;padding:9px 12px;border-radius:7px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;font-size:14px">
+    </label>
+    <label style="display:block;margin-bottom:20px">
+      <span style="font-size:12px;color:#94a3b8;display:block;margin-bottom:4px">Preferred Location</span>
+      <input id="pref-location" type="text" placeholder="e.g. Bengaluru, Delhi NCR, Remote India"
+        style="width:100%;box-sizing:border-box;padding:9px 12px;border-radius:7px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;font-size:14px">
+    </label>
+    <p style="margin:0 0 16px;font-size:11px;color:#64748b">These will be saved to your profile for future fetches.</p>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button onclick="closePrefsModal()" style="padding:8px 18px;border-radius:7px;border:1px solid #334155;background:none;color:#94a3b8;cursor:pointer;font-size:13px">Cancel</button>
+      <button onclick="submitPrefsAndFetch()" style="padding:8px 18px;border-radius:7px;border:none;background:#6366f1;color:#fff;cursor:pointer;font-size:13px;font-weight:600">Start Fetch</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let fetchTimer = null;
+
+function toast(msg, dur=3000){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), dur);
+}
+
+function startFetch(){
+  const btn = document.getElementById('fetch-btn');
+  btn.innerHTML='<span class="spinner"></span>Fetching…';
+  btn.disabled=true;
+  fetch('/fetch',{method:'POST'}).then(r=>r.json()).then(d=>{
+    toast(d.message);
+    pollFetch();
+  });
+}
+
+function pollFetch(){
+  fetchTimer = setInterval(()=>{
+    fetch('/fetch-status').then(r=>r.json()).then(d=>{
+      document.getElementById('status-msg').textContent = d.message;
+      if(!d.running){
+        clearInterval(fetchTimer);
+        document.getElementById('fetch-btn').innerHTML='Fetch New Jobs';
+        document.getElementById('fetch-btn').disabled=false;
+        toast('Done! Refreshing…');
+        setTimeout(()=>location.reload(), 1200);
+      }
+    });
+  }, 2000);
+}
+
+function _showTailorOverlay(title, company, extraMsg){
+  const box = document.getElementById('tailor-overlay-box');
+  box.classList.remove('done');
+  document.getElementById('ov-title').textContent = 'Tailoring Resume…';
+  document.getElementById('ov-msg').innerHTML =
+    `<strong>${title}</strong> @ <strong>${company}</strong><br><br>`+
+    `AI is analysing the job description and rewriting your resume.<br>`+
+    `Retries up to 3× until score ≥ 8. This takes 20–90 seconds.`+
+    (extraMsg ? `<br><br><span style="color:#e65100;font-weight:600">${extraMsg}</span>` : '');
+  document.getElementById('tailor-overlay').classList.add('active');
+}
+
+function _showTailorSuccess(title, company){
+  const box = document.getElementById('tailor-overlay-box');
+  box.classList.add('done');
+  document.getElementById('ov-title').textContent = 'Resume Tailored!';
+  document.getElementById('ov-msg').innerHTML =
+    `<strong>${title}</strong> @ <strong>${company}</strong><br><br>`+
+    `Your resume has been tailored and keywords bolded. Opening diff view…`;
+}
+
+function _hideTailorOverlay(){
+  document.getElementById('tailor-overlay').classList.remove('active');
+  document.getElementById('tailor-overlay-box').classList.remove('done');
+}
+
+function tailorJob(jobId){
+  const card  = document.getElementById('card-'+jobId);
+  const title   = card ? card.querySelector('.card-title')?.textContent   : 'this job';
+  const company = card ? card.querySelector('.card-company')?.textContent : '';
+  const btn = document.getElementById('tailor-btn-'+jobId);
+  if(btn){ btn.innerHTML='<span class="spinner spinner-dark"></span>Tailoring…'; btn.disabled=true; }
+  _showTailorOverlay(title, company);
+  fetch('/tailor/'+jobId,{method:'POST'}).then(r=>r.json()).then(d=>{
+    if(!d.ok){ _hideTailorOverlay(); toast('⚠️ '+d.message); return; }
+    pollTailor(jobId, title, company);
+  });
+}
+
+function pollTailor(jobId, title, company){
+  title   = title   || jobId;
+  company = company || '';
+  const timer = setInterval(()=>{
+    fetch('/tailor-status/'+jobId).then(r=>r.json()).then(d=>{
+      // Show retry notice mid-run (server sets message field during retries)
+      if(d.running && d.message && d.message.includes('retrying')){
+        _showTailorOverlay(title, company, '🔄 '+d.message);
+      }
+      if(d.done){
+        clearInterval(timer);
+        _showTailorSuccess(title, company);
+        // Open tailored resume in new tab; update card buttons in place
+        setTimeout(()=>{
+          window.open('/diff/'+jobId, '_blank');
+          // Swap the tailor button for view/download buttons in place
+          const btn = document.getElementById('tailor-btn-'+jobId);
+          if(btn){
+            const wrap = btn.parentElement;
+            btn.remove();
+            const viewBtn = document.createElement('button');
+            viewBtn.className='btn-sm btn-primary';
+            viewBtn.textContent='📄 View Resume';
+            viewBtn.onclick=()=>window.location='/job/'+jobId;
+            const coverBtn = document.createElement('a');
+            coverBtn.href='/cover/'+jobId; coverBtn.target='_blank';
+            coverBtn.className='btn-sm';
+            coverBtn.style.cssText='background:#e8f5e9;color:#1b5e20;border:1.5px solid #a5d6a7';
+            coverBtn.textContent='📝 Cover Letter';
+            const outreachBtn = document.createElement('button');
+            outreachBtn.className='btn-sm';
+            outreachBtn.style.cssText='background:#fce4ec;color:#880e4f;border:1.5px solid #f48fb1';
+            outreachBtn.textContent='📨 Outreach';
+            outreachBtn.onclick=()=>openOutreach(jobId);
+            wrap.prepend(outreachBtn); wrap.prepend(coverBtn); wrap.prepend(viewBtn);
+          }
+          const card = document.getElementById('card-'+jobId);
+          if(card) card.dataset.tailored='yes';
+          // Hide overlay after short success display
+          setTimeout(()=>_hideTailorOverlay(), 2200);
+        }, 400);
+      } else if(!d.running){
+        clearInterval(timer);
+        _hideTailorOverlay();
+        const btn=document.getElementById('tailor-btn-'+jobId);
+        if(btn){ btn.innerHTML='✨ Tailor Resume'; btn.disabled=false; }
+        const errMsg = d.error || 'Tailoring failed — check terminal logs';
+        toast('❌ ' + errMsg, 8000);
+      }
+    });
+  }, 3000);
+}
+
+// Active filter state
+const activeFilters = {source:'all', loc:'all', role:'all', exp:'all', status:'all', cotype:'all', tier:'all'};
+
+function applyFilters(btn, group){
+  if(btn && group){
+    document.querySelectorAll(`[data-filter="${group}"]`).forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    activeFilters[group] = btn.dataset.val;
+  }
+  const q = (document.getElementById('search').value||'').toLowerCase();
+
+  document.querySelectorAll('.card').forEach(c=>{
+    let show = true;
+    // Source
+    if(activeFilters.source !== 'all'){
+      const src = (c.dataset.source || '').toLowerCase();
+      const _careerAtsSystems = ['greenhouse','lever','workday','smartrecruiters','icims'];
+      if(activeFilters.source === 'career_site'){
+        if(!_careerAtsSystems.some(ats => src.includes(ats))) show=false;
+      } else {
+        if(c.dataset.source !== activeFilters.source) show=false;
+      }
+    }
+    // Location
+    if(show && activeFilters.loc !== 'all'){
+      const loc = (c.dataset.loc||'').toLowerCase();
+      const locMap = {
+        'bengaluru': ['bengaluru','bangalore'],
+        'delhi':     ['delhi','ncr','noida','gurgaon','gurugram'],
+        'hyderabad': ['hyderabad'],
+        'mumbai':    ['mumbai'],
+        'pune':      ['pune'],
+        'remote':    ['remote'],
+      };
+      const terms = locMap[activeFilters.loc] || [activeFilters.loc];
+      if(!terms.some(t => loc.includes(t))) show=false;
+    }
+    // Role
+    if(show && activeFilters.role !== 'all'){
+      const title = (c.dataset.text||'').toLowerCase();
+      const roleMap = {
+        'java':      ['java'],
+        'data':      ['data analyst','data engineer','data scientist','analytics'],
+        'devops':    ['devops','sre','platform engineer','infrastructure'],
+        'fullstack': ['full stack','fullstack','frontend','backend'],
+        'cloud':     ['cloud','aws','azure','gcp','architect'],
+      };
+      const terms = roleMap[activeFilters.role] || [activeFilters.role];
+      if(!terms.some(t => title.includes(t))) show=false;
+    }
+    // Experience — only filter out if the job has explicit experience data AND it's outside range
+    // Jobs with no experience data (LinkedIn/Glassdoor/Indeed never return it) pass through
+    if(show && activeFilters.exp !== 'all'){
+      const expRaw = c.dataset.expmin;
+      if(expRaw !== ''){
+        const expMin = parseInt(expRaw);
+        if(!isNaN(expMin)){
+          const bucket = activeFilters.exp;
+          if(bucket.endsWith('+')){
+            const lo = parseInt(bucket);
+            if(expMin < lo) show=false;
+          } else {
+            const [lo, hi] = bucket.split('-').map(Number);
+            if(expMin < lo || expMin >= hi) show=false;
+          }
+        }
+      }
+    }
+    // Company type
+    if(show && activeFilters.cotype !== 'all' && (c.dataset.companytype||'').toLowerCase() !== activeFilters.cotype.toLowerCase()) show=false;
+    // Tier
+    if(show && activeFilters.tier !== 'all' && c.dataset.tier !== activeFilters.tier) show=false;
+    // Status
+    const js = c.dataset.jobstatus || '';
+    if(activeFilters.status === 'all'      && c.dataset.applied === 'yes') show=false;
+    if(show && activeFilters.status === 'tailored'  && (c.dataset.tailored !== 'yes' || c.dataset.applied === 'yes')) show=false;
+    if(show && activeFilters.status === 'applied'   && (c.dataset.applied !== 'yes' || js === 'interview' || js === 'rejected')) show=false;
+    if(show && activeFilters.status === 'interview' && js !== 'interview') show=false;
+    if(show && activeFilters.status === 'rejected'  && js !== 'rejected')  show=false;
+    if(show && activeFilters.status === 'responded'  && (c.dataset.responded !== 'yes' || js === 'rejected')) show=false;
+    // Search text
+    if(show && q && !c.dataset.text.includes(q)) show=false;
+    c.style.display = show ? '' : 'none';
+  });
+}
+
+function clearAll(){
+  fetch('/clear',{method:'POST'}).then(()=>location.reload());
+}
+
+function removeJob(jobId, btn){
+  if(!confirm('Remove this job? It will be permanently hidden and won\'t reappear on future fetches.')) return;
+  fetch(`/remove/${jobId}`,{method:'POST'}).then(r=>r.json()).then(d=>{
+    if(d.ok){
+      const card=document.getElementById('card-'+jobId);
+      if(card){ card.style.transition='opacity .3s'; card.style.opacity='0';
+        setTimeout(()=>card.remove(), 300); }
+    }
+  });
+}
+
+function toggleApplied(jobId, btn){
+  const applying = btn.dataset.applied !== 'yes';
+  fetch(`/apply/${jobId}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({applied:applying})})
+    .then(r=>r.json()).then(()=>{
+      const card = document.getElementById('card-'+jobId);
+      if(applying){
+        btn.textContent='✓ Applied';
+        btn.style.cssText='background:#e8f5e9;color:#1b5e20;border:1.5px solid #a5d6a7';
+        btn.dataset.applied='yes';
+        if(card){
+          card.dataset.applied='yes';
+          const src=card.querySelector('.card-source');
+          if(src && !src.querySelector('.badge-applied')){
+            const b=document.createElement('span');
+            b.className='badge-applied'; b.textContent='✓ Applied';
+            src.insertBefore(b, src.querySelector('span[style]'));
+          }
+        }
+        toast('Marked as applied!');
+      } else {
+        btn.textContent='Mark Applied';
+        btn.style.cssText='background:#f5f5f5;color:#777;border:1.5px solid #ddd';
+        btn.dataset.applied='no';
+        if(card){
+          card.dataset.applied='no';
+          const badge=card.querySelector('.badge-applied');
+          if(badge) badge.remove();
+        }
+        toast('Removed from applied.');
+      }
+    });
+}
+
+function setJobStatus(jobId, newStatus, sel){
+  const card = document.getElementById('card-' + jobId);
+
+  // If selecting "applied" for the first time, mark as applied on backend
+  if(newStatus === 'applied'){
+    fetch(`/apply/${jobId}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({applied:true})})
+      .then(()=> fetch(`/job-status/${jobId}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:''})}))
+      .then(()=>{
+        if(card){ card.dataset.applied='yes'; card.dataset.jobstatus=''; }
+        sel.dataset.val = 'applied';
+        _updateBadges(card, 'applied');
+        toast('✓ Marked as Applied');
+        applyFilters();
+      });
+    return;
+  }
+
+  // If clearing (— Track Status —), unapply
+  if(newStatus === ''){
+    fetch(`/apply/${jobId}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({applied:false})})
+      .then(()=>{
+        if(card){ card.dataset.applied='no'; card.dataset.jobstatus=''; }
+        sel.dataset.val = '';
+        _updateBadges(card, '');
+        toast('Status cleared');
+      });
+    return;
+  }
+
+  // interview / rejected — keep applied, just update job_status
+  fetch(`/job-status/${jobId}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:newStatus})})
+    .then(r=>r.json()).then(()=>{
+      if(card){ card.dataset.applied='yes'; card.dataset.jobstatus=newStatus; }
+      sel.dataset.val = newStatus;
+      _updateBadges(card, newStatus);
+      const msgs = {interview:'🟢 Marked for Interview', rejected:'🔴 Marked as Rejected'};
+      toast(msgs[newStatus]);
+    });
+}
+
+function _updateBadges(card, status){
+  if(!card) return;
+  card.querySelectorAll('.badge-applied,.badge-rejected,.badge-interview').forEach(b=>b.remove());
+  const src = card.querySelector('.card-source');
+  if(!src || !status) return;
+  const b = document.createElement('span');
+  const map = {applied:['badge-applied','✓ Applied'], interview:['badge-interview','🟢 Interview'], rejected:['badge-rejected','🔴 Rejected']};
+  if(map[status]){ b.className=map[status][0]; b.textContent=map[status][1]; src.appendChild(b); }
+}
+
+function checkResponses(){
+  const btn=document.getElementById('resp-btn');
+  btn.innerHTML='<span class="spinner"></span>Checking…'; btn.disabled=true;
+  fetch('/check-responses',{method:'POST'}).then(r=>r.json()).then(d=>{
+    toast(d.message);
+    const t=setInterval(()=>{
+      fetch('/check-responses-status').then(r=>r.json()).then(s=>{
+        if(!s.running){
+          clearInterval(t);
+          btn.innerHTML='📬 Check Responses'; btn.disabled=false;
+          toast('Done! Reloading…');
+          setTimeout(()=>location.reload(),1000);
+        }
+      });
+    },2000);
+  });
+}
+
+// Resume auto-poll if fetch was running before reload
+if("{{ status.running }}"==="True") pollFetch();
+
+// ── Career Sites fetch ────────────────────────────────────────────────────
+function toggleCareerMenu(){
+  const m = document.getElementById('career-menu');
+  m.style.display = m.style.display === 'none' ? 'block' : 'none';
+}
+document.addEventListener('click', function(e){
+  if(!e.target.closest('.career-fetch-wrap'))
+    document.getElementById('career-menu').style.display='none';
+});
+let careerTimer = null;
+let _pendingCareerTier = null, _pendingCareerType = null;
+
+function startCareerFetch(tier, type){
+  document.getElementById('career-menu').style.display='none';
+  _pendingCareerTier = tier;
+  _pendingCareerType = type;
+  _doCareerFetch(tier, type, null, null);
+}
+
+function _doCareerFetch(tier, type, role, location){
+  const btn = document.getElementById('career-btn');
+  btn.innerHTML='<span class="spinner"></span>Scraping…';
+  btn.disabled=true;
+  document.getElementById('career-status-msg').textContent='Starting…';
+  const body = {
+    tier_filter: tier==='all'?null:tier,
+    type_filter: type==='all'?null:type,
+  };
+  if(role)     body.role = role;
+  if(location) body.location = location;
+  fetch('/fetch-careers',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(body)
+  }).then(r=>r.json()).then(d=>{
+    if(d.needs_prefs){
+      // Profile has no role/location — show the preferences modal
+      btn.innerHTML='Career Sites ▾'; btn.disabled=false;
+      document.getElementById('career-status-msg').textContent='';
+      document.getElementById('pref-role').value = d.current_role || '';
+      document.getElementById('pref-location').value = d.current_location || '';
+      document.getElementById('career-prefs-overlay').style.display='flex';
+      document.getElementById('pref-role').focus();
+      return;
+    }
+    if(!d.ok){ toast('⚠️ '+d.message); btn.innerHTML='Career Sites ▾'; btn.disabled=false; return; }
+    pollCareerFetch();
+  });
+}
+
+function closePrefsModal(){
+  document.getElementById('career-prefs-overlay').style.display='none';
+}
+
+function submitPrefsAndFetch(){
+  const role     = document.getElementById('pref-role').value.trim();
+  const location = document.getElementById('pref-location').value.trim();
+  if(!role){
+    document.getElementById('pref-role').style.borderColor='#ef4444';
+    document.getElementById('pref-role').focus();
+    return;
+  }
+  if(!location){
+    document.getElementById('pref-location').style.borderColor='#ef4444';
+    document.getElementById('pref-location').focus();
+    return;
+  }
+  closePrefsModal();
+  _doCareerFetch(_pendingCareerTier, _pendingCareerType, role, location);
+}
+function pollCareerFetch(){
+  if(careerTimer) clearInterval(careerTimer);
+  careerTimer = setInterval(()=>{
+    fetch('/fetch-careers-status').then(r=>r.json()).then(d=>{
+      document.getElementById('career-status-msg').textContent = d.message || '';
+      if(!d.running){
+        clearInterval(careerTimer);
+        careerTimer = null;
+        document.getElementById('career-btn').innerHTML='Career Sites ▾';
+        document.getElementById('career-btn').disabled=false;
+        toast('Career scrape done! Refreshing…');
+        setTimeout(()=>location.reload(), 1200);
+      }
+    });
+  }, 2000);
+}
+// Auto-resume poll if career fetch was running before page reload
+if("{{ career_status.running }}"==="True") pollCareerFetch();
+
+function showResponses(evt, jobId){
+  if(evt) evt.stopPropagation();
+  const card = document.getElementById('card-'+jobId);
+  let responses = [];
+  try{ responses = JSON.parse(card.dataset.responses || '[]'); }catch(e){}
+  if(!responses.length){ toast('No responses stored yet'); return; }
+
+  const body = document.getElementById('resp-modal-body');
+  body.innerHTML = responses.map(r => `
+    <div class="resp-card">
+      <div class="resp-card-top">
+        <div class="resp-subject">${escHtml(r.subject||'(No subject)')}</div>
+        <a class="resp-open" href="${escHtml(r.gmail_url||'#')}" target="_blank" rel="noopener">Open in Gmail ↗</a>
+      </div>
+      <div class="resp-meta">From: ${escHtml(r.from||'')} &nbsp;·&nbsp; ${escHtml((r.date||'').slice(0,25))}</div>
+      <div class="resp-snippet">${escHtml(r.snippet||'')}</div>
+    </div>`).join('');
+
+  const jobTitle = card.querySelector('.card-title')?.textContent || '';
+  document.getElementById('resp-modal-title').textContent =
+    `📬 ${responses.length} Response${responses.length>1?'s':''} — ${jobTitle}`;
+  document.getElementById('resp-modal-overlay').classList.add('open');
+}
+
+function closeRespModal(evt){
+  if(evt && evt.target !== document.getElementById('resp-modal-overlay') &&
+     evt.target !== document.getElementById('resp-modal-close')) return;
+  document.getElementById('resp-modal-overlay').classList.remove('open');
+}
+
+function escHtml(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function togglePdfDropdown(jobId){
+  const el = document.getElementById('pdf-split-'+jobId);
+  if(!el) return;
+  const isOpen = el.classList.contains('open');
+  // close all others
+  document.querySelectorAll('.pdf-split.open').forEach(e=>e.classList.remove('open'));
+  if(!isOpen) el.classList.add('open');
+}
+// Close dropdown when clicking outside
+document.addEventListener('click', function(e){
+  if(!e.target.closest('.pdf-split')){
+    document.querySelectorAll('.pdf-split.open').forEach(el=>el.classList.remove('open'));
+  }
+});
+
+// ── Settings modal ────────────────────────────────────────────────────────
+function openSettings(){
+  document.getElementById('settings-overlay').classList.add('open');
+}
+function closeSettings(evt){
+  if(evt && evt.target !== document.getElementById('settings-overlay')) return;
+  document.getElementById('settings-overlay').classList.remove('open');
+  // reset upload state
+  document.getElementById('upload-meta').style.display='none';
+  document.getElementById('no-struct-warn').style.display='none';
+  document.getElementById('resume-upload-input').value='';
+}
+
+function saveSettings(){
+  const name  = document.getElementById('s-name').value.trim();
+  const email = document.getElementById('s-email').value.trim();
+  const exp   = parseInt(document.getElementById('s-exp').value)||0;
+  if(!name || !email){ toast('Name and email are required'); return; }
+  fetch('/settings',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({name, email, total_experience_years: exp})
+  }).then(r=>r.json()).then(d=>{
+    if(d.ok){
+      document.getElementById('header-name').textContent = '— ' + d.candidate.name;
+      document.getElementById('current-resume-info').innerHTML =
+        '<strong>Current resume:</strong> ' + escHtml(d.candidate.name) +
+        ' — <a href="/resume-base" target="_blank" style="color:#0d47a1">Preview</a>';
+      toast('✅ Profile saved');
+      closeSettings();
+    } else {
+      toast('Save failed');
+    }
+  });
+}
+
+// ── Outreach Modal ─────────────────────────────────────────────────────────
+let _outreachData = null;
+
+let _outreachJobId = '';
+function openGmailWithResume(evt){
+  // Open Gmail compose in a new tab (default link behaviour via target=_blank)
+  // Also open the resume PDF in another new tab so user can drag-attach it
+  const jobId = evt.currentTarget.dataset.jobid;
+  if(jobId){
+    window.open('/pdf/' + jobId, '_blank');
+    toast('📎 Resume opened in a new tab — drag it into the Gmail compose window');
+  }
+  // Let the <a> tag navigate to Gmail normally (target=_blank)
+}
+
+function openOutreach(jobId){
+  _outreachJobId = jobId;
+  fetch('/outreach/'+jobId).then(r=>r.json()).then(d=>{
+    if(d.error){ toast('⚠️ '+d.error); return; }
+    _outreachData = d;
+
+    document.getElementById('outreach-modal-title').textContent =
+      `📨 Outreach — ${d.title} @ ${d.company}`;
+
+    // Tab 0: LinkedIn InMail
+    document.getElementById('or-inmail').textContent = d.linkedin_inmail;
+    document.getElementById('or-inmail-chars').textContent =
+      `${d.linkedin_inmail.length} / 300 characters`;
+
+    // Tab 1: Cold Email
+    document.getElementById('or-subject').textContent = d.cold_email_subject;
+    document.getElementById('or-body').textContent    = d.cold_email_body;
+    const mailtoEl = document.getElementById('or-mailto');
+    if(d.mailto){ mailtoEl.href=d.mailto; mailtoEl.dataset.jobid=_outreachJobId; mailtoEl.style.display=''; }
+    else { mailtoEl.style.display='none'; }
+
+    // Tab 2: HR Emails
+    const list = document.getElementById('or-hr-list');
+    if(d.hr_emails && d.hr_emails.length){
+      list.innerHTML = d.hr_emails.map(em=>`
+        <div class="hr-email-row" data-email="${escHtml(em)}">
+          <span class="hr-email-addr">${escHtml(em)}</span>
+          <span class="hr-verify-badge"></span>
+          <button class="btn-copy" onclick="copyText('${escHtml(em)}',this)">📋 Copy</button>
+        </div>`).join('');
+      document.getElementById('or-verify-btn').textContent = '🔍 Verify deliverability (free)';
+      document.getElementById('or-verify-btn').disabled = false;
+      document.getElementById('or-hr-note').innerHTML = d.hr_verified
+        ? '✅ Emails found via <strong>Hunter.io</strong> — real addresses from this company domain.'
+        : '⚠️ These are <strong>guessed</strong> addresses. Add a free <strong>HUNTER_API_KEY</strong> in .env for real emails.';
+    } else {
+      list.innerHTML = '<p style="color:#aaa;font-size:13px">Could not determine company domain — find the HR email on the company\'s careers page.</p>';
+      document.getElementById('or-hr-note').textContent = '';
+    }
+
+    // Tab 3: Referrals
+    const joburlActions = document.getElementById('or-joburl-actions');
+    if(d.job_url){
+      joburlActions.style.display = '';
+      document.getElementById('or-joburl-btn').textContent = d.job_url_is_company_site
+        ? '📋 Copy Job Link (company site)'
+        : '📋 Copy Search Link (finds it on their careers site)';
+    } else {
+      joburlActions.style.display = 'none';
+    }
+    const refList = document.getElementById('or-referral-list');
+    if(d.referral_contacts && d.referral_contacts.length){
+      refList.innerHTML = d.referral_contacts.map(c=>`
+        <div class="hr-email-row">
+          <span class="hr-email-addr">
+            ${escHtml(c.name)}${c.position ? ' — '+escHtml(c.position) : ''}
+            ${c.email ? '<br><span style="color:#aaa;font-size:12px">'+escHtml(c.email)+'</span>' : ''}
+          </span>
+          ${c.profile_url ? `<a class="btn-copy" href="${escHtml(c.profile_url)}" target="_blank">🔗 Profile</a>` : ''}
+        </div>`).join('');
+      document.getElementById('or-referral-note').innerHTML =
+        `🤝 Found from your LinkedIn connections — ${d.referral_contacts.length} contact(s) at ${escHtml(d.company)}.`;
+    } else {
+      refList.innerHTML = '<p style="color:#aaa;font-size:13px">No matching connections found at this company.</p>';
+      document.getElementById('or-referral-note').innerHTML =
+        '💡 Export your connections via LinkedIn Settings → Data Privacy → "Get a copy of your data" and save as <code>output/linkedin_connections.csv</code>.';
+    }
+
+    // Tab 4: Decision-Makers
+    const decList = document.getElementById('or-decision-list');
+    if(d.decision_maker_links && d.decision_maker_links.length){
+      decList.innerHTML = d.decision_maker_links.map(l=>`
+        <div class="hr-email-row">
+          <span class="hr-email-addr">${escHtml(l.label)}</span>
+          <a class="btn-copy" href="${escHtml(l.url)}" target="_blank">🔎 Search on LinkedIn</a>
+        </div>`).join('');
+    } else {
+      decList.innerHTML = '<p style="color:#aaa;font-size:13px">Could not build search links for this company.</p>';
+    }
+
+    // Reset to tab 0
+    switchOutreachTab(0, document.querySelector('.outreach-tab'));
+
+    document.getElementById('outreach-overlay').classList.add('open');
+  }).catch(()=>toast('Failed to load outreach data'));
+}
+
+function closeOutreach(evt){
+  if(evt && evt.target !== document.getElementById('outreach-overlay') &&
+     evt.target !== document.getElementById('outreach-modal-close')) return;
+  document.getElementById('outreach-overlay').classList.remove('open');
+}
+
+function switchOutreachTab(idx, btn){
+  document.querySelectorAll('.outreach-tab').forEach((t,i)=>t.classList.toggle('active',i===idx));
+  document.querySelectorAll('.outreach-panel').forEach((p,i)=>p.classList.toggle('active',i===idx));
+}
+
+function copyOutreach(elemId, btn){
+  const text = document.getElementById(elemId).textContent;
+  copyText(text, btn);
+}
+
+function copyOutreachEmail(btn){
+  if(!_outreachData) return;
+  const text = `Subject: ${_outreachData.cold_email_subject}\n\n${_outreachData.cold_email_body}`;
+  copyText(text, btn);
+}
+
+function copyJobUrl(btn){
+  if(!_outreachData || !_outreachData.job_url) return;
+  copyText(_outreachData.job_url, btn);
+}
+
+function verifyHrEmails(btn){
+  if(!_outreachData || !_outreachData.hr_emails || !_outreachData.hr_emails.length) return;
+  btn.disabled = true;
+  btn.textContent = '🔍 Checking mail servers…';
+  fetch('/verify-emails', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({emails: _outreachData.hr_emails})
+  }).then(r=>r.json()).then(d=>{
+    btn.disabled = false;
+    btn.textContent = '🔍 Verify deliverability (free)';
+    if(!d.ok){ toast('Verification failed: ' + (d.message||'')); return; }
+    const badges = {
+      valid:     '✅ Valid',
+      invalid:   '❌ Invalid',
+      catch_all: '⚠️ Catch-all (unconfirmed)',
+      unknown:   '❓ Unknown',
+    };
+    document.querySelectorAll('#or-hr-list .hr-email-row').forEach(row=>{
+      const em = row.dataset.email;
+      const res = d.results[em];
+      if(res){
+        const badgeEl = row.querySelector('.hr-verify-badge');
+        badgeEl.textContent = badges[res.status] || res.status;
+        badgeEl.title = res.detail || '';
+        badgeEl.className = 'hr-verify-badge badge-' + res.status;
+      }
+    });
+  }).catch(()=>{
+    btn.disabled = false;
+    btn.textContent = '🔍 Verify deliverability (free)';
+    toast('Verification request failed');
+  });
+}
+
+function copyText(text, btn){
+  navigator.clipboard.writeText(text).then(()=>{
+    const orig = btn.textContent;
+    btn.textContent='✅ Copied!'; btn.classList.add('copied');
+    setTimeout(()=>{ btn.textContent=orig; btn.classList.remove('copied'); }, 2000);
+  }).catch(()=>toast('Copy failed — select text manually'));
+}
+
+function uploadResume(input){
+  const file = input.files[0];
+  if(!file) return;
+  const fd = new FormData();
+  fd.append('resume', file);
+  toast('Uploading resume…');
+  fetch('/upload-resume',{method:'POST', body:fd})
+    .then(r=>r.json()).then(d=>{
+      if(!d.ok){ toast('❌ ' + d.message); return; }
+      const meta = d.meta;
+      const metaEl = document.getElementById('upload-meta');
+      metaEl.style.display='block';
+      metaEl.innerHTML = `<strong>✅ Resume imported successfully</strong>
+        ${meta.name ? '<br>Name: <b>'+escHtml(meta.name)+'</b>' : ''}
+        ${meta.email ? '<br>Email: <b>'+escHtml(meta.email)+'</b>' : ''}
+        ${meta.phone ? '<br>Phone: <b>'+escHtml(meta.phone)+'</b>' : ''}
+        ${d.cleared_jobs ? '<br>🧹 Cleared '+d.cleared_jobs+' job(s) from the previous resume (applications you tracked were kept)' : ''}
+        ${d.warning ? '<br><span style="color:#b3261e">⚠️ '+escHtml(d.warning)+'</span>' : ''}`;
+      // Fill profile fields with extracted values
+      if(meta.name)  document.getElementById('s-name').value  = meta.name;
+      if(meta.email) document.getElementById('s-email').value = meta.email;
+      // Warn if no standard structure
+      document.getElementById('no-struct-warn').style.display = d.has_structure ? 'none' : 'block';
+      // Update header and current resume info
+      if(meta.name){
+        document.getElementById('header-name').textContent = '— ' + meta.name;
+        document.getElementById('current-resume-info').innerHTML =
+          '<strong>Current resume:</strong> ' + escHtml(meta.name) +
+          ' — <a href="/resume-base" target="_blank" style="color:#0d47a1">Preview</a>';
+      }
+      toast('✅ Resume imported — click Save Profile to confirm');
+      // Hide the "upload resume first" banner and reveal the Fetch Now button
+      const banner = document.getElementById('no-resume-banner');
+      if(banner) banner.style.display = 'none';
+      const hint = document.getElementById('empty-hint');
+      if(hint) hint.innerHTML = 'Click <strong>Fetch New Jobs</strong> to scrape LinkedIn + Shine';
+      const fetchBtn = document.getElementById('empty-fetch-btn');
+      if(fetchBtn) fetchBtn.style.display = '';
+    }).catch(()=>toast('Upload failed'));
+}
+
+// Apply filters on page load so applied jobs are hidden from "All" tab immediately
+document.addEventListener('DOMContentLoaded', () => applyFilters());
+</script>
+</body>
+</html>

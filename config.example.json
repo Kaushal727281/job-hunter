@@ -1,0 +1,32 @@
+{
+  "candidate": {
+    "name": "Your Full Name",
+    "email": "you@gmail.com",
+    "total_experience_years": 5
+  },
+  "job_search": {
+    "locations": [
+      "Bengaluru",
+      "Hyderabad",
+      "Remote India"
+    ],
+    "days_old": 3,
+    "max_jobs_per_run": 40,
+    "sources": [
+      "LinkedIn",
+      "Shine",
+      "Glassdoor",
+      "Indeed"
+    ]
+  },
+  "filters": {
+    "job_types": [],
+    "min_salary_lpa": 0
+  },
+  "email": {
+    "send_hour": 8,
+    "top_n_with_pdf": 5,
+    "subject_prefix": "[Job Digest]"
+  },
+  "output_dir": "output"
+}

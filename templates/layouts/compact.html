@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>{{ name }} – Resume</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Open+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    /* Single-column, not two-column — the previous .columns flex layout
+       caused the EDUCATION section header to render mid-sentence inside
+       the TiffinLane project description when read by an ATS text parser
+       (Chrome's PDF text stream orders by vertical position across both
+       columns). Stacking everything keeps reading order strictly linear. */
+    @page { margin: 0.5in 0.55in; size: A4; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Open Sans', 'Segoe UI', Arial, sans-serif;
+      font-size: 10pt;
+      color: #1E1B4B;
+      background: #FFFFFF;
+      line-height: 1.2;
+    }
+
+    /* ── Header ── */
+    .header {
+      padding-bottom: 12px;
+      border-bottom: 2px solid #7C3AED;
+      margin-bottom: 16px;
+    }
+    .header h1 {
+      font-family: 'Poppins', sans-serif;
+      font-size: 24pt; font-weight: 700;
+      color: #312E81; letter-spacing: -0.3px;
+    }
+    .header .role {
+      font-family: 'Poppins', sans-serif;
+      font-size: 12pt; font-weight: 500;
+      color: #7C3AED; margin-top: 3px;
+    }
+    .contact {
+      display: flex; flex-wrap: wrap; gap: 3px 16px;
+      font-size: 9.5pt; color: #475569; margin-top: 7px;
+    }
+    .contact a { color: #7C3AED; text-decoration: none; }
+
+    /* ── Section titles ── */
+    .section-title {
+      font-family: 'Poppins', sans-serif;
+      font-size: 10.5pt; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.8px;
+      color: #7C3AED;
+      border-bottom: 1.5px solid #DDD6FE;
+      padding-bottom: 3px; margin-bottom: 9px; margin-top: 16px;
+    }
+    .section-title:first-child { margin-top: 0; }
+
+    /* ── Summary ── */
+    .summary-text { font-size: 10pt; line-height: 1.55; color: #475569; }
+
+    /* ── Experience ──
+       Dates are stacked blocks, not flex-positioned to the side — see note
+       above about why side-positioned content breaks ATS text extraction. */
+    .job { margin-bottom: 12px; }
+    .job:last-child { margin-bottom: 0; }
+    .job-title {
+      font-family: 'Poppins', sans-serif;
+      font-size: 10.5pt; font-weight: 600; color: #312E81;
+    }
+    .job-company { font-size: 9.5pt; color: #475569; margin-top: 1px; }
+    .job-date { font-size: 9pt; color: #94A3B8; margin-top: 1px; }
+    ul { margin: 5px 0 0 14px; padding: 0; }
+    li { font-size: 9.5pt; line-height: 1.5; margin-bottom: 4px; color: #475569; }
+    li::marker { color: #7C3AED; }
+
+    /* ── Projects ── */
+    .project { margin-bottom: 10px; }
+    .project:last-child { margin-bottom: 0; }
+    .project-name {
+      font-family: 'Poppins', sans-serif;
+      font-size: 10pt; font-weight: 600; color: #312E81;
+    }
+    .project-role { font-size: 8.5pt; color: #94A3B8; }
+    .project-stack { font-size: 8.5pt; color: #7C3AED; margin: 6px 0 3px; font-weight: 500; }
+    .project-desc { font-size: 9.5pt; line-height: 1.5; color: #475569; }
+
+    /* ── Skill highlight boxes ── */
+    .skill-box { margin-bottom: 10px; }
+    .skill-box-label {
+      font-family: 'Poppins', sans-serif;
+      font-size: 8.5pt; font-weight: 600;
+      color: #FFFFFF; background: #7C3AED;
+      padding: 2px 8px; border-radius: 3px 3px 0 0;
+      display: inline-block; margin-bottom: 0;
+    }
+    .skill-box-content {
+      font-size: 9pt; color: #475569;
+      background: #F5F3FF; border: 1px solid #DDD6FE;
+      border-radius: 0 3px 3px 3px;
+      padding: 6px 9px; line-height: 1.6;
+    }
+
+    /* ── Education ── */
+    .edu-degree {
+      font-family: 'Poppins', sans-serif;
+      font-size: 10pt; font-weight: 600; color: #312E81;
+    }
+    .edu-school { font-size: 9pt; color: #475569; margin-top: 2px; }
+    .edu-date { font-size: 8.5pt; color: #94A3B8; margin-top: 2px; }
+
+    /* ── Certifications ──
+       No position:absolute on the bullet glyph — an absolutely-positioned
+       pseudo-element got extracted into the PDF text layer separately from
+       its actual text, landing as an empty "▸" line with the cert text
+       elsewhere. A plain inline glyph stays attached to its text. */
+    .cert-item { font-size: 9pt; color: #475569; margin-bottom: 5px; line-height: 1.4; }
+    .cert-item::before { content: "▸  "; color: #7C3AED; font-weight: 700; }
+
+    /* ── Soft skills ── */
+    .soft-item { font-size: 9pt; color: #475569; margin-bottom: 4px; line-height: 1.4; }
+    .soft-item::before { content: "✓  "; color: #7C3AED; font-weight: 700; }
+
+    /* ── ATS keywords ── */
+    strong { font-weight: 600; }
+    strong.ats-kw { color: #7C3AED; font-weight: 700; }
+    .tag.tag-ats { background: #F5F3FF; color: #7C3AED; font-weight: 600;
+                   border-radius: 2px; padding: 1px 5px; font-size: 8.5pt; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>{{ name }}</h1>
+  {% if role %}<div class="role">{{ role }}</div>{% endif %}
+  <div class="contact">
+    {% if email %}<a href="mailto:{{ email }}">{{ email }}</a>{% endif %}
+    {% if phone %}<span>{{ phone }}</span>{% endif %}
+    {% if linkedin %}<a href="{{ linkedin }}">{{ linkedin | replace('https://', '') | replace('http://', '') }}</a>{% endif %}
+    {% if github %}<a href="{{ github }}">{{ github | replace('https://', '') | replace('http://', '') }}</a>{% endif %}
+  </div>
+</div>
+
+{% if summary %}
+<div class="section-title">Summary</div>
+<div class="summary-text">{{ summary | safe }}</div>
+{% endif %}
+
+{% if jobs %}
+<div class="section-title">Experience</div>
+{% for job in jobs %}
+<div class="job">
+  <div class="job-title">{{ job.title }}</div>
+  {% if job.company %}<div class="job-company">{{ job.company }}</div>{% endif %}
+  {% if job.date %}<div class="job-date">{{ job.date }}</div>{% endif %}
+  {% if job.bullets %}
+  <ul>{% for b in job.bullets %}<li>{{ b | safe }}</li>{% endfor %}</ul>
+  {% endif %}
+</div>
+{% endfor %}
+{% endif %}
+
+{% if projects %}
+<div class="section-title">Projects</div>
+{% for p in projects %}
+<div class="project">
+  <div class="project-header">
+    <span class="project-name">{{ p.name }}</span>
+    {% if p.role %}<span class="project-role">{{ p.role }}</span>{% endif %}
+  </div>
+  {% if p.stack %}<div class="project-stack">{{ p.stack | join(' · ') }}</div>{% endif %}
+  {% if p.description %}<div class="project-desc">{{ p.description }}</div>{% endif %}
+</div>
+{% endfor %}
+{% endif %}
+
+{% if skill_groups %}
+<div class="section-title">Technical Skills</div>
+{% for sg in skill_groups %}
+<div class="skill-box">
+  {% if sg.label %}<div class="skill-box-label">{{ sg.label }}</div>{% endif %}
+  <div class="skill-box-content">{{ sg.tags | join(', ') }}</div>
+</div>
+{% endfor %}
+{% endif %}
+
+{% if education %}
+<div class="section-title">Education</div>
+<div class="edu-degree">{{ education.degree }}</div>
+{% if education.school %}<div class="edu-school">{{ education.school }}</div>{% endif %}
+{% if education.date %}<div class="edu-date">{{ education.date }}</div>{% endif %}
+{% endif %}
+
+{% if certifications %}
+<div class="section-title">Certifications</div>
+{% for c in certifications %}<div class="cert-item">{{ c }}</div>{% endfor %}
+{% endif %}
+
+{% if soft_skills %}
+<div class="section-title">Soft Skills</div>
+{% for s in soft_skills %}<div class="soft-item">{{ s | replace('✔ ', '') | replace('✔', '') }}</div>{% endfor %}
+{% endif %}
+
+</body>
+</html>
