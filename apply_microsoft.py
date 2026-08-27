@@ -376,7 +376,7 @@ def apply(job_url: str, dry_run: bool = False):
                 el = page.locator(sel).first
                 if el.is_visible(timeout=1000):
                     if not el.input_value():
-                        el.fill("560100")
+                        el.fill(PROFILE["postal_code"])
                     break
             except Exception:
                 pass
