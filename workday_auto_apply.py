@@ -63,16 +63,26 @@ PROFILE = {
 _WD_PWD = _e("WORKDAY_DEFAULT_PASSWORD")
 _RH_PWD = _e("WORKDAY_RH_PASSWORD")   # Red Hat Workday account (HAR-verified)
 TENANT_CREDENTIALS = {
-    "ms":        _e("WORKDAY_MS_PASSWORD"),  # Morgan Stanley (existing account, 11-char password)
-    "redhat":    _RH_PWD,                    # Red Hat (redhat.wd5)
-    "visa":      _WD_PWD,                    # Visa (existing account)
-    "cisco":     _WD_PWD,                    # Cisco (created in earlier runs)
-    "adobe":     _WD_PWD,                    # Adobe (created in earlier runs)
-    "workday":   _WD_PWD,                    # Workday Inc (created in earlier runs)
-    "autodesk":  _WD_PWD,                    # Autodesk (created in earlier runs)
-    "mastercard": _WD_PWD,                   # Mastercard (created in earlier runs)
-    "hp":        _WD_PWD,                    # HP Inc (created in earlier runs)
-    # Add more tenants as accounts are created:
+    "ms":          _e("WORKDAY_MS_PASSWORD"),  # Morgan Stanley (existing account, 11-char password)
+    "redhat":      _RH_PWD,                    # Red Hat (redhat.wd5)
+    "visa":        _WD_PWD,                    # Visa (existing account)
+    "cisco":       _WD_PWD,                    # Cisco (created in earlier runs)
+    "adobe":       _WD_PWD,                    # Adobe (created in earlier runs)
+    "workday":     _WD_PWD,                    # Workday Inc (created in earlier runs)
+    "autodesk":    _WD_PWD,                    # Autodesk (created in earlier runs)
+    "mastercard":  _WD_PWD,                    # Mastercard (created in earlier runs)
+    "hp":          _WD_PWD,                    # HP Inc (created in earlier runs)
+    # ── Add after manually creating account on each portal ──────────────────────
+    "broadcom":    _WD_PWD,                    # TODO: create account at broadcom.wd1.myworkdayjobs.com
+    "cadence":     _WD_PWD,                    # TODO: create account at cadence.wd1.myworkdayjobs.com
+    "cloudera":    _WD_PWD,                    # TODO: create account at cloudera.wd5.myworkdayjobs.com
+    "warnerbros":  _WD_PWD,                    # TODO: create account at warnerbros.wd5.myworkdayjobs.com
+    "salesforce":  _WD_PWD,                    # TODO: create account at salesforce.wd12.myworkdayjobs.com
+    "intel":       _WD_PWD,                    # TODO: create account at intel.wd1.myworkdayjobs.com
+    "crowdstrike": _WD_PWD,                    # TODO: create account at crowdstrike.wd5.myworkdayjobs.com
+    "cohesity":    _WD_PWD,                    # TODO: create account at cohesity.wd5.myworkdayjobs.com
+    "sprinklr":    _WD_PWD,                    # TODO: create account at sprinklr.wd1.myworkdayjobs.com
+    "ptc":         _WD_PWD,                    # TODO: create account at ptc.wd1.myworkdayjobs.com
 }
 
 # Tenants that cannot be automated (OAuth-only or require email verification)
