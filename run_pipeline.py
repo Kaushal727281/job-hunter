@@ -52,6 +52,7 @@ def run_fetch():
         ["fetch_smartrecruiters.py", "--no-score"],
         ["fetch_ashby.py",           "--no-score"],
         ["fetch_phenom.py",          "--no-score"],
+        ["fetch_gmail_alerts.py",    "--no-score"],
     ]
     total_new = 0
     for script_args in fetchers:
