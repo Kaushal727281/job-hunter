@@ -8,59 +8,94 @@
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f9;color:#1e1e1e;min-height:100vh}
 
-    header{background:linear-gradient(135deg,#0d47a1,#1976d2);color:#fff;padding:20px 32px;
-           display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;
+    header{background:linear-gradient(135deg,#0d47a1,#1976d2);color:#fff;padding:18px 32px;
+           display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;
            box-shadow:0 2px 12px rgba(0,0,0,.18)}
-    header h1{font-size:22px;font-weight:700;letter-spacing:.4px}
-    .btn{border:none;border-radius:6px;padding:9px 18px;font-size:13px;font-weight:600;
-         cursor:pointer;transition:opacity .15s,transform .1s;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
-    .btn-white{background:#fff;color:#0d47a1}
-    .btn-white:hover{opacity:.9}
+    header h1{font-size:20px;font-weight:700}
+    .btn{border:none;border-radius:6px;padding:8px 16px;font-size:12.5px;font-weight:600;
+         cursor:pointer;transition:.15s;text-decoration:none;display:inline-flex;align-items:center;gap:5px}
+    .btn-white{background:#fff;color:#0d47a1}.btn-white:hover{opacity:.88}
+    .btn-outline{background:transparent;border:1.5px solid rgba(255,255,255,.7);color:#fff}
+    .btn-outline:hover{background:rgba(255,255,255,.12)}
 
-    .summary{display:flex;gap:16px;padding:20px 32px;flex-wrap:wrap}
-    .stat-card{background:#fff;border-radius:12px;padding:18px 24px;flex:1;min-width:160px;
-               box-shadow:0 1px 6px rgba(0,0,0,.08);text-align:center}
-    .stat-num{font-size:36px;font-weight:700;line-height:1}
-    .stat-label{font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:#888;margin-top:6px}
-    .stat-success .stat-num{color:#2e7d32}
-    .stat-failed  .stat-num{color:#c62828}
-    .stat-pending .stat-num{color:#e65100}
-    .stat-total   .stat-num{color:#0d47a1}
+    /* ── Summary stat cards ── */
+    .summary{display:flex;gap:14px;padding:18px 32px;flex-wrap:wrap}
+    .stat{background:#fff;border-radius:10px;padding:14px 20px;flex:1;min-width:110px;
+          box-shadow:0 1px 5px rgba(0,0,0,.07);text-align:center;cursor:pointer;
+          border:2px solid transparent;transition:.15s}
+    .stat.active{border-color:#0d47a1}
+    .stat:hover{border-color:#90caf9}
+    .stat-num{font-size:32px;font-weight:700;line-height:1}
+    .stat-label{font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:#888;margin-top:5px}
+    .c-run    .stat-num{color:#e65100}
+    .c-success.stat-num,.c-success .stat-num{color:#2e7d32}
+    .c-failed .stat-num{color:#c62828}
+    .c-error  .stat-num{color:#b71c1c}
+    .c-stuck  .stat-num{color:#6a1b9a}
+    .c-skipped.stat-num,.c-skipped .stat-num{color:#888}
+    .c-pending.stat-num,.c-pending .stat-num{color:#0d47a1}
+    .c-total  .stat-num,.c-total .stat-num{color:#0d47a1}
 
+    /* ── Filter toolbar ── */
+    .toolbar{padding:10px 32px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;
+             background:#fff;border-bottom:1px solid #dde4ed}
+    .filter-btn{border:1.5px solid #c7d5e8;background:#fff;color:#555;border-radius:20px;
+                padding:5px 14px;font-size:12px;font-weight:500;cursor:pointer;transition:.15s}
+    .filter-btn.active,.filter-btn:hover{background:#0d47a1;border-color:#0d47a1;color:#fff}
+    .search-box{margin-left:auto;border:1.5px solid #c7d5e8;border-radius:6px;
+                padding:6px 11px;font-size:13px;width:200px;outline:none}
+    .search-box:focus{border-color:#1976d2}
+
+    /* ── Main table ── */
     .section{margin:0 32px 28px}
-    .section-title{font-size:15px;font-weight:700;padding:8px 0 12px;border-bottom:2px solid #e3eaf4;
-                   margin-bottom:12px;display:flex;align-items:center;gap:8px}
-    .dot{width:10px;height:10px;border-radius:50%;display:inline-block}
-    .dot-success{background:#2e7d32}.dot-failed{background:#c62828}.dot-pending{background:#e65100}
+    .section-head{font-size:14px;font-weight:700;padding:14px 0 10px;
+                  border-bottom:2px solid #e3eaf4;margin-bottom:12px;display:flex;
+                  align-items:center;gap:8px}
+    .count-chip{background:#e8eaf6;color:#3949ab;font-size:11px;font-weight:600;
+                padding:2px 9px;border-radius:20px}
 
     table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;
-          overflow:hidden;box-shadow:0 1px 6px rgba(0,0,0,.08)}
-    th{background:#f5f8ff;font-size:11px;text-transform:uppercase;letter-spacing:.8px;
-       color:#666;padding:10px 14px;text-align:left;border-bottom:1px solid #e3eaf4}
-    td{padding:10px 14px;border-bottom:1px solid #f0f4f9;font-size:13px;vertical-align:top}
+          overflow:hidden;box-shadow:0 1px 5px rgba(0,0,0,.07)}
+    th{background:#f5f8ff;font-size:11px;text-transform:uppercase;letter-spacing:.7px;
+       color:#666;padding:9px 12px;text-align:left;border-bottom:1px solid #e3eaf4;white-space:nowrap}
+    td{padding:9px 12px;border-bottom:1px solid #f0f4f9;font-size:12.5px;vertical-align:top}
     tr:last-child td{border-bottom:none}
-    tr:hover td{background:#fafcff}
+    tr.row-running td{background:#fff8f0}
+    tr.row-stuck   td{background:#fce4ec}
+    tr.row-error   td{background:#ffebee}
+    tr:hover td{filter:brightness(.97)}
 
-    .badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600}
-    .badge-success{background:#e8f5e9;color:#2e7d32}
-    .badge-failed {background:#ffebee;color:#c62828}
-    .badge-pending{background:#fff3e0;color:#e65100}
+    .badge{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;
+           border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
+    .b-running {background:#fff3e0;color:#e65100}
+    .b-success {background:#e8f5e9;color:#2e7d32}
+    .b-failed  {background:#ffebee;color:#c62828}
+    .b-error   {background:#fce4ec;color:#b71c1c}
+    .b-stuck   {background:#f3e5f5;color:#6a1b9a}
+    .b-skipped {background:#eceff1;color:#546e7a}
+    .b-pending {background:#e3f2fd;color:#1565c0}
 
-    .ats-tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;
-             background:#e8eaf6;color:#3949ab;font-weight:600}
-
-    .error-msg{font-size:11px;color:#c62828;max-width:320px;word-break:break-word;
-               background:#ffebee;padding:4px 8px;border-radius:4px;margin-top:4px}
-    .job-link{color:#1976d2;text-decoration:none;font-weight:500}
+    .ats-tag{background:#e8eaf6;color:#3949ab;padding:2px 8px;border-radius:4px;
+             font-size:11px;font-weight:600}
+    .score-dot{display:inline-flex;align-items:center;justify-content:center;
+               width:26px;height:26px;border-radius:50%;font-weight:700;
+               font-size:11px;color:#fff}
+    .sd-high{background:#2e7d32}.sd-mid{background:#f57c00}.sd-low{background:#bbb}
+    .job-link{color:#1976d2;text-decoration:none;font-size:11.5px}
     .job-link:hover{text-decoration:underline}
+    .err-cell{font-size:11px;color:#c62828;word-break:break-word;max-width:280px;
+              background:#ffebee;padding:3px 7px;border-radius:4px;margin-top:3px}
+    .dur{font-size:11px;color:#888;white-space:nowrap}
+    .ts{font-size:11px;color:#888;white-space:nowrap}
 
-    .company-group{margin-bottom:8px}
-    .company-name{font-weight:700;font-size:13px;color:#0d47a1;margin-bottom:4px}
-    .company-count{background:#e8eaf6;color:#3949ab;font-size:11px;font-weight:600;
-                   padding:2px 7px;border-radius:10px;margin-left:6px}
+    /* ── Pending section ── */
+    .pending-table td{font-size:12.5px}
 
-    .empty{color:#aaa;font-size:13px;padding:24px;text-align:center}
-    .refresh-note{font-size:11px;color:#aaa;margin-left:auto}
+    .empty{color:#aaa;font-size:13px;padding:28px;text-align:center}
+
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .spin{display:inline-block;width:10px;height:10px;border:2px solid #e65100;
+          border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite}
   </style>
 </head>
 <body>
@@ -68,121 +103,149 @@
 <header>
   <h1>🤖 Automation Board</h1>
   <div style="display:flex;gap:10px;align-items:center">
-    <span id="last-refresh" style="font-size:12px;opacity:.75"></span>
+    <span id="live-indicator" style="font-size:12px;opacity:.8"></span>
     <a href="/" class="btn btn-white">← Back to Jobs</a>
   </div>
 </header>
 
-<!-- Summary stats -->
+<!-- Summary stats — click to filter -->
 <div class="summary">
-  <div class="stat-card stat-success">
-    <div class="stat-num" id="cnt-success">{{ applied|length }}</div>
-    <div class="stat-label">Applied</div>
+  <div class="stat c-total  active" id="stat-all"     onclick="setFilter('all')">
+    <div class="stat-num" id="cnt-total">{{ counts.total }}</div>
+    <div class="stat-label">All Attempts</div>
   </div>
-  <div class="stat-card stat-failed">
-    <div class="stat-num" id="cnt-failed">{{ failed|length }}</div>
-    <div class="stat-label">Failed</div>
+  <div class="stat c-run" id="stat-running"  onclick="setFilter('running')">
+    <div class="stat-num" id="cnt-running">{{ counts.running }}</div>
+    <div class="stat-label">🔄 Running</div>
   </div>
-  <div class="stat-card stat-pending">
+  <div class="stat c-success" id="stat-success"  onclick="setFilter('success')">
+    <div class="stat-num" id="cnt-success">{{ counts.success }}</div>
+    <div class="stat-label">✅ Success</div>
+  </div>
+  <div class="stat c-failed"  id="stat-failed"   onclick="setFilter('failed')">
+    <div class="stat-num" id="cnt-failed">{{ counts.failed }}</div>
+    <div class="stat-label">❌ Failed</div>
+  </div>
+  <div class="stat c-error"   id="stat-error"    onclick="setFilter('error')">
+    <div class="stat-num" id="cnt-error">{{ counts.error }}</div>
+    <div class="stat-label">⚠️ Error</div>
+  </div>
+  <div class="stat c-stuck"   id="stat-stuck"    onclick="setFilter('stuck')">
+    <div class="stat-num" id="cnt-stuck">{{ counts.stuck }}</div>
+    <div class="stat-label">🔴 Stuck</div>
+  </div>
+  <div class="stat c-skipped" id="stat-skipped"  onclick="setFilter('skipped')">
+    <div class="stat-num" id="cnt-skipped">{{ counts.skipped }}</div>
+    <div class="stat-label">⏭ Skipped</div>
+  </div>
+  <div class="stat c-pending" id="stat-pending"  onclick="setFilter('pending')">
     <div class="stat-num" id="cnt-pending">{{ pending|length }}</div>
-    <div class="stat-label">Pending (old)</div>
-  </div>
-  <div class="stat-card stat-total">
-    <div class="stat-num" id="cnt-total">{{ (applied|length) + (failed|length) + (pending|length) }}</div>
-    <div class="stat-label">Total Attempts</div>
+    <div class="stat-label">⏳ In Queue</div>
   </div>
 </div>
 
-<!-- Applied by company -->
-{% if by_company %}
-<div class="section">
-  <div class="section-title"><span class="dot dot-success"></span> Applied — by Company</div>
-  {% for company, jobs in by_company.items()|sort %}
-  <div class="company-group">
-    <div class="company-name">{{ company }} <span class="company-count">{{ jobs|length }}</span></div>
-    <table>
-      <thead>
-        <tr>
-          <th>Job Title</th>
-          <th>ATS</th>
-          <th>Score</th>
-          <th>Applied At</th>
-          <th>Link</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for j in jobs %}
-        <tr>
-          <td>{{ j.title }}</td>
-          <td><span class="ats-tag">{{ j.ats_type }}</span></td>
-          <td>{{ j.fit_score or '—' }}/10</td>
-          <td style="white-space:nowrap">{{ (j.applied_at or '')[:16] }}</td>
-          <td>
-            {% if j.apply_link %}
-            <a class="job-link" href="{{ j.apply_link }}" target="_blank">View ↗</a>
-            {% else %}—{% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% endfor %}
+<!-- Filter toolbar -->
+<div class="toolbar">
+  <button class="filter-btn active" data-f="all"     onclick="setFilter('all',this)">All</button>
+  <button class="filter-btn"        data-f="running" onclick="setFilter('running',this)">Running</button>
+  <button class="filter-btn"        data-f="success" onclick="setFilter('success',this)">Success</button>
+  <button class="filter-btn"        data-f="failed"  onclick="setFilter('failed',this)">Failed</button>
+  <button class="filter-btn"        data-f="error"   onclick="setFilter('error',this)">Error</button>
+  <button class="filter-btn"        data-f="stuck"   onclick="setFilter('stuck',this)">Stuck</button>
+  <button class="filter-btn"        data-f="skipped" onclick="setFilter('skipped',this)">Skipped</button>
+  <button class="filter-btn"        data-f="pending" onclick="setFilter('pending',this)">Pending Queue</button>
+  <input class="search-box" id="search" type="text" placeholder="Search job, company…" oninput="applySearch()"/>
 </div>
-{% endif %}
 
-<!-- Failed -->
-{% if failed %}
-<div class="section">
-  <div class="section-title"><span class="dot dot-failed"></span> Failed Applications</div>
-  <table>
+<!-- ── Run Log Table ── -->
+<div class="section" id="log-section" style="margin-top:20px">
+  <div class="section-head">
+    📋 Run Log
+    <span class="count-chip" id="log-count">{{ runs|length }}</span>
+  </div>
+
+  {% if runs %}
+  <table id="run-table">
     <thead>
       <tr>
+        <th>Time</th>
+        <th>Duration</th>
         <th>Job Title</th>
         <th>Company</th>
         <th>ATS</th>
         <th>Score</th>
+        <th>Status</th>
         <th>Error / Reason</th>
         <th>Link</th>
       </tr>
     </thead>
-    <tbody>
-      {% for j in failed %}
-      <tr>
-        <td>{{ j.title }}</td>
-        <td>{{ j.company }}</td>
-        <td><span class="ats-tag">{{ j.ats_type }}</span></td>
-        <td>{{ j.fit_score or '—' }}/10</td>
+    <tbody id="run-tbody">
+      {% for r in runs %}
+      <tr class="run-row row-{{ r.status }}"
+          data-status="{{ r.status }}"
+          data-text="{{ (r.title + ' ' + r.company)|lower }}">
+        <td class="ts">{{ (r.started_at or '')[:16].replace('T',' ') }}</td>
+        <td class="dur">
+          {% if r.finished_at and r.started_at %}
+            {% set d = ((r.finished_at[:19]|string) | replace('T',' ')) %}
+            <span id="dur-{{ r.run_id }}">{{ r.finished_at[:16]|replace('T',' ') }}</span>
+          {% elif r.status == 'running' %}
+            <span class="spin"></span>
+          {% else %}—{% endif %}
+        </td>
+        <td><strong>{{ r.title }}</strong></td>
+        <td>{{ r.company }}</td>
+        <td><span class="ats-tag">{{ r.ats }}</span></td>
         <td>
-          <div class="error-msg">{{ j.apply_error or 'Unknown error' }}</div>
+          {% set sc = r.score|int %}
+          <span class="score-dot {% if sc >= 8 %}sd-high{% elif sc >= 6 %}sd-mid{% else %}sd-low{% endif %}">{{ sc }}</span>
         </td>
         <td>
-          {% if j.apply_link %}
-          <a class="job-link" href="{{ j.apply_link }}" target="_blank">Retry ↗</a>
+          <span class="badge b-{{ r.status }}">
+            {% if r.status == 'running' %}<span class="spin"></span>{% endif %}
+            {{ r.status|upper }}
+          </span>
+        </td>
+        <td>
+          {% if r.error %}
+          <div class="err-cell">{{ r.error }}</div>
+          {% else %}—{% endif %}
+        </td>
+        <td>
+          {% if r.apply_link %}
+          <a class="job-link" href="{{ r.apply_link }}" target="_blank">View ↗</a>
           {% else %}—{% endif %}
         </td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
+  {% else %}
+  <div class="empty">No automation runs yet. Run <code>./run.sh --apply-only</code> to start.</div>
+  {% endif %}
 </div>
-{% endif %}
 
-<!-- Pending (applied_at set but no apply_status) — legacy entries -->
-{% if pending %}
-<div class="section">
-  <div class="section-title"><span class="dot dot-pending"></span> Pending / Legacy Applied</div>
-  <table>
+<!-- ── Pending Queue ── -->
+<div class="section" id="pending-section" style="display:none">
+  <div class="section-head">
+    ⏳ Pending Queue — jobs queued for next automation run
+    <span class="count-chip">{{ pending|length }}</span>
+  </div>
+  {% if pending %}
+  <table class="pending-table">
     <thead>
-      <tr><th>Job Title</th><th>Company</th><th>ATS</th><th>Applied At</th><th>Link</th></tr>
+      <tr><th>Job Title</th><th>Company</th><th>ATS</th><th>Score</th><th>Link</th></tr>
     </thead>
     <tbody>
       {% for j in pending %}
-      <tr>
-        <td>{{ j.title }}</td>
+      <tr data-status="pending" data-text="{{ (j.title + ' ' + j.company)|lower }}">
+        <td><strong>{{ j.title }}</strong></td>
         <td>{{ j.company }}</td>
         <td><span class="ats-tag">{{ j.ats_type }}</span></td>
-        <td style="white-space:nowrap">{{ (j.applied_at or '')[:16] }}</td>
+        <td>
+          {% set sc = j.fit_score|int %}
+          <span class="score-dot {% if sc >= 8 %}sd-high{% elif sc >= 6 %}sd-mid{% else %}sd-low{% endif %}">{{ sc }}</span>
+        </td>
         <td>
           {% if j.apply_link %}<a class="job-link" href="{{ j.apply_link }}" target="_blank">View ↗</a>
           {% else %}—{% endif %}
@@ -191,28 +254,74 @@
       {% endfor %}
     </tbody>
   </table>
+  {% else %}
+  <div class="empty">No jobs currently queued (all high-score jobs already attempted or applied).</div>
+  {% endif %}
 </div>
-{% endif %}
-
-{% if not applied and not failed and not pending %}
-<div class="empty">No automation activity yet. Run <code>./run.sh</code> to start applying.</div>
-{% endif %}
 
 <script>
-  // Auto-refresh stats every 15s
-  function refresh() {
-    fetch('/api/automation-board')
-      .then(r => r.json())
-      .then(d => {
-        document.getElementById('cnt-success').textContent = d.applied.length;
-        document.getElementById('cnt-failed').textContent  = d.failed.length;
-        document.getElementById('cnt-pending').textContent = d.pending.length;
-        document.getElementById('cnt-total').textContent   = d.applied.length + d.failed.length + d.pending.length;
-        document.getElementById('last-refresh').textContent = 'Updated ' + new Date().toLocaleTimeString();
-      });
+let currentFilter = 'all';
+
+function setFilter(f, btn) {
+  currentFilter = f;
+  // Update filter buttons
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  else {
+    const b = document.querySelector(`[data-f="${f}"]`);
+    if (b) b.classList.add('active');
   }
-  setInterval(refresh, 15000);
-  refresh();
+  // Update stat card active state
+  document.querySelectorAll('.stat').forEach(s => s.classList.remove('active'));
+  const sc = document.getElementById('stat-' + (f === 'all' ? 'all' : f));
+  if (sc) sc.classList.add('active');
+
+  const logSec     = document.getElementById('log-section');
+  const pendingSec = document.getElementById('pending-section');
+
+  if (f === 'pending') {
+    logSec.style.display     = 'none';
+    pendingSec.style.display = '';
+  } else {
+    logSec.style.display     = '';
+    pendingSec.style.display = 'none';
+    applySearch();
+  }
+}
+
+function applySearch() {
+  const q = (document.getElementById('search').value || '').toLowerCase();
+  let visible = 0;
+  document.querySelectorAll('#run-tbody .run-row').forEach(row => {
+    const matchFilter = currentFilter === 'all' || row.dataset.status === currentFilter;
+    const matchSearch = !q || (row.dataset.text || '').includes(q);
+    row.style.display = (matchFilter && matchSearch) ? '' : 'none';
+    if (matchFilter && matchSearch) visible++;
+  });
+  const lc = document.getElementById('log-count');
+  if (lc) lc.textContent = visible;
+}
+
+// Auto-refresh every 8 seconds
+function refresh() {
+  fetch('/api/automation-board')
+    .then(r => r.json())
+    .then(d => {
+      const counts = d.counts || {};
+      const fields = ['total','running','success','failed','error','stuck','skipped'];
+      fields.forEach(k => {
+        const el = document.getElementById('cnt-' + k);
+        if (el) el.textContent = counts[k] ?? 0;
+      });
+      const pe = document.getElementById('cnt-pending');
+      if (pe) pe.textContent = (d.pending || []).length;
+      document.getElementById('live-indicator').textContent =
+        'Updated ' + new Date().toLocaleTimeString();
+    })
+    .catch(() => {});
+}
+setInterval(refresh, 8000);
+refresh();
 </script>
 </body>
 </html>

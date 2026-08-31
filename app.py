@@ -1167,28 +1167,15 @@ def remove_job(job_id):
 @app.route("/automation-board")
 def automation_board():
     _select_profile()
-    jobs = job_store.all_jobs()
-
-    applied  = [j for j in jobs if j.get("apply_status") == "success"]
-    failed   = [j for j in jobs if j.get("apply_status") == "failed"]
-    pending  = [j for j in jobs if j.get("applied_at") and not j.get("apply_status")]
-
-    # sort applied by applied_at desc
-    applied.sort(key=lambda j: j.get("applied_at", ""), reverse=True)
-    failed.sort( key=lambda j: j.get("applied_at", ""), reverse=True)
-
-    # Group applied by company
-    by_company: dict = {}
-    for j in applied:
-        co = j.get("company", "Unknown")
-        by_company.setdefault(co, []).append(j)
-
+    import automation_log as _al
+    runs    = _al.all_runs()
+    counts  = _al.run_counts()
+    pending = _al.pending_jobs()
     return render_template(
         "automation_board.html",
-        applied=applied,
-        failed=failed,
+        runs=runs,
+        counts=counts,
         pending=pending,
-        by_company=by_company,
     )
 
 
@@ -1196,14 +1183,12 @@ def automation_board():
 def api_automation_board():
     """JSON feed for automation board — used for live refresh."""
     _select_profile()
-    jobs = job_store.all_jobs()
-    result = {
-        "applied": [j for j in jobs if j.get("apply_status") == "success"],
-        "failed":  [j for j in jobs if j.get("apply_status") == "failed"],
-        "pending": [j for j in jobs if j.get("applied_at") and not j.get("apply_status")],
-        "total":   len(jobs),
-    }
-    return jsonify(result)
+    import automation_log as _al
+    return jsonify({
+        "runs":    _al.all_runs(limit=200),
+        "counts":  _al.run_counts(),
+        "pending": _al.pending_jobs(),
+    })
 
 
 @app.route("/clear", methods=["POST"])

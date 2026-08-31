@@ -38,6 +38,7 @@ from email.header import decode_header
 
 import truststore
 import requests
+import automation_log
 import urllib3
 from playwright.sync_api import sync_playwright
 from playwright_stealth import Stealth
@@ -1829,20 +1830,24 @@ def main():
             )
 
         for j in jobs:
+            _run_id = automation_log.log_start(j)
             try:
                 ok = apply_to_job(j, ctx, sess)
                 if ok:
                     job_store.mark_applied(j["id"], applied=True)
                     applied_ids.append(j["id"])
+                    automation_log.log_finish(_run_id, "success")
                     print(f"  Marked applied: {j['id']}")
                 else:
-                    job_store.mark_applied(j["id"], applied=False,
-                                           error="Form not confirmed — manual review needed")
+                    err_msg = "Form not confirmed — manual review needed"
+                    job_store.mark_applied(j["id"], applied=False, error=err_msg)
+                    automation_log.log_finish(_run_id, "failed", error=err_msg)
                     skipped.append(j)
             except Exception as exc:
                 err = str(exc)[:200]
                 logger.warning(f"  [{j.get('company')}] Unexpected error: {err}")
                 job_store.mark_applied(j["id"], applied=False, error=err)
+                automation_log.log_finish(_run_id, "error", error=err)
                 skipped.append(j)
             time.sleep(RATE_SLEEP)
 

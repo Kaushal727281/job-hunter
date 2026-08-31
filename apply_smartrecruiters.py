@@ -36,6 +36,7 @@ import time
 
 from playwright.sync_api import sync_playwright
 from playwright_stealth import Stealth
+import automation_log
 
 try:
     import browser_cookie3 as _bc3
@@ -525,24 +526,28 @@ if __name__ == "__main__":
         print(f"  SCORE: {j.get('fit_score','?')}/10")
         print(f"  URL  : {j['apply_link']}")
         print(f"{'='*60}")
+        _run_id = automation_log.log_start(j)
         try:
             ok = apply(j["apply_link"], dry_run=args.dry_run)
             if ok:
                 job_store.mark_applied(j["id"], applied=True)
                 applied_count += 1
+                automation_log.log_finish(_run_id, "success")
                 print(f"  Marked applied: {j['id']}")
             else:
-                job_store.mark_applied(j["id"], applied=False,
-                                       error="Form not confirmed — manual review needed")
+                err_msg = "Form not confirmed — manual review needed"
+                job_store.mark_applied(j["id"], applied=False, error=err_msg)
+                automation_log.log_finish(_run_id, "failed", error=err_msg)
                 failed_count += 1
         except DataDomeBlockedError:
-            # Do NOT permanently fail — just skip so it can be retried when cookies refresh
             print(f"  [DataDome] {j.get('company')} — skipped (bot detection). Will retry later.")
+            automation_log.log_finish(_run_id, "failed", error="datadome_bot_detection")
             failed_count += 1
         except Exception as exc:
             err = str(exc)[:200]
             print(f"[ERROR] {err}")
             job_store.mark_applied(j["id"], applied=False, error=err)
+            automation_log.log_finish(_run_id, "error", error=err)
             failed_count += 1
         time.sleep(2)
 

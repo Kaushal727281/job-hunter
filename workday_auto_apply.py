@@ -34,6 +34,7 @@ import time
 
 from playwright.sync_api import sync_playwright
 from playwright_stealth import Stealth
+import automation_log
 
 # ── Candidate profile (loaded from .env) ──────────────────────────────────────
 
@@ -3433,21 +3434,29 @@ def main():
 
         for job in jobs:
             _out = {}
-            result = apply_to_job(job, ctx, dry_run=False, _out=_out)
+            _run_id = automation_log.log_start(job)
+            try:
+                result = apply_to_job(job, ctx, dry_run=False, _out=_out)
+            except Exception as _exc:
+                automation_log.log_finish(_run_id, "error", error=str(_exc)[:400])
+                raise
             if result == "dead":
                 # Job page 404 — soft-delete so it never appears again
                 if job["id"] != "manual":
                     job_store.remove_job(job["id"])
+                automation_log.log_finish(_run_id, "skipped", error="job_page_dead")
                 print(f"  [DEAD] Marked removed: {job['id']}")
             elif result == "already_applied":
                 # Portal confirms we already applied — mark in store
                 if job["id"] != "manual":
                     job_store.mark_applied(job["id"])
                     applied_ids.append(job["id"])
+                automation_log.log_finish(_run_id, "success")
                 print(f"  [ALREADY APPLIED] Marked in store: {job['id']}")
             elif result and job["id"] != "manual":
                 job_store.mark_applied(job["id"])
                 applied_ids.append(job["id"])
+                automation_log.log_finish(_run_id, "success")
                 print(f"  Marked as applied: {job['id']}")
             elif not result:
                 failed_ids.append(job["id"])
@@ -3455,6 +3464,7 @@ def main():
                 print(f"  [FAILED] {job['title']} @ {job['company']}: {err_reason}")
                 if job["id"] != "manual":
                     job_store.mark_applied(job["id"], applied=False, error=err_reason)
+                automation_log.log_finish(_run_id, "failed", error=err_reason)
 
             # Small pause between applications
             if len(jobs) > 1:
