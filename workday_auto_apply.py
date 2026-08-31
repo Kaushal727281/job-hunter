@@ -616,11 +616,17 @@ def _try_create_account(page, tenant: str = "") -> bool:
 
 # ── Apply to one job ──────────────────────────────────────────────────────────
 
-def apply_to_job(job: dict, ctx, dry_run: bool = False):
+def apply_to_job(job: dict, ctx, dry_run: bool = False, _out: dict = None):
     """
     Apply to one Workday job using an existing browser context.
     Returns True if we reached the review / thank-you page.
+    _out: optional dict; on failure, _out["error"] is set to the reason string.
     """
+    def _fail(reason: str):
+        """Mark failure reason in _out and return False."""
+        if _out is not None:
+            _out["error"] = reason
+        return False
     job_url    = job["apply_link"]
     resume_pdf = _resume_for_job(job)
     tenant     = _tenant_from_url(job_url) or ""
@@ -634,11 +640,11 @@ def apply_to_job(job: dict, ctx, dry_run: bool = False):
 
     if not os.path.isfile(resume_pdf):
         print(f"  [SKIP] Resume PDF not found: {resume_pdf}")
-        return False
+        return _fail("resume_pdf_not_found")
 
     if tenant in _OAUTH_ONLY_TENANTS:
         print(f"  [SKIP] {tenant} requires Google/LinkedIn OAuth — cannot automate")
-        return False
+        return _fail("oauth_only_tenant")
 
     if dry_run:
         return True
@@ -1092,6 +1098,72 @@ def apply_to_job(job: dict, ctx, dry_run: bool = False):
         _fill_field(["addressSection_postalCode", "postalCode"],     PROFILE["postal_code"])
         # Phone: clear existing (autofill may have wrong format) and fill digits only
         _fill_field(["phone-number", "phoneNumber"], PROFILE["phone"])
+
+        # Phone Device Type — select "Mobile" (required field, Workday single-select)
+        try:
+            _pt_cont = page.locator('[data-automation-id="formField-phoneType"]').first
+            if _pt_cont.is_visible(timeout=2000):
+                _pt_res = page.evaluate('''() => {
+                    var c = document.querySelector('[data-automation-id="formField-phoneType"]');
+                    if (!c) return "no-cont";
+                    // Try radio inputs first
+                    var radios = c.querySelectorAll('input[type="radio"]');
+                    for (var i = 0; i < radios.length; i++) {
+                        var r = radios[i];
+                        var label = (r.labels && r.labels[0]) ? r.labels[0].innerText : "";
+                        var v = (r.value + " " + label).toLowerCase();
+                        if (v.includes("mobile") || v.includes("cell")) {
+                            r.click();
+                            r.dispatchEvent(new Event("change", {bubbles: true}));
+                            return "radio-mobile:" + r.value;
+                        }
+                    }
+                    // Workday custom select: open dropdown and pick Mobile
+                    var btn = c.querySelector("button") || c.querySelector('[data-automation-id="promptIcon"]');
+                    if (!btn) return "no-btn";
+                    var br = btn.getBoundingClientRect();
+                    var o = {bubbles:true, cancelable:true, clientX:br.left+br.width/2, clientY:br.top+br.height/2};
+                    btn.dispatchEvent(new MouseEvent("mousedown", o));
+                    btn.dispatchEvent(new MouseEvent("mouseup", o));
+                    btn.dispatchEvent(new MouseEvent("click", o));
+                    return "opened-dropdown";
+                }''')
+                print(f"  [phoneType] {_pt_res}")
+                if "opened-dropdown" in str(_pt_res):
+                    time.sleep(0.8)
+                    _pt_pick = page.evaluate('''() => {
+                        var opts = Array.from(document.querySelectorAll('[role="option"]'))
+                            .filter(function(e) {
+                                var r = e.getBoundingClientRect();
+                                return r.width > 0 && r.height > 0;
+                            });
+                        for (var i = 0; i < opts.length; i++) {
+                            var t = (opts[i].innerText || "").toLowerCase();
+                            if (t.includes("mobile") || t.includes("cell")) {
+                                var r = opts[i].getBoundingClientRect();
+                                var o = {bubbles:true, cancelable:true,
+                                         clientX:r.left+r.width/2, clientY:r.top+r.height/2};
+                                opts[i].dispatchEvent(new MouseEvent("click", o));
+                                return "picked:" + opts[i].innerText.trim();
+                            }
+                        }
+                        // Fallback: pick first non-empty option
+                        for (var i = 0; i < opts.length; i++) {
+                            var t = (opts[i].innerText || "").trim().toLowerCase();
+                            if (t && t !== "select one") {
+                                var r = opts[i].getBoundingClientRect();
+                                var o = {bubbles:true, cancelable:true,
+                                         clientX:r.left+r.width/2, clientY:r.top+r.height/2};
+                                opts[i].dispatchEvent(new MouseEvent("click", o));
+                                return "picked-first:" + opts[i].innerText.trim();
+                            }
+                        }
+                        return "no-opts";
+                    }''')
+                    print(f"  [phoneType-pick] {_pt_pick}")
+        except Exception as _pte:
+            print(f"  [phoneType-err] {_pte}")
+
         # Debug: print all formField IDs + their text so we can identify required fields
         try:
             _all_ff = page.evaluate('''() => {
@@ -3132,16 +3204,18 @@ def apply_to_job(job: dict, ctx, dry_run: bool = False):
             page.screenshot(path=f"/tmp/wd_apply_{tenant}.png")
             print(f"[WARN] Not confirmed — screenshot at /tmp/wd_apply_{tenant}.png")
             page.close()
-            return False
+            return _fail(f"not_confirmed — screenshot: /tmp/wd_apply_{tenant}.png")
 
     except Exception as exc:
-        print(f"[ERROR] Unexpected error: {exc}")
+        err_msg = str(exc)
+        print(f"[ERROR] Unexpected error: {err_msg}")
         try:
             page.screenshot(path=f"/tmp/wd_error_{tenant}.png")
+            err_msg += f" — screenshot: /tmp/wd_error_{tenant}.png"
         except Exception:
             pass
         page.close()
-        return False
+        return _fail(f"exception: {err_msg[:300]}")
 
 
 # ── Main ─────────────────────────────────────────────────────────────────────
@@ -3367,7 +3441,8 @@ def main():
             )
 
         for job in jobs:
-            result = apply_to_job(job, ctx, dry_run=False)
+            _out = {}
+            result = apply_to_job(job, ctx, dry_run=False, _out=_out)
             if result == "dead":
                 # Job page 404 — soft-delete so it never appears again
                 if job["id"] != "manual":
@@ -3385,6 +3460,10 @@ def main():
                 print(f"  Marked as applied: {job['id']}")
             elif not result:
                 failed_ids.append(job["id"])
+                err_reason = _out.get("error", "unknown_error")
+                print(f"  [FAILED] {job['title']} @ {job['company']}: {err_reason}")
+                if job["id"] != "manual":
+                    job_store.mark_applied(job["id"], applied=False, error=err_reason)
 
             # Small pause between applications
             if len(jobs) > 1:
