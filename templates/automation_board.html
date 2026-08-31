@@ -15,60 +15,71 @@
     .btn{border:none;border-radius:6px;padding:8px 16px;font-size:12.5px;font-weight:600;
          cursor:pointer;transition:.15s;text-decoration:none;display:inline-flex;align-items:center;gap:5px}
     .btn-white{background:#fff;color:#0d47a1}.btn-white:hover{opacity:.88}
-    .btn-outline{background:transparent;border:1.5px solid rgba(255,255,255,.7);color:#fff}
-    .btn-outline:hover{background:rgba(255,255,255,.12)}
 
     /* ── Summary stat cards ── */
     .summary{display:flex;gap:14px;padding:18px 32px;flex-wrap:wrap}
     .stat{background:#fff;border-radius:10px;padding:14px 20px;flex:1;min-width:110px;
           box-shadow:0 1px 5px rgba(0,0,0,.07);text-align:center;cursor:pointer;
           border:2px solid transparent;transition:.15s}
-    .stat.active{border-color:#0d47a1}
+    .stat.active{border-color:#0d47a1;box-shadow:0 2px 10px rgba(13,71,161,.18)}
     .stat:hover{border-color:#90caf9}
     .stat-num{font-size:32px;font-weight:700;line-height:1}
     .stat-label{font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:#888;margin-top:5px}
-    .c-run    .stat-num{color:#e65100}
-    .c-success.stat-num,.c-success .stat-num{color:#2e7d32}
-    .c-failed .stat-num{color:#c62828}
-    .c-error  .stat-num{color:#b71c1c}
-    .c-stuck  .stat-num{color:#6a1b9a}
-    .c-skipped.stat-num,.c-skipped .stat-num{color:#888}
-    .c-pending.stat-num,.c-pending .stat-num{color:#0d47a1}
-    .c-total  .stat-num,.c-total .stat-num{color:#0d47a1}
+    .c-applied .stat-num{color:#1b5e20}
+    .c-run     .stat-num{color:#e65100}
+    .c-success .stat-num{color:#2e7d32}
+    .c-failed  .stat-num{color:#c62828}
+    .c-error   .stat-num{color:#b71c1c}
+    .c-stuck   .stat-num{color:#6a1b9a}
+    .c-skipped .stat-num{color:#888}
+    .c-pending .stat-num{color:#0d47a1}
+    .c-total   .stat-num{color:#37474f}
 
     /* ── Filter toolbar ── */
-    .toolbar{padding:10px 32px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;
-             background:#fff;border-bottom:1px solid #dde4ed}
-    .filter-btn{border:1.5px solid #c7d5e8;background:#fff;color:#555;border-radius:20px;
-                padding:5px 14px;font-size:12px;font-weight:500;cursor:pointer;transition:.15s}
-    .filter-btn.active,.filter-btn:hover{background:#0d47a1;border-color:#0d47a1;color:#fff}
-    .search-box{margin-left:auto;border:1.5px solid #c7d5e8;border-radius:6px;
-                padding:6px 11px;font-size:13px;width:200px;outline:none}
+    .toolbar{padding:12px 32px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+             background:#fff;border-bottom:2px solid #e3eaf4;border-top:1px solid #e3eaf4}
+    .filter-btn{border:1.5px solid #c7d5e8;background:#fff;color:#444;border-radius:20px;
+                padding:6px 16px;font-size:12.5px;font-weight:600;cursor:pointer;transition:.15s;
+                white-space:nowrap}
+    .filter-btn.active{background:#0d47a1;border-color:#0d47a1;color:#fff;
+                       box-shadow:0 2px 6px rgba(13,71,161,.25)}
+    .filter-btn:hover:not(.active){background:#e8eaf6;border-color:#9fa8da}
+    .filter-btn.f-applied.active{background:#1b5e20;border-color:#1b5e20}
+    .filter-btn.f-failed.active{background:#c62828;border-color:#c62828}
+    .filter-btn.f-pending.active{background:#1565c0;border-color:#1565c0}
+    .search-box{margin-left:auto;border:1.5px solid #c7d5e8;border-radius:8px;
+                padding:7px 13px;font-size:13px;width:220px;outline:none}
     .search-box:focus{border-color:#1976d2}
 
-    /* ── Main table ── */
-    .section{margin:0 32px 28px}
-    .section-head{font-size:14px;font-weight:700;padding:14px 0 10px;
-                  border-bottom:2px solid #e3eaf4;margin-bottom:12px;display:flex;
+    /* ── Section ── */
+    .section{margin:0 32px 32px}
+    .section-head{font-size:14px;font-weight:700;padding:16px 0 10px;
+                  border-bottom:2px solid #e3eaf4;margin-bottom:14px;display:flex;
                   align-items:center;gap:8px}
     .count-chip{background:#e8eaf6;color:#3949ab;font-size:11px;font-weight:600;
                 padding:2px 9px;border-radius:20px}
+    .count-chip.green{background:#e8f5e9;color:#2e7d32}
+    .count-chip.red{background:#ffebee;color:#c62828}
+    .count-chip.blue{background:#e3f2fd;color:#1565c0}
 
+    /* ── Tables ── */
     table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;
-          overflow:hidden;box-shadow:0 1px 5px rgba(0,0,0,.07)}
-    th{background:#f5f8ff;font-size:11px;text-transform:uppercase;letter-spacing:.7px;
-       color:#666;padding:9px 12px;text-align:left;border-bottom:1px solid #e3eaf4;white-space:nowrap}
+          overflow:hidden;box-shadow:0 1px 6px rgba(0,0,0,.07)}
+    th{background:#f5f8ff;font-size:11px;text-transform:uppercase;letter-spacing:.6px;
+       color:#666;padding:10px 12px;text-align:left;border-bottom:1px solid #e3eaf4;white-space:nowrap}
     td{padding:9px 12px;border-bottom:1px solid #f0f4f9;font-size:12.5px;vertical-align:top}
     tr:last-child td{border-bottom:none}
     tr.row-running td{background:#fff8f0}
     tr.row-stuck   td{background:#fce4ec}
     tr.row-error   td{background:#ffebee}
-    tr:hover td{filter:brightness(.97)}
+    tr:hover td{filter:brightness(.975)}
 
-    .badge{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;
+    /* ── Badges ── */
+    .badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;
            border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
     .b-running {background:#fff3e0;color:#e65100}
     .b-success {background:#e8f5e9;color:#2e7d32}
+    .b-applied {background:#c8e6c9;color:#1b5e20}
     .b-failed  {background:#ffebee;color:#c62828}
     .b-error   {background:#fce4ec;color:#b71c1c}
     .b-stuck   {background:#f3e5f5;color:#6a1b9a}
@@ -83,23 +94,28 @@
     .sd-high{background:#2e7d32}.sd-mid{background:#f57c00}.sd-low{background:#bbb}
     .job-link{color:#1976d2;text-decoration:none;font-size:11.5px}
     .job-link:hover{text-decoration:underline}
-    .err-cell{font-size:11px;color:#c62828;word-break:break-word;max-width:280px;
-              background:#ffebee;padding:3px 7px;border-radius:4px;margin-top:3px}
-    .dur{font-size:11px;color:#888;white-space:nowrap}
-    .ts{font-size:11px;color:#888;white-space:nowrap}
-    .err-expand{font-size:11px;color:#1976d2;cursor:pointer;text-decoration:underline;display:block;margin-top:3px}
-    .err-full{display:none;font-size:11px;color:#555;margin-top:4px;padding:5px 8px;
-              background:#fff3e0;border-radius:4px;word-break:break-word;white-space:pre-wrap;max-width:340px}
+
+    /* ── Error cells ── */
+    .err-cell{font-size:11.5px;color:#c62828;word-break:break-word;
+              padding:4px 8px;border-radius:4px;margin-top:3px;background:#ffebee;
+              line-height:1.5}
+    .err-expand{font-size:11px;color:#1976d2;cursor:pointer;text-decoration:underline;
+                display:inline-block;margin-top:4px}
+    .err-full{display:none;font-size:11px;color:#555;margin-top:5px;padding:6px 9px;
+              background:#fff3e0;border-radius:4px;word-break:break-word;
+              white-space:pre-wrap;max-width:400px;line-height:1.5}
     .err-full.open{display:block}
 
-    /* ── Pending section ── */
-    .pending-table td{font-size:12.5px}
-
-    .empty{color:#aaa;font-size:13px;padding:28px;text-align:center}
+    .dur{font-size:11px;color:#888;white-space:nowrap}
+    .ts{font-size:11px;color:#888;white-space:nowrap}
+    .empty{color:#aaa;font-size:13px;padding:32px;text-align:center}
 
     @keyframes spin{to{transform:rotate(360deg)}}
     .spin{display:inline-block;width:10px;height:10px;border:2px solid #e65100;
           border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite}
+
+    /* ── Applied jobs table ── */
+    .applied-date{font-size:11px;color:#2e7d32;white-space:nowrap}
   </style>
 </head>
 <body>
@@ -112,63 +128,196 @@
   </div>
 </header>
 
-<!-- Summary stats — click to filter -->
+<!-- ── Summary stat cards ── -->
 <div class="summary">
-  <div class="stat c-total  active" id="stat-all"     onclick="setFilter('all')">
-    <div class="stat-num" id="cnt-total">{{ counts.total }}</div>
-    <div class="stat-label">All Attempts</div>
+  <div class="stat c-applied active" id="stat-applied" onclick="setFilter('applied',null,this)">
+    <div class="stat-num" id="cnt-applied-jobs">{{ counts.applied_jobs }}</div>
+    <div class="stat-label">✅ Applied</div>
   </div>
-  <div class="stat c-run" id="stat-running"  onclick="setFilter('running')">
+  <div class="stat c-run" id="stat-running" onclick="setFilter('running',null,this)">
     <div class="stat-num" id="cnt-running">{{ counts.running }}</div>
     <div class="stat-label">🔄 Running</div>
   </div>
-  <div class="stat c-success" id="stat-success"  onclick="setFilter('success')">
+  <div class="stat c-success" id="stat-success" onclick="setFilter('success',null,this)">
     <div class="stat-num" id="cnt-success">{{ counts.success }}</div>
-    <div class="stat-label">✅ Success</div>
+    <div class="stat-label">✓ Submitted</div>
   </div>
-  <div class="stat c-failed"  id="stat-failed"   onclick="setFilter('failed')">
-    <div class="stat-num" id="cnt-failed">{{ counts.failed }}</div>
+  <div class="stat c-failed" id="stat-failed" onclick="setFilter('failed',null,this)">
+    <div class="stat-num" id="cnt-failed-jobs">{{ counts.failed_jobs }}</div>
     <div class="stat-label">❌ Failed</div>
   </div>
-  <div class="stat c-error"   id="stat-error"    onclick="setFilter('error')">
+  <div class="stat c-error" id="stat-error" onclick="setFilter('error',null,this)">
     <div class="stat-num" id="cnt-error">{{ counts.error }}</div>
     <div class="stat-label">⚠️ Error</div>
   </div>
-  <div class="stat c-stuck"   id="stat-stuck"    onclick="setFilter('stuck')">
+  <div class="stat c-stuck" id="stat-stuck" onclick="setFilter('stuck',null,this)">
     <div class="stat-num" id="cnt-stuck">{{ counts.stuck }}</div>
     <div class="stat-label">🔴 Stuck</div>
   </div>
-  <div class="stat c-skipped" id="stat-skipped"  onclick="setFilter('skipped')">
+  <div class="stat c-skipped" id="stat-skipped" onclick="setFilter('skipped',null,this)">
     <div class="stat-num" id="cnt-skipped">{{ counts.skipped }}</div>
     <div class="stat-label">⏭ Skipped</div>
   </div>
-  <div class="stat c-pending" id="stat-pending"  onclick="setFilter('pending')">
+  <div class="stat c-pending" id="stat-pending" onclick="setFilter('pending',null,this)">
     <div class="stat-num" id="cnt-pending">{{ pending|length }}</div>
-    <div class="stat-label">⏳ In Queue</div>
+    <div class="stat-label">⏳ Pending</div>
+  </div>
+  <div class="stat c-total" id="stat-all" onclick="setFilter('all',null,this)">
+    <div class="stat-num" id="cnt-total">{{ counts.total }}</div>
+    <div class="stat-label">📋 Run Log</div>
   </div>
 </div>
 
-<!-- Filter toolbar -->
+<!-- ── Filter toolbar ── -->
 <div class="toolbar">
-  <button class="filter-btn active" data-f="all"     onclick="setFilter('all',this)">All</button>
-  <button class="filter-btn"        data-f="running" onclick="setFilter('running',this)">Running</button>
-  <button class="filter-btn"        data-f="success" onclick="setFilter('success',this)">Success</button>
-  <button class="filter-btn"        data-f="failed"  onclick="setFilter('failed',this)">Failed</button>
-  <button class="filter-btn"        data-f="error"   onclick="setFilter('error',this)">Error</button>
-  <button class="filter-btn"        data-f="stuck"   onclick="setFilter('stuck',this)">Stuck</button>
-  <button class="filter-btn"        data-f="skipped" onclick="setFilter('skipped',this)">Skipped</button>
-  <button class="filter-btn"        data-f="pending" onclick="setFilter('pending',this)">Pending Queue</button>
-  <input class="search-box" id="search" type="text" placeholder="Search job, company…" oninput="applySearch()"/>
+  <button class="filter-btn f-applied active" data-f="applied"  onclick="setFilter('applied',this)">✅ Applied ({{ counts.applied_jobs }})</button>
+  <button class="filter-btn f-failed"         data-f="failed"   onclick="setFilter('failed',this)">❌ Failed ({{ counts.failed_jobs }})</button>
+  <button class="filter-btn f-pending"        data-f="pending"  onclick="setFilter('pending',this)">⏳ Pending ({{ pending|length }})</button>
+  <button class="filter-btn"                  data-f="running"  onclick="setFilter('running',this)">🔄 Running</button>
+  <button class="filter-btn"                  data-f="success"  onclick="setFilter('success',this)">✓ Submitted</button>
+  <button class="filter-btn"                  data-f="error"    onclick="setFilter('error',this)">⚠️ Error</button>
+  <button class="filter-btn"                  data-f="stuck"    onclick="setFilter('stuck',this)">🔴 Stuck</button>
+  <button class="filter-btn"                  data-f="skipped"  onclick="setFilter('skipped',this)">⏭ Skipped</button>
+  <button class="filter-btn"                  data-f="all"      onclick="setFilter('all',this)">📋 All Runs</button>
+  <input class="search-box" id="search" type="text" placeholder="Search job or company…" oninput="applySearch()"/>
 </div>
 
-<!-- ── Run Log Table ── -->
-<div class="section" id="log-section" style="margin-top:20px">
+<!-- ── Applied Jobs Section ── -->
+<div class="section" id="applied-section" style="margin-top:20px">
   <div class="section-head">
-    📋 Run Log
+    ✅ Applied Jobs
+    <span class="count-chip green" id="applied-count">{{ applied|length }}</span>
+  </div>
+  <div id="applied-empty" style="display:none" class="empty">No applications submitted yet.</div>
+  <table id="applied-table">
+    <thead>
+      <tr>
+        <th>Applied At</th>
+        <th>Job Title</th>
+        <th>Company</th>
+        <th>ATS</th>
+        <th>Score</th>
+        <th>Status</th>
+        <th>Link</th>
+      </tr>
+    </thead>
+    <tbody id="applied-tbody">
+      {% for j in applied %}
+      <tr data-text="{{ (j.title + ' ' + j.company)|lower }}">
+        <td class="applied-date">{{ (j.applied_at or '')[:16].replace('T',' ') }}</td>
+        <td><strong>{{ j.title }}</strong></td>
+        <td>{{ j.company }}</td>
+        <td><span class="ats-tag">{{ j.ats_type }}</span></td>
+        <td>
+          {% set sc = j.fit_score|int %}
+          <span class="score-dot {% if sc >= 8 %}sd-high{% elif sc >= 6 %}sd-mid{% else %}sd-low{% endif %}">{{ sc }}</span>
+        </td>
+        <td><span class="badge b-applied">Applied</span></td>
+        <td>
+          {% if j.apply_link %}<a class="job-link" href="{{ j.apply_link }}" target="_blank">View ↗</a>
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if not applied %}
+  <script>document.getElementById('applied-empty').style.display='';document.getElementById('applied-table').style.display='none';</script>
+  {% endif %}
+</div>
+
+<!-- ── Failed Jobs Section ── -->
+<div class="section" id="failed-section" style="display:none">
+  <div class="section-head">
+    ❌ Failed Jobs
+    <span class="count-chip red" id="failed-count">{{ failed_jobs|length }}</span>
+  </div>
+  <div id="failed-empty" class="empty" style="display:none">No failed applications.</div>
+  <table id="failed-table">
+    <thead>
+      <tr>
+        <th>Job Title</th>
+        <th>Company</th>
+        <th>ATS</th>
+        <th>Score</th>
+        <th>Error / Reason</th>
+        <th>Link</th>
+      </tr>
+    </thead>
+    <tbody id="failed-tbody">
+      {% for j in failed_jobs %}
+      <tr data-text="{{ (j.title + ' ' + j.company)|lower }}">
+        <td><strong>{{ j.title }}</strong></td>
+        <td>{{ j.company }}</td>
+        <td><span class="ats-tag">{{ j.ats_type }}</span></td>
+        <td>
+          {% set sc = j.fit_score|int %}
+          <span class="score-dot {% if sc >= 8 %}sd-high{% elif sc >= 6 %}sd-mid{% else %}sd-low{% endif %}">{{ sc }}</span>
+        </td>
+        <td>
+          {% set err = j.apply_error or '' %}
+          {% if err %}
+          <div class="err-cell">{{ err[:120] }}{% if err|length > 120 %}…{% endif %}</div>
+          {% if err|length > 120 %}
+          <span class="err-expand" onclick="toggleErr(this)">▼ more info</span>
+          <div class="err-full">{{ err }}</div>
+          {% endif %}
+          {% else %}—{% endif %}
+        </td>
+        <td>
+          {% if j.apply_link %}<a class="job-link" href="{{ j.apply_link }}" target="_blank">View ↗</a>
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if not failed_jobs %}
+  <script>document.getElementById('failed-empty').style.display='';document.getElementById('failed-table').style.display='none';</script>
+  {% endif %}
+</div>
+
+<!-- ── Pending Queue Section ── -->
+<div class="section" id="pending-section" style="display:none">
+  <div class="section-head">
+    ⏳ Pending Queue — queued for next automation run
+    <span class="count-chip blue" id="pending-count">{{ pending|length }}</span>
+  </div>
+  <div id="pending-empty" class="empty" style="display:none">No jobs currently queued.</div>
+  <table id="pending-table">
+    <thead>
+      <tr><th>Job Title</th><th>Company</th><th>ATS</th><th>Score</th><th>Link</th></tr>
+    </thead>
+    <tbody id="pending-tbody">
+      {% for j in pending %}
+      <tr data-text="{{ (j.title + ' ' + j.company)|lower }}">
+        <td><strong>{{ j.title }}</strong></td>
+        <td>{{ j.company }}</td>
+        <td><span class="ats-tag">{{ j.ats_type }}</span></td>
+        <td>
+          {% set sc = j.fit_score|int %}
+          <span class="score-dot {% if sc >= 8 %}sd-high{% elif sc >= 6 %}sd-mid{% else %}sd-low{% endif %}">{{ sc }}</span>
+        </td>
+        <td>
+          {% if j.apply_link %}<a class="job-link" href="{{ j.apply_link }}" target="_blank">View ↗</a>
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if not pending %}
+  <script>document.getElementById('pending-empty').style.display='';document.getElementById('pending-table').style.display='none';</script>
+  {% endif %}
+</div>
+
+<!-- ── Run Log Section ── -->
+<div class="section" id="log-section" style="display:none">
+  <div class="section-head">
+    📋 Automation Run Log
     <span class="count-chip" id="log-count">{{ runs|length }}</span>
   </div>
-
-  <div id="run-empty" style="display:none" class="empty">No automation runs yet. Run <code>./run.sh --apply-only</code> to start.</div>
+  <div id="run-empty" class="empty" style="display:none">No automation runs yet.</div>
   <table id="run-table">
     <thead>
       <tr>
@@ -191,9 +340,9 @@
         <td class="ts">{{ (r.started_at or '')[:16].replace('T',' ') }}</td>
         <td class="dur">
           {% if r.finished_at and r.started_at %}
-            <span id="dur-{{ r.run_id }}" data-start="{{ r.started_at }}" data-end="{{ r.finished_at }}">—</span>
-          {% elif r.status == 'running' or r.status == 'stuck' %}
-            <span class="spin" id="dur-{{ r.run_id }}" data-start="{{ r.started_at }}"></span>
+            <span data-start="{{ r.started_at }}" data-end="{{ r.finished_at }}">—</span>
+          {% elif r.status in ('running','stuck') %}
+            <span class="spin" data-start="{{ r.started_at }}"></span>
           {% else %}—{% endif %}
         </td>
         <td><strong>{{ r.title }}</strong></td>
@@ -211,8 +360,8 @@
         </td>
         <td>
           {% if r.error %}
-          <div class="err-cell">{{ r.error[:80] }}{% if r.error|length > 80 %}…{% endif %}</div>
-          {% if r.error|length > 80 %}
+          <div class="err-cell">{{ r.error[:120] }}{% if r.error|length > 120 %}…{% endif %}</div>
+          {% if r.error|length > 120 %}
           <span class="err-expand" onclick="toggleErr(this)">▼ more info</span>
           <div class="err-full">{{ r.error }}</div>
           {% endif %}
@@ -227,49 +376,14 @@
       {% endfor %}
     </tbody>
   </table>
-  {% if not runs %}
-  <script>document.getElementById('run-empty').style.display='';document.getElementById('run-table').style.display='none';</script>
-  {% endif %}
-</div>
-
-<!-- ── Pending Queue ── -->
-<div class="section" id="pending-section" style="display:none">
-  <div class="section-head">
-    ⏳ Pending Queue — jobs queued for next automation run
-    <span class="count-chip">{{ pending|length }}</span>
-  </div>
-  {% if pending %}
-  <table class="pending-table">
-    <thead>
-      <tr><th>Job Title</th><th>Company</th><th>ATS</th><th>Score</th><th>Link</th></tr>
-    </thead>
-    <tbody id="pending-tbody">
-      {% for j in pending %}
-      <tr data-status="pending" data-text="{{ (j.title + ' ' + j.company)|lower }}">
-        <td><strong>{{ j.title }}</strong></td>
-        <td>{{ j.company }}</td>
-        <td><span class="ats-tag">{{ j.ats_type }}</span></td>
-        <td>
-          {% set sc = j.fit_score|int %}
-          <span class="score-dot {% if sc >= 8 %}sd-high{% elif sc >= 6 %}sd-mid{% else %}sd-low{% endif %}">{{ sc }}</span>
-        </td>
-        <td>
-          {% if j.apply_link %}<a class="job-link" href="{{ j.apply_link }}" target="_blank">View ↗</a>
-          {% else %}—{% endif %}
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <div class="empty">No jobs currently queued (all high-score jobs already attempted or applied).</div>
-  {% endif %}
 </div>
 
 <script>
-let currentFilter = 'all';
-let _allRuns = [];
+let currentFilter = 'applied';
+let _allRuns     = [];
 let _pendingJobs = [];
+let _appliedJobs = [];
+let _failedJobs  = [];
 
 // ── Duration helpers ──────────────────────────────────────────────────────
 function fmtDur(startIso, endIso) {
@@ -285,16 +399,13 @@ function fmtDur(startIso, endIso) {
 function refreshDurations() {
   document.querySelectorAll('[data-start]').forEach(el => {
     const end = el.dataset.end;
-    if (!end) {
-      // still running — show elapsed
-      el.innerHTML = '<span class="spin"></span> ' + fmtDur(el.dataset.start);
-    } else {
-      el.textContent = fmtDur(el.dataset.start, end);
-    }
+    el.innerHTML = end
+      ? fmtDur(el.dataset.start, end)
+      : '<span class="spin"></span> ' + fmtDur(el.dataset.start);
   });
 }
 
-// ── Expand/collapse error detail ──────────────────────────────────────────
+// ── Expand/collapse error ─────────────────────────────────────────────────
 function toggleErr(el) {
   const full = el.nextElementSibling;
   if (!full) return;
@@ -307,19 +418,18 @@ function scoreDot(sc) {
   const cls = sc >= 8 ? 'sd-high' : sc >= 6 ? 'sd-mid' : 'sd-low';
   return `<span class="score-dot ${cls}">${sc}</span>`;
 }
-
 function statusBadge(status) {
   const spin = status === 'running' ? '<span class="spin"></span> ' : '';
   return `<span class="badge b-${status}">${spin}${status.toUpperCase()}</span>`;
 }
-
 function errorCell(err) {
   if (!err) return '—';
-  const short = err.length > 80 ? err.slice(0, 80) + '…' : err;
+  const esc = err.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  const short = esc.length > 120 ? esc.slice(0,120) + '…' : esc;
   let html = `<div class="err-cell">${short}</div>`;
-  if (err.length > 80) {
+  if (err.length > 120) {
     html += `<span class="err-expand" onclick="toggleErr(this)">▼ more info</span>
-             <div class="err-full">${err.replace(/</g,'&lt;')}</div>`;
+             <div class="err-full">${esc}</div>`;
   }
   return html;
 }
@@ -329,13 +439,15 @@ function buildRunRow(r) {
   const durAttr = r.started_at
     ? `data-start="${r.started_at}"${r.finished_at ? ` data-end="${r.finished_at}"` : ''}`
     : '';
-  const link = r.apply_link
-    ? `<a class="job-link" href="${r.apply_link}" target="_blank">View ↗</a>`
+  const durHtml = r.started_at
+    ? `<span ${durAttr}>—</span>`
     : '—';
+  const link = r.apply_link
+    ? `<a class="job-link" href="${r.apply_link}" target="_blank">View ↗</a>` : '—';
   return `<tr class="run-row ${rowCls}" data-status="${r.status}"
               data-text="${(r.title+' '+r.company).toLowerCase()}">
     <td class="ts">${(r.started_at||'').slice(0,16).replace('T',' ')}</td>
-    <td class="dur"><span ${durAttr}>—</span></td>
+    <td class="dur">${durHtml}</td>
     <td><strong>${r.title||''}</strong></td>
     <td>${r.company||''}</td>
     <td><span class="ats-tag">${r.ats||''}</span></td>
@@ -346,46 +458,145 @@ function buildRunRow(r) {
   </tr>`;
 }
 
-function buildPendingRow(j) {
+function buildAppliedRow(j) {
   const sc = +(j.fit_score||0);
-  const dot = scoreDot(sc);
+  const dt = (j.applied_at||'').slice(0,16).replace('T',' ');
   const link = j.apply_link ? `<a class="job-link" href="${j.apply_link}" target="_blank">View ↗</a>` : '—';
-  return `<tr data-status="pending" data-text="${(j.title+' '+j.company).toLowerCase()}">
+  return `<tr data-text="${(j.title+' '+j.company).toLowerCase()}">
+    <td class="applied-date">${dt}</td>
     <td><strong>${j.title||''}</strong></td>
     <td>${j.company||''}</td>
     <td><span class="ats-tag">${j.ats_type||''}</span></td>
-    <td>${dot}</td>
+    <td>${scoreDot(sc)}</td>
+    <td><span class="badge b-applied">Applied</span></td>
     <td>${link}</td>
   </tr>`;
 }
 
-// ── Filter & search ───────────────────────────────────────────────────────
-function setFilter(f, btn) {
+function buildFailedRow(j) {
+  const sc = +(j.fit_score||0);
+  const link = j.apply_link ? `<a class="job-link" href="${j.apply_link}" target="_blank">View ↗</a>` : '—';
+  return `<tr data-text="${(j.title+' '+j.company).toLowerCase()}">
+    <td><strong>${j.title||''}</strong></td>
+    <td>${j.company||''}</td>
+    <td><span class="ats-tag">${j.ats_type||''}</span></td>
+    <td>${scoreDot(sc)}</td>
+    <td>${errorCell(j.apply_error||'')}</td>
+    <td>${link}</td>
+  </tr>`;
+}
+
+function buildPendingRow(j) {
+  const sc = +(j.fit_score||0);
+  const link = j.apply_link ? `<a class="job-link" href="${j.apply_link}" target="_blank">View ↗</a>` : '—';
+  return `<tr data-text="${(j.title+' '+j.company).toLowerCase()}">
+    <td><strong>${j.title||''}</strong></td>
+    <td>${j.company||''}</td>
+    <td><span class="ats-tag">${j.ats_type||''}</span></td>
+    <td>${scoreDot(sc)}</td>
+    <td>${link}</td>
+  </tr>`;
+}
+
+// ── Section visibility ────────────────────────────────────────────────────
+const _SECTIONS = {
+  applied: 'applied-section',
+  failed:  'failed-section',
+  pending: 'pending-section',
+};
+const _RUN_FILTERS = new Set(['all','running','success','error','stuck','skipped']);
+
+function showSection(id) {
+  ['applied-section','failed-section','pending-section','log-section'].forEach(s => {
+    document.getElementById(s).style.display = s === id ? '' : 'none';
+  });
+}
+
+// ── Filter ────────────────────────────────────────────────────────────────
+function setFilter(f, btn, statCard) {
   currentFilter = f;
+  // Toolbar buttons
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-  if (btn) btn.classList.add('active');
-  else { const b = document.querySelector(`[data-f="${f}"]`); if (b) b.classList.add('active'); }
+  if (btn) { btn.classList.add('active'); }
+  else {
+    const b = document.querySelector(`[data-f="${f}"]`);
+    if (b) b.classList.add('active');
+  }
+  // Stat cards
   document.querySelectorAll('.stat').forEach(s => s.classList.remove('active'));
-  const sc = document.getElementById('stat-' + (f==='all'?'all':f));
+  const statId = {applied:'stat-applied',running:'stat-running',success:'stat-success',
+                  failed:'stat-failed',error:'stat-error',stuck:'stat-stuck',
+                  skipped:'stat-skipped',pending:'stat-pending',all:'stat-all'}[f];
+  const sc = document.getElementById(statId);
   if (sc) sc.classList.add('active');
 
-  const logSec     = document.getElementById('log-section');
-  const pendingSec = document.getElementById('pending-section');
-  if (f === 'pending') {
-    logSec.style.display = 'none';
-    pendingSec.style.display = '';
+  if (f === 'applied') {
+    showSection('applied-section');
+    renderApplied();
+  } else if (f === 'failed') {
+    showSection('failed-section');
+    renderFailed();
+  } else if (f === 'pending') {
+    showSection('pending-section');
     renderPending();
   } else {
-    logSec.style.display = '';
-    pendingSec.style.display = 'none';
+    showSection('log-section');
     renderRuns();
   }
 }
 
-function applySearch() { renderRuns(); }
+function applySearch() {
+  if (currentFilter === 'applied')      renderApplied();
+  else if (currentFilter === 'failed')  renderFailed();
+  else if (currentFilter === 'pending') renderPending();
+  else                                  renderRuns();
+}
+
+// ── Render functions ──────────────────────────────────────────────────────
+function _searchQ() { return (document.getElementById('search').value||'').toLowerCase(); }
+
+function renderApplied() {
+  const q = _searchQ();
+  const tbody = document.getElementById('applied-tbody');
+  if (!tbody) return;
+  let html = '', cnt = 0;
+  (_appliedJobs||[]).forEach(j => {
+    if (!q || (j.title+' '+j.company).toLowerCase().includes(q)) { html += buildAppliedRow(j); cnt++; }
+  });
+  tbody.innerHTML = html || `<tr><td colspan="7" class="empty">No applied jobs match.</td></tr>`;
+  const el = document.getElementById('applied-count'); if (el) el.textContent = cnt;
+  const table = document.getElementById('applied-table');
+  const empty = document.getElementById('applied-empty');
+  if (table) table.style.display = _appliedJobs.length ? '' : 'none';
+  if (empty) empty.style.display = _appliedJobs.length ? 'none' : '';
+}
+
+function renderFailed() {
+  const q = _searchQ();
+  const tbody = document.getElementById('failed-tbody');
+  if (!tbody) return;
+  let html = '', cnt = 0;
+  (_failedJobs||[]).forEach(j => {
+    if (!q || (j.title+' '+j.company).toLowerCase().includes(q)) { html += buildFailedRow(j); cnt++; }
+  });
+  tbody.innerHTML = html || `<tr><td colspan="6" class="empty">No failed jobs match.</td></tr>`;
+  const el = document.getElementById('failed-count'); if (el) el.textContent = cnt;
+}
+
+function renderPending() {
+  const q = _searchQ();
+  const tbody = document.getElementById('pending-tbody');
+  if (!tbody) return;
+  let html = '', cnt = 0;
+  (_pendingJobs||[]).forEach(j => {
+    if (!q || (j.title+' '+j.company).toLowerCase().includes(q)) { html += buildPendingRow(j); cnt++; }
+  });
+  tbody.innerHTML = html || `<tr><td colspan="5" class="empty">No pending jobs.</td></tr>`;
+  const el = document.getElementById('pending-count'); if (el) el.textContent = cnt;
+}
 
 function renderRuns() {
-  const q = (document.getElementById('search').value||'').toLowerCase();
+  const q = _searchQ();
   const tbody = document.getElementById('run-tbody');
   if (!tbody) return;
   let html = '', visible = 0;
@@ -395,55 +606,67 @@ function renderRuns() {
     if (matchF && matchQ) { html += buildRunRow(r); visible++; }
   });
   tbody.innerHTML = html || `<tr><td colspan="9" class="empty">No runs match this filter.</td></tr>`;
-  const lc = document.getElementById('log-count');
-  if (lc) lc.textContent = visible;
+  const lc = document.getElementById('log-count'); if (lc) lc.textContent = visible;
   refreshDurations();
-  // Show empty-state div if no runs at all
-  const runTable = document.getElementById('run-table');
-  const emptyDiv = document.getElementById('run-empty');
-  if (runTable)  runTable.style.display = _allRuns.length ? '' : 'none';
-  if (emptyDiv)  emptyDiv.style.display = _allRuns.length ? 'none' : '';
 }
 
-function renderPending() {
-  const tbody = document.getElementById('pending-tbody');
-  if (!tbody) return;
-  const q = (document.getElementById('search').value||'').toLowerCase();
-  let html = '';
-  (_pendingJobs||[]).forEach(j => {
-    if (!q || (j.title+' '+j.company).toLowerCase().includes(q)) html += buildPendingRow(j);
-  });
-  tbody.innerHTML = html || `<tr><td colspan="5" class="empty">No pending jobs.</td></tr>`;
-}
-
-// ── Auto-refresh every 6 seconds ──────────────────────────────────────────
+// ── Auto-refresh ──────────────────────────────────────────────────────────
 function refresh() {
   fetch('/api/automation-board')
     .then(r => r.json())
     .then(d => {
-      _allRuns     = d.runs    || [];
-      _pendingJobs = d.pending || [];
-      const counts = d.counts  || {};
-      const fields = ['total','running','success','failed','error','stuck','skipped'];
-      fields.forEach(k => {
-        const el = document.getElementById('cnt-' + k);
-        if (el) el.textContent = counts[k] ?? 0;
+      _allRuns     = d.runs        || [];
+      _pendingJobs = d.pending     || [];
+      _appliedJobs = d.applied     || [];
+      _failedJobs  = d.failed_jobs || [];
+      const counts = d.counts || {};
+
+      // Update stat card numbers
+      const map = {
+        'cnt-running':      counts.running     ?? 0,
+        'cnt-success':      counts.success     ?? 0,
+        'cnt-error':        counts.error       ?? 0,
+        'cnt-stuck':        counts.stuck       ?? 0,
+        'cnt-skipped':      counts.skipped     ?? 0,
+        'cnt-total':        counts.total       ?? 0,
+        'cnt-applied-jobs': counts.applied_jobs ?? 0,
+        'cnt-failed-jobs':  counts.failed_jobs  ?? 0,
+        'cnt-pending':      _pendingJobs.length,
+      };
+      Object.entries(map).forEach(([id, val]) => {
+        const el = document.getElementById(id); if (el) el.textContent = val;
       });
-      const pe = document.getElementById('cnt-pending');
-      if (pe) pe.textContent = _pendingJobs.length;
+      // Update filter button labels
+      const appliedBtn = document.querySelector('[data-f="applied"]');
+      if (appliedBtn) appliedBtn.textContent = `✅ Applied (${counts.applied_jobs ?? 0})`;
+      const failedBtn = document.querySelector('[data-f="failed"]');
+      if (failedBtn) failedBtn.textContent = `❌ Failed (${counts.failed_jobs ?? 0})`;
+      const pendingBtn = document.querySelector('[data-f="pending"]');
+      if (pendingBtn) pendingBtn.textContent = `⏳ Pending (${_pendingJobs.length})`;
+
       document.getElementById('live-indicator').textContent =
         'Updated ' + new Date().toLocaleTimeString();
-      if (currentFilter === 'pending') renderPending();
-      else renderRuns();
+
+      if      (currentFilter === 'applied') renderApplied();
+      else if (currentFilter === 'failed')  renderFailed();
+      else if (currentFilter === 'pending') renderPending();
+      else                                  renderRuns();
     })
     .catch(() => {});
 }
 
-// Init durations from server-rendered rows, then start live refresh
+// ── Init ──────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
+  // On first load, use server-rendered data so there's no flash of empty
+  _appliedJobs = {{ applied | tojson }};
+  _failedJobs  = {{ failed_jobs | tojson }};
+  _pendingJobs = {{ pending | tojson }};
+  _allRuns     = {{ runs | tojson }};
+
   refreshDurations();
   setInterval(refreshDurations, 3000);
-  refresh();
+  // Default view: Applied
+  setFilter('applied');
   setInterval(refresh, 6000);
 });
 </script>

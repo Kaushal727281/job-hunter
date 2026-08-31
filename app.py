@@ -1186,11 +1186,21 @@ def automation_board():
     runs    = _al.all_runs()
     counts  = _al.run_counts()
     pending = _al.pending_jobs()
+    applied = sorted(job_store.applied_jobs(),
+                     key=lambda j: j.get("applied_at", ""), reverse=True)
+    failed_jobs = sorted(
+        [j for j in job_store.all_jobs() if j.get("apply_status") == "failed"],
+        key=lambda j: j.get("applied_at", "") or j.get("fetched_at", ""), reverse=True
+    )
+    counts["applied_jobs"] = len(applied)
+    counts["failed_jobs"]  = len(failed_jobs)
     return render_template(
         "automation_board.html",
         runs=runs,
         counts=counts,
         pending=pending,
+        applied=applied,
+        failed_jobs=failed_jobs,
     )
 
 
@@ -1199,10 +1209,21 @@ def api_automation_board():
     """JSON feed for automation board — used for live refresh."""
     _select_profile()
     import automation_log as _al
+    applied = sorted(job_store.applied_jobs(),
+                     key=lambda j: j.get("applied_at", ""), reverse=True)
+    failed_jobs = sorted(
+        [j for j in job_store.all_jobs() if j.get("apply_status") == "failed"],
+        key=lambda j: j.get("applied_at", "") or j.get("fetched_at", ""), reverse=True
+    )
+    counts = _al.run_counts()
+    counts["applied_jobs"] = len(applied)
+    counts["failed_jobs"]  = len(failed_jobs)
     return jsonify({
-        "runs":    _al.all_runs(limit=200),
-        "counts":  _al.run_counts(),
-        "pending": _al.pending_jobs(),
+        "runs":        _al.all_runs(limit=200),
+        "counts":      counts,
+        "pending":     _al.pending_jobs(),
+        "applied":     applied,
+        "failed_jobs": failed_jobs,
     })
 
 
