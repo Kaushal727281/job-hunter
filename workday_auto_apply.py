@@ -632,6 +632,78 @@ def apply_to_job(job: dict, ctx, dry_run: bool = False, _out: dict = None):
     resume_pdf = _resume_for_job(job)
     tenant     = _tenant_from_url(job_url) or ""
 
+    # ── Console / error log collector ────────────────────────────────────────
+    _console_msgs: list[dict] = []   # {type, text} captured from browser console
+
+    def _save_debug(page, step: str, extra: str = ""):
+        """Dump page errors + console log to /tmp/wd_debug_{tenant}_{step}.json
+        instead of relying solely on screenshots."""
+        import json as _json
+        try:
+            # Visible validation error messages on page
+            page_errors = page.evaluate("""() => {
+                const sel = [
+                    '[class*="error"]:not(script):not(style)',
+                    '[data-automation-id*="error"]',
+                    '[aria-invalid="true"]',
+                    '.validation-error',
+                    '[class*="Error"]',
+                ].join(',');
+                const els = Array.from(document.querySelectorAll(sel));
+                const texts = [];
+                els.forEach(el => {
+                    const t = (el.innerText || el.textContent || '').trim();
+                    if (t && t.length < 300 && !texts.includes(t)) texts.push(t);
+                });
+                return texts.slice(0, 30);
+            }""")
+        except Exception:
+            page_errors = []
+
+        try:
+            # Required fields currently empty
+            required_empty = page.evaluate("""() => {
+                const results = [];
+                document.querySelectorAll('[required],[aria-required="true"]').forEach(el => {
+                    if (!el.value || el.value === '') {
+                        const label = document.querySelector('label[for="'+el.id+'"]');
+                        const name = (label ? label.innerText : el.getAttribute('data-automation-id') || el.name || el.id || '?').trim();
+                        if (name && name.length < 100) results.push(name);
+                    }
+                });
+                return results.slice(0, 20);
+            }""")
+        except Exception:
+            required_empty = []
+
+        debug = {
+            "step":           step,
+            "url":            page.url,
+            "company":        job.get("company", ""),
+            "title":          job.get("title", ""),
+            "extra":          extra,
+            "page_errors":    page_errors,
+            "required_empty": required_empty,
+            "console":        _console_msgs[-40:],   # last 40 console lines
+        }
+        path = f"/tmp/wd_debug_{tenant}_{step}.json"
+        try:
+            with open(path, "w") as fh:
+                _json.dump(debug, fh, indent=2, ensure_ascii=False)
+        except Exception:
+            pass
+
+        # Print a concise summary to the log so it's searchable
+        print(f"  [debug-log] {path}")
+        if page_errors:
+            print(f"  [page-errors] {page_errors[:5]}")
+        if required_empty:
+            print(f"  [required-empty] {required_empty[:5]}")
+        console_errors = [m for m in _console_msgs[-20:] if m.get("type") in ("error","warning")]
+        if console_errors:
+            print(f"  [console-errors] {[m['text'][:80] for m in console_errors[:3]]}")
+        return path
+
     print(f"\n{'='*60}")
     print(f"  JOB  : {job['title']} @ {job['company']}")
     print(f"  SCORE: {job.get('fit_score', '?')}/10  — {job.get('fit_reason', '')}")
@@ -652,6 +724,14 @@ def apply_to_job(job: dict, ctx, dry_run: bool = False, _out: dict = None):
 
     page = ctx.new_page()
     Stealth().apply_stealth_sync(page)
+
+    # Attach console listener to capture JS logs/errors from the browser
+    page.on("console", lambda msg: _console_msgs.append({
+        "type": msg.type, "text": msg.text[:200]
+    }))
+    page.on("pageerror", lambda err: _console_msgs.append({
+        "type": "pageerror", "text": str(err)[:200]
+    }))
 
     try:
         # ── Step 1: Login (if credentials available) ─────────────────────────
@@ -3197,10 +3277,9 @@ def apply_to_job(job: dict, ctx, dry_run: bool = False, _out: dict = None):
         # MS External uses pageFooterNextButton on the Review step too.
         submitted = False
         try:
-            page.screenshot(path=f"/tmp/wd_before_submit_{tenant}.png")
-            print(f"  [screenshot] before-submit at /tmp/wd_before_submit_{tenant}.png")
+            _save_debug(page, "before_submit", extra="about to click submit")
         except Exception:
-            print(f"  [screenshot-warn] Could not take before-submit screenshot")
+            pass
         for sel in [
             'button:has-text("Submit")',
             'button:has-text("Submit Application")',
@@ -3257,17 +3336,19 @@ def apply_to_job(job: dict, ctx, dry_run: bool = False, _out: dict = None):
             page.close()
             return True
         else:
+            _save_debug(page, "not_confirmed", extra="submit attempted but no confirmation detected")
             page.screenshot(path=f"/tmp/wd_apply_{tenant}.png")
-            print(f"[WARN] Not confirmed — screenshot at /tmp/wd_apply_{tenant}.png")
+            print(f"[WARN] Not confirmed — debug log + screenshot at /tmp/wd_debug_{tenant}_not_confirmed.json")
             page.close()
-            return _fail(f"not_confirmed — screenshot: /tmp/wd_apply_{tenant}.png")
+            return _fail(f"not_confirmed — debug: /tmp/wd_debug_{tenant}_not_confirmed.json")
 
     except Exception as exc:
         err_msg = str(exc)
         print(f"[ERROR] Unexpected error: {err_msg}")
         try:
+            _save_debug(page, "exception", extra=err_msg[:200])
             page.screenshot(path=f"/tmp/wd_error_{tenant}.png")
-            err_msg += f" — screenshot: /tmp/wd_error_{tenant}.png"
+            err_msg += f" — debug: /tmp/wd_debug_{tenant}_exception.json"
         except Exception:
             pass
         page.close()
