@@ -477,7 +477,7 @@ PRODUCT_TIER2 = [
 
     # ---- Remote-First Companies (added 2026-08-31) ----
     # Greenhouse
-    {"name": "Cash App (Block)", "career_url": "https://boards.greenhouse.io/block", "tier": 1, "company_type": "product", "valuation_usd_b": 40.0, "india_office": False, "remote": True, "ats_type": "greenhouse", "hq": "San Francisco, USA", "india_hq": "", "greenhouse_board": "block"},
+    {"name": "Cash App (Block)", "career_url": "https://boards.greenhouse.io/cashapp", "tier": 1, "company_type": "product", "valuation_usd_b": 40.0, "india_office": False, "remote": True, "ats_type": "greenhouse", "hq": "San Francisco, USA", "india_hq": "", "greenhouse_board": "cashapp"},
     {"name": "GitLab", "career_url": "https://boards.greenhouse.io/gitlab", "tier": 1, "company_type": "product", "valuation_usd_b": 10.0, "india_office": False, "remote": True, "ats_type": "greenhouse", "hq": "San Francisco, USA", "india_hq": "", "greenhouse_board": "gitlab"},
     {"name": "Canonical", "career_url": "https://boards.greenhouse.io/canonical", "tier": 2, "company_type": "product", "valuation_usd_b": 0.5, "india_office": False, "remote": True, "ats_type": "greenhouse", "hq": "London, UK", "india_hq": "", "greenhouse_board": "canonical"},
     {"name": "Akamai Technologies", "career_url": "https://boards.greenhouse.io/akamai", "tier": 1, "company_type": "product", "valuation_usd_b": 15.0, "india_office": True, "remote": True, "ats_type": "greenhouse", "hq": "Cambridge, USA", "india_hq": "Bengaluru", "greenhouse_board": "akamai"},
@@ -493,8 +493,8 @@ PRODUCT_TIER2 = [
     {"name": "DigitalOcean", "career_url": "https://jobs.ashbyhq.com/digitalocean", "tier": 2, "company_type": "product", "valuation_usd_b": 3.0, "india_office": False, "remote": True, "ats_type": "ashby", "hq": "New York, USA", "india_hq": "", "ashby_board": "digitalocean"},
     {"name": "Shopify", "career_url": "https://jobs.ashbyhq.com/shopify", "tier": 1, "company_type": "product", "valuation_usd_b": 100.0, "india_office": False, "remote": True, "ats_type": "ashby", "hq": "Ottawa, Canada", "india_hq": "", "ashby_board": "shopify"},
     {"name": "DuckDuckGo", "career_url": "https://jobs.ashbyhq.com/duckduckgo", "tier": 2, "company_type": "product", "valuation_usd_b": 1.0, "india_office": False, "remote": True, "ats_type": "ashby", "hq": "Paoli, USA", "india_hq": "", "ashby_board": "duckduckgo"},
-    # Workday
-    {"name": "DocuSign", "career_url": "https://docusign.wd1.myworkdayjobs.com/en-US/DocuSign", "tier": 1, "company_type": "product", "valuation_usd_b": 17.0, "india_office": True, "remote": True, "ats_type": "workday", "hq": "San Francisco, USA", "india_hq": "Bengaluru", "workday_tenant": "docusign", "workday_instance": "wd1", "workday_site": "DocuSign"},
+    # iCIMS (not automatable — needs manual apply)
+    {"name": "DocuSign", "career_url": "https://careers.docusign.com", "tier": 1, "company_type": "product", "valuation_usd_b": 17.0, "india_office": True, "remote": True, "ats_type": "icims", "hq": "San Francisco, USA", "india_hq": "Bengaluru"},
     {"name": "Atlassian", "career_url": "https://www.atlassian.com/company/careers", "tier": 1, "company_type": "product", "valuation_usd_b": 40.0, "india_office": True, "remote": True, "ats_type": "greenhouse", "hq": "Sydney, Australia", "india_hq": "Bengaluru", "greenhouse_board": "atlassian"},
     # Cloudflare — custom portal (workers.cloudflare.com)
     {"name": "Cloudflare", "career_url": "https://www.cloudflare.com/careers/jobs/", "tier": 1, "company_type": "product", "valuation_usd_b": 25.0, "india_office": True, "remote": True, "ats_type": "greenhouse", "hq": "San Francisco, USA", "india_hq": "Bengaluru", "greenhouse_board": "cloudflare"},
