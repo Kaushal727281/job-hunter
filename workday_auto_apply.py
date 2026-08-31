@@ -1138,6 +1138,7 @@ def apply_to_job(job: dict, ctx, dry_run: bool = False, _out: dict = None):
                         _ot = (_opt.inner_text(timeout=500) or "").strip()
                         if "mobile" in _ot.lower() or "cell" in _ot.lower():
                             _opt.click()
+                            time.sleep(0.8)   # wait for React to register the selection
                             print(f"  [phoneType] picked: {_ot}")
                             _pt_picked = True
                             break
@@ -1171,12 +1172,17 @@ def apply_to_job(job: dict, ctx, dry_run: bool = False, _out: dict = None):
         except Exception as _dbe:
             print(f"  [field-dump] {_dbe}")
 
-        # "Have you previously worked at Morgan Stanley?" → click No
+        # "Have you previously worked here / ever been employed?" → click No
         # Find container by visible text (not automation-id which varies per instance)
         _prev_done = False
         try:
             _pq = page.locator('[data-automation-id^="formField-"]').filter(
-                has_text=re.compile(r"previously worked|former employee|previous worker", re.I)
+                has_text=re.compile(
+                    r"previously worked|former employee|previous worker"
+                    r"|ever been employed|ever worked for|worked at .{2,30} before"
+                    r"|candidateIsPrevious",
+                    re.I
+                )
             ).first
             _pq.wait_for(state="visible", timeout=3000)
             _pq_id = _pq.get_attribute("data-automation-id")
@@ -1258,7 +1264,8 @@ def apply_to_job(job: dict, ctx, dry_run: bool = False, _out: dict = None):
             _opened = False
             for _open_sel in (
                 '[data-automation-id="promptIcon"]',    # ≡ icon — primary trigger
-                'input',                                 # search input inside the multiselect
+                'button',                               # plain button (Broadcom / standard WD)
+                'input',                                # search input inside the multiselect
                 '[data-automation-id="multiselectInputContainer"]',
                 '[data-automation-id="multiSelectContainer"]',
             ):
@@ -1289,6 +1296,14 @@ def apply_to_job(job: dict, ctx, dry_run: bool = False, _out: dict = None):
                             icon.click();
                             icon.dispatchEvent(new MouseEvent("mouseup", {bubbles:true}));
                             return "JS-promptIcon";
+                        }
+                        // Try plain button (Broadcom style)
+                        var btn = c.querySelector("button");
+                        if (btn) {
+                            btn.dispatchEvent(new MouseEvent("mousedown", {bubbles:true}));
+                            btn.click();
+                            btn.dispatchEvent(new MouseEvent("mouseup", {bubbles:true}));
+                            return "JS-button";
                         }
                         // Try the INPUT
                         var inp = c.querySelector("input");
@@ -1327,9 +1342,48 @@ def apply_to_job(job: dict, ctx, dry_run: bool = False, _out: dict = None):
                 except Exception:
                     pass
             if _opened:
+                # ── Fast-path: plain single-select dropdown (Broadcom, most WD tenants) ──
+                # If role=option items are directly visible (no tree-select navigation
+                # needed), just click the first one that looks like a reasonable source.
+                _phone_codes_fp = {"India (+91)", "United States (+1)", "United Kingdom (+44)"}
+                _fp_opts = []
+                try:
+                    time.sleep(0.8)
+                    for _fpo in page.locator('[role="option"]:visible').all():
+                        try:
+                            _fpt = (_fpo.inner_text(timeout=300) or "").strip()
+                            if _fpt and _fpt not in _phone_codes_fp and "(+" not in _fpt:
+                                _fp_opts.append((_fpt, _fpo))
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+                if _fp_opts:
+                    # Prefer LinkedIn/Indeed/Job Board/Naukri; fallback to first option
+                    _prefer = ["linkedin", "indeed", "job board", "naukri", "glassdoor",
+                               "company website", "internet", "online"]
+                    _chosen = None
+                    for _kw in _prefer:
+                        for _ft, _fo in _fp_opts:
+                            if _kw in _ft.lower():
+                                _chosen = (_ft, _fo)
+                                break
+                        if _chosen:
+                            break
+                    if not _chosen:
+                        _chosen = _fp_opts[0]
+                    try:
+                        _chosen[1].click(timeout=2000)
+                        time.sleep(0.6)
+                        _src_done = True
+                        print(f"  [source-plain] picked: {_chosen[0]!r}")
+                    except Exception as _fpe:
+                        print(f"  [source-plain-err] {_fpe}")
+
                 # MS tree-select: all visible items are BRANCH nodes that navigate
                 # deeper when clicked. We need to keep clicking the first visible
                 # item until aria-instruction shows "1 item selected" (reached leaf).
+                # (This path only runs if fast-path above didn't set _src_done=True)
                 # Also inspect the DOM to understand the tree depth.
 
                 # First: JS-inspect the visible options to understand their aria attrs
@@ -2634,6 +2688,10 @@ def apply_to_job(job: dict, ctx, dry_run: bool = False, _out: dict = None):
             "provide documentation", "documentation establishing",
             "able to work on a daily basis", "work in the country",
             "identity and right",
+            # Adobe / generic work-eligibility questions
+            "legal age to work", "of legal age",
+            "willing to relocate", "able to perform",
+            "work authorization", "authorized for",
         )
         # Questions that should ALWAYS be answered No regardless of yes_kw matches
         q_no_kw = (
@@ -2938,10 +2996,11 @@ def apply_to_job(job: dict, ctx, dry_run: bool = False, _out: dict = None):
 
             # Handle multi-select checkbox groups — e.g. "Have you ever worked at Adobe in the following capacity?"
             # → check "I have not worked for X in the past" option
+            # Uses Playwright .click() so React 17+ synthetic events fire correctly.
             try:
-                _chk_filled = page.evaluate('''() => {
-                    var filled = 0;
-                    // Find all visible required checkbox groups
+                _chk_targets = page.evaluate('''() => {
+                    var targets = [];
+                    var _NOT_WORKED_KW = ["have not worked","not worked","i have not","none of the above","not previously"];
                     var groups = Array.from(document.querySelectorAll(
                         '[data-automation-id^="formField-"],[data-automation-id^="checkboxGroup"]'
                     )).filter(function(f) {
@@ -2950,34 +3009,31 @@ def apply_to_job(job: dict, ctx, dry_run: bool = False, _out: dict = None):
                     });
                     groups.forEach(function(g) {
                         var checkboxes = Array.from(g.querySelectorAll('input[type="checkbox"]'));
-                        var anyChecked = checkboxes.some(function(c) { return c.checked; });
-                        if (anyChecked) return;  // already answered
-                        var labelText = (g.innerText || "").toLowerCase();
-                        // For "worked at X" questions, find "have not worked" or "I have not worked" option
-                        var notWorkedCb = null;
+                        if (checkboxes.some(function(c) { return c.checked; })) return;
                         checkboxes.forEach(function(cb) {
                             var cbLabel = "";
                             var lbl = document.querySelector('label[for="'+cb.id+'"]');
                             if (lbl) cbLabel = lbl.innerText.toLowerCase();
                             else { var p = cb.parentElement; if (p) cbLabel = p.innerText.toLowerCase(); }
-                            if (cbLabel.includes("have not worked") || cbLabel.includes("not worked") ||
-                                cbLabel.includes("i have not") || cbLabel.includes("none of the above") ||
-                                cbLabel.includes("not previously")) {
-                                notWorkedCb = cb;
+                            for (var kw of _NOT_WORKED_KW) {
+                                if (cbLabel.includes(kw)) {
+                                    var r = cb.getBoundingClientRect();
+                                    targets.push({x: r.left + r.width/2, y: r.top + r.height/2, label: cbLabel.substring(0,40)});
+                                    break;
+                                }
                             }
                         });
-                        if (notWorkedCb) {
-                            notWorkedCb.checked = true;
-                            notWorkedCb.dispatchEvent(new Event("change", {bubbles: true}));
-                            notWorkedCb.dispatchEvent(new Event("click", {bubbles: true}));
-                            filled++;
-                        }
                     });
-                    return filled;
+                    return targets;
                 }''')
-                if _chk_filled:
-                    print(f"  [q-checkbox] ticked {_chk_filled} 'not worked' checkbox(es)")
-                    answered = True
+                for _ct in (_chk_targets or []):
+                    try:
+                        page.mouse.click(_ct["x"], _ct["y"])
+                        time.sleep(0.3)
+                        print(f"  [q-checkbox] Playwright-clicked: {_ct['label']!r}")
+                        answered = True
+                    except Exception as _cte:
+                        print(f"  [q-checkbox-err] {_cte}")
             except Exception:
                 pass
 
