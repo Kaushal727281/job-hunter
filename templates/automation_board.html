@@ -87,6 +87,10 @@
               background:#ffebee;padding:3px 7px;border-radius:4px;margin-top:3px}
     .dur{font-size:11px;color:#888;white-space:nowrap}
     .ts{font-size:11px;color:#888;white-space:nowrap}
+    .err-expand{font-size:11px;color:#1976d2;cursor:pointer;text-decoration:underline;display:block;margin-top:3px}
+    .err-full{display:none;font-size:11px;color:#555;margin-top:4px;padding:5px 8px;
+              background:#fff3e0;border-radius:4px;word-break:break-word;white-space:pre-wrap;max-width:340px}
+    .err-full.open{display:block}
 
     /* ── Pending section ── */
     .pending-table td{font-size:12.5px}
@@ -164,7 +168,7 @@
     <span class="count-chip" id="log-count">{{ runs|length }}</span>
   </div>
 
-  {% if runs %}
+  <div id="run-empty" style="display:none" class="empty">No automation runs yet. Run <code>./run.sh --apply-only</code> to start.</div>
   <table id="run-table">
     <thead>
       <tr>
@@ -187,10 +191,9 @@
         <td class="ts">{{ (r.started_at or '')[:16].replace('T',' ') }}</td>
         <td class="dur">
           {% if r.finished_at and r.started_at %}
-            {% set d = ((r.finished_at[:19]|string) | replace('T',' ')) %}
-            <span id="dur-{{ r.run_id }}">{{ r.finished_at[:16]|replace('T',' ') }}</span>
-          {% elif r.status == 'running' %}
-            <span class="spin"></span>
+            <span id="dur-{{ r.run_id }}" data-start="{{ r.started_at }}" data-end="{{ r.finished_at }}">—</span>
+          {% elif r.status == 'running' or r.status == 'stuck' %}
+            <span class="spin" id="dur-{{ r.run_id }}" data-start="{{ r.started_at }}"></span>
           {% else %}—{% endif %}
         </td>
         <td><strong>{{ r.title }}</strong></td>
@@ -208,7 +211,11 @@
         </td>
         <td>
           {% if r.error %}
-          <div class="err-cell">{{ r.error }}</div>
+          <div class="err-cell">{{ r.error[:80] }}{% if r.error|length > 80 %}…{% endif %}</div>
+          {% if r.error|length > 80 %}
+          <span class="err-expand" onclick="toggleErr(this)">▼ more info</span>
+          <div class="err-full">{{ r.error }}</div>
+          {% endif %}
           {% else %}—{% endif %}
         </td>
         <td>
@@ -220,8 +227,8 @@
       {% endfor %}
     </tbody>
   </table>
-  {% else %}
-  <div class="empty">No automation runs yet. Run <code>./run.sh --apply-only</code> to start.</div>
+  {% if not runs %}
+  <script>document.getElementById('run-empty').style.display='';document.getElementById('run-table').style.display='none';</script>
   {% endif %}
 </div>
 
@@ -236,7 +243,7 @@
     <thead>
       <tr><th>Job Title</th><th>Company</th><th>ATS</th><th>Score</th><th>Link</th></tr>
     </thead>
-    <tbody>
+    <tbody id="pending-tbody">
       {% for j in pending %}
       <tr data-status="pending" data-text="{{ (j.title + ' ' + j.company)|lower }}">
         <td><strong>{{ j.title }}</strong></td>
@@ -261,67 +268,184 @@
 
 <script>
 let currentFilter = 'all';
+let _allRuns = [];
+let _pendingJobs = [];
 
+// ── Duration helpers ──────────────────────────────────────────────────────
+function fmtDur(startIso, endIso) {
+  try {
+    const s = new Date(startIso), e = endIso ? new Date(endIso) : new Date();
+    const sec = Math.round((e - s) / 1000);
+    if (sec < 60) return sec + 's';
+    const m = Math.floor(sec / 60), rs = sec % 60;
+    return m + 'm ' + rs + 's';
+  } catch { return '—'; }
+}
+
+function refreshDurations() {
+  document.querySelectorAll('[data-start]').forEach(el => {
+    const end = el.dataset.end;
+    if (!end) {
+      // still running — show elapsed
+      el.innerHTML = '<span class="spin"></span> ' + fmtDur(el.dataset.start);
+    } else {
+      el.textContent = fmtDur(el.dataset.start, end);
+    }
+  });
+}
+
+// ── Expand/collapse error detail ──────────────────────────────────────────
+function toggleErr(el) {
+  const full = el.nextElementSibling;
+  if (!full) return;
+  const open = full.classList.toggle('open');
+  el.textContent = open ? '▲ less' : '▼ more info';
+}
+
+// ── Render helpers ────────────────────────────────────────────────────────
+function scoreDot(sc) {
+  const cls = sc >= 8 ? 'sd-high' : sc >= 6 ? 'sd-mid' : 'sd-low';
+  return `<span class="score-dot ${cls}">${sc}</span>`;
+}
+
+function statusBadge(status) {
+  const spin = status === 'running' ? '<span class="spin"></span> ' : '';
+  return `<span class="badge b-${status}">${spin}${status.toUpperCase()}</span>`;
+}
+
+function errorCell(err) {
+  if (!err) return '—';
+  const short = err.length > 80 ? err.slice(0, 80) + '…' : err;
+  let html = `<div class="err-cell">${short}</div>`;
+  if (err.length > 80) {
+    html += `<span class="err-expand" onclick="toggleErr(this)">▼ more info</span>
+             <div class="err-full">${err.replace(/</g,'&lt;')}</div>`;
+  }
+  return html;
+}
+
+function buildRunRow(r) {
+  const rowCls = ['running','stuck','error'].includes(r.status) ? `row-${r.status}` : '';
+  const durAttr = r.started_at
+    ? `data-start="${r.started_at}"${r.finished_at ? ` data-end="${r.finished_at}"` : ''}`
+    : '';
+  const link = r.apply_link
+    ? `<a class="job-link" href="${r.apply_link}" target="_blank">View ↗</a>`
+    : '—';
+  return `<tr class="run-row ${rowCls}" data-status="${r.status}"
+              data-text="${(r.title+' '+r.company).toLowerCase()}">
+    <td class="ts">${(r.started_at||'').slice(0,16).replace('T',' ')}</td>
+    <td class="dur"><span ${durAttr}>—</span></td>
+    <td><strong>${r.title||''}</strong></td>
+    <td>${r.company||''}</td>
+    <td><span class="ats-tag">${r.ats||''}</span></td>
+    <td>${scoreDot(+(r.score||0))}</td>
+    <td>${statusBadge(r.status)}</td>
+    <td>${errorCell(r.error||'')}</td>
+    <td>${link}</td>
+  </tr>`;
+}
+
+function buildPendingRow(j) {
+  const sc = +(j.fit_score||0);
+  const dot = scoreDot(sc);
+  const link = j.apply_link ? `<a class="job-link" href="${j.apply_link}" target="_blank">View ↗</a>` : '—';
+  return `<tr data-status="pending" data-text="${(j.title+' '+j.company).toLowerCase()}">
+    <td><strong>${j.title||''}</strong></td>
+    <td>${j.company||''}</td>
+    <td><span class="ats-tag">${j.ats_type||''}</span></td>
+    <td>${dot}</td>
+    <td>${link}</td>
+  </tr>`;
+}
+
+// ── Filter & search ───────────────────────────────────────────────────────
 function setFilter(f, btn) {
   currentFilter = f;
-  // Update filter buttons
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  else {
-    const b = document.querySelector(`[data-f="${f}"]`);
-    if (b) b.classList.add('active');
-  }
-  // Update stat card active state
+  else { const b = document.querySelector(`[data-f="${f}"]`); if (b) b.classList.add('active'); }
   document.querySelectorAll('.stat').forEach(s => s.classList.remove('active'));
-  const sc = document.getElementById('stat-' + (f === 'all' ? 'all' : f));
+  const sc = document.getElementById('stat-' + (f==='all'?'all':f));
   if (sc) sc.classList.add('active');
 
   const logSec     = document.getElementById('log-section');
   const pendingSec = document.getElementById('pending-section');
-
   if (f === 'pending') {
-    logSec.style.display     = 'none';
+    logSec.style.display = 'none';
     pendingSec.style.display = '';
+    renderPending();
   } else {
-    logSec.style.display     = '';
+    logSec.style.display = '';
     pendingSec.style.display = 'none';
-    applySearch();
+    renderRuns();
   }
 }
 
-function applySearch() {
-  const q = (document.getElementById('search').value || '').toLowerCase();
-  let visible = 0;
-  document.querySelectorAll('#run-tbody .run-row').forEach(row => {
-    const matchFilter = currentFilter === 'all' || row.dataset.status === currentFilter;
-    const matchSearch = !q || (row.dataset.text || '').includes(q);
-    row.style.display = (matchFilter && matchSearch) ? '' : 'none';
-    if (matchFilter && matchSearch) visible++;
+function applySearch() { renderRuns(); }
+
+function renderRuns() {
+  const q = (document.getElementById('search').value||'').toLowerCase();
+  const tbody = document.getElementById('run-tbody');
+  if (!tbody) return;
+  let html = '', visible = 0;
+  (_allRuns||[]).forEach(r => {
+    const matchF = currentFilter === 'all' || r.status === currentFilter;
+    const matchQ = !q || (r.title+' '+r.company).toLowerCase().includes(q);
+    if (matchF && matchQ) { html += buildRunRow(r); visible++; }
   });
+  tbody.innerHTML = html || `<tr><td colspan="9" class="empty">No runs match this filter.</td></tr>`;
   const lc = document.getElementById('log-count');
   if (lc) lc.textContent = visible;
+  refreshDurations();
+  // Show empty-state div if no runs at all
+  const runTable = document.getElementById('run-table');
+  const emptyDiv = document.getElementById('run-empty');
+  if (runTable)  runTable.style.display = _allRuns.length ? '' : 'none';
+  if (emptyDiv)  emptyDiv.style.display = _allRuns.length ? 'none' : '';
 }
 
-// Auto-refresh every 8 seconds
+function renderPending() {
+  const tbody = document.getElementById('pending-tbody');
+  if (!tbody) return;
+  const q = (document.getElementById('search').value||'').toLowerCase();
+  let html = '';
+  (_pendingJobs||[]).forEach(j => {
+    if (!q || (j.title+' '+j.company).toLowerCase().includes(q)) html += buildPendingRow(j);
+  });
+  tbody.innerHTML = html || `<tr><td colspan="5" class="empty">No pending jobs.</td></tr>`;
+}
+
+// ── Auto-refresh every 6 seconds ──────────────────────────────────────────
 function refresh() {
   fetch('/api/automation-board')
     .then(r => r.json())
     .then(d => {
-      const counts = d.counts || {};
+      _allRuns     = d.runs    || [];
+      _pendingJobs = d.pending || [];
+      const counts = d.counts  || {};
       const fields = ['total','running','success','failed','error','stuck','skipped'];
       fields.forEach(k => {
         const el = document.getElementById('cnt-' + k);
         if (el) el.textContent = counts[k] ?? 0;
       });
       const pe = document.getElementById('cnt-pending');
-      if (pe) pe.textContent = (d.pending || []).length;
+      if (pe) pe.textContent = _pendingJobs.length;
       document.getElementById('live-indicator').textContent =
         'Updated ' + new Date().toLocaleTimeString();
+      if (currentFilter === 'pending') renderPending();
+      else renderRuns();
     })
     .catch(() => {});
 }
-setInterval(refresh, 8000);
-refresh();
+
+// Init durations from server-rendered rows, then start live refresh
+document.addEventListener('DOMContentLoaded', () => {
+  refreshDurations();
+  setInterval(refreshDurations, 3000);
+  refresh();
+  setInterval(refresh, 6000);
+});
 </script>
 </body>
 </html>
