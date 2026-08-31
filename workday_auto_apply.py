@@ -2701,6 +2701,13 @@ def apply_to_job(job: dict, ctx, dry_run: bool = False, _out: dict = None):
             "require morgan stanley to sponsor", "require a work visa",
             "currently employed as", "previously employed as",
             "currently employed or previously", "board member", "contingent worker",
+            # Broadcom-specific
+            "previously interviewed for employment with broadcom",
+            "previously interviewed for employment",
+            "worked as a temporary or contract employee through a 3rd party",
+            "temporary or contract employee",
+            "relatives who work for broadcom",
+            "do you have relatives who work",
         )
         for _q_iter in range(12):   # up to 12 questionnaire pages
             # Close any lingering open dropdown from previous iteration
@@ -3222,11 +3229,12 @@ def apply_to_job(job: dict, ctx, dry_run: bool = False, _out: dict = None):
         # Wait up to 90s for a success/thank-you indicator on the page
         _success = False
         _success_keywords = (
-            "thank you", "application submitted", "application has been submitted",
+            "thank you for applying", "thank you for your application",
+            "application submitted", "application has been submitted",
             "successfully submitted", "we received your application",
             "your application is complete", "application complete",
-            "you've already applied", "you have already applied",
-            "already applied for this job", "already submitted",
+            # NOTE: "already applied" NOT here — handled separately earlier as already_applied
+            # to avoid false-positive when a draft/in-progress application exists
         )
         for _sw in range(30):  # poll up to 30s
             try:
