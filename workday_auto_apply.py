@@ -1100,67 +1100,58 @@ def apply_to_job(job: dict, ctx, dry_run: bool = False, _out: dict = None):
         _fill_field(["phone-number", "phoneNumber"], PROFILE["phone"])
 
         # Phone Device Type — select "Mobile" (required field, Workday single-select)
+        # Use real Playwright clicks (not JS dispatchEvent) so React synthetic events fire.
         try:
             _pt_cont = page.locator('[data-automation-id="formField-phoneType"]').first
             if _pt_cont.is_visible(timeout=2000):
-                _pt_res = page.evaluate('''() => {
-                    var c = document.querySelector('[data-automation-id="formField-phoneType"]');
-                    if (!c) return "no-cont";
-                    // Try radio inputs first
-                    var radios = c.querySelectorAll('input[type="radio"]');
-                    for (var i = 0; i < radios.length; i++) {
-                        var r = radios[i];
-                        var label = (r.labels && r.labels[0]) ? r.labels[0].innerText : "";
-                        var v = (r.value + " " + label).toLowerCase();
-                        if (v.includes("mobile") || v.includes("cell")) {
-                            r.click();
-                            r.dispatchEvent(new Event("change", {bubbles: true}));
-                            return "radio-mobile:" + r.value;
-                        }
-                    }
-                    // Workday custom select: open dropdown and pick Mobile
-                    var btn = c.querySelector("button") || c.querySelector('[data-automation-id="promptIcon"]');
-                    if (!btn) return "no-btn";
-                    var br = btn.getBoundingClientRect();
-                    var o = {bubbles:true, cancelable:true, clientX:br.left+br.width/2, clientY:br.top+br.height/2};
-                    btn.dispatchEvent(new MouseEvent("mousedown", o));
-                    btn.dispatchEvent(new MouseEvent("mouseup", o));
-                    btn.dispatchEvent(new MouseEvent("click", o));
-                    return "opened-dropdown";
-                }''')
-                print(f"  [phoneType] {_pt_res}")
-                if "opened-dropdown" in str(_pt_res):
-                    time.sleep(0.8)
-                    _pt_pick = page.evaluate('''() => {
-                        var opts = Array.from(document.querySelectorAll('[role="option"]'))
-                            .filter(function(e) {
-                                var r = e.getBoundingClientRect();
-                                return r.width > 0 && r.height > 0;
-                            });
-                        for (var i = 0; i < opts.length; i++) {
-                            var t = (opts[i].innerText || "").toLowerCase();
-                            if (t.includes("mobile") || t.includes("cell")) {
-                                var r = opts[i].getBoundingClientRect();
-                                var o = {bubbles:true, cancelable:true,
-                                         clientX:r.left+r.width/2, clientY:r.top+r.height/2};
-                                opts[i].dispatchEvent(new MouseEvent("click", o));
-                                return "picked:" + opts[i].innerText.trim();
-                            }
-                        }
-                        // Fallback: pick first non-empty option
-                        for (var i = 0; i < opts.length; i++) {
-                            var t = (opts[i].innerText || "").trim().toLowerCase();
-                            if (t && t !== "select one") {
-                                var r = opts[i].getBoundingClientRect();
-                                var o = {bubbles:true, cancelable:true,
-                                         clientX:r.left+r.width/2, clientY:r.top+r.height/2};
-                                opts[i].dispatchEvent(new MouseEvent("click", o));
-                                return "picked-first:" + opts[i].innerText.trim();
-                            }
-                        }
-                        return "no-opts";
-                    }''')
-                    print(f"  [phoneType-pick] {_pt_pick}")
+                # 1) Try radio buttons first (some Workday tenants render radios)
+                _pt_radios = _pt_cont.locator('input[type="radio"]')
+                _pt_radio_count = _pt_radios.count()
+                _pt_picked = False
+                for _ri in range(_pt_radio_count):
+                    _r = _pt_radios.nth(_ri)
+                    _rv = (_r.get_attribute("value") or "").lower()
+                    _rl = ""
+                    try:
+                        _rl = _pt_cont.locator(f'label[for="{_r.get_attribute("id")}"]').inner_text(timeout=500).lower()
+                    except Exception:
+                        pass
+                    if "mobile" in _rv or "cell" in _rv or "mobile" in _rl or "cell" in _rl:
+                        _r.click(force=True)
+                        print(f"  [phoneType] radio-mobile val={_rv}")
+                        _pt_picked = True
+                        break
+                if not _pt_picked:
+                    # 2) Workday custom select widget — use Playwright click to open, then pick
+                    _pt_btn = _pt_cont.locator("button, [data-automation-id='promptIcon']").first
+                    _pt_btn.click(timeout=3000)
+                    print(f"  [phoneType] opened dropdown via Playwright click")
+                    time.sleep(0.5)
+                    # Wait for options list to appear and pick Mobile / first non-empty
+                    _pt_opts = page.locator('[role="option"]')
+                    _pt_opts.first.wait_for(state="visible", timeout=3000)
+                    _pt_total = _pt_opts.count()
+                    print(f"  [phoneType] {_pt_total} options visible")
+                    for _oi in range(_pt_total):
+                        _opt = _pt_opts.nth(_oi)
+                        _ot = (_opt.inner_text(timeout=500) or "").strip()
+                        if "mobile" in _ot.lower() or "cell" in _ot.lower():
+                            _opt.click()
+                            print(f"  [phoneType] picked: {_ot}")
+                            _pt_picked = True
+                            break
+                    if not _pt_picked:
+                        # Fallback: first option that isn't blank / "Select One"
+                        for _oi in range(_pt_total):
+                            _opt = _pt_opts.nth(_oi)
+                            _ot = (_opt.inner_text(timeout=500) or "").strip()
+                            if _ot and _ot.lower() not in ("select one", ""):
+                                _opt.click()
+                                print(f"  [phoneType] picked-first: {_ot}")
+                                _pt_picked = True
+                                break
+                    if not _pt_picked:
+                        print(f"  [phoneType] WARNING: could not pick any option")
         except Exception as _pte:
             print(f"  [phoneType-err] {_pte}")
 
