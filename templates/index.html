@@ -77,6 +77,9 @@
     .status-select[data-val="interview"]{background:#e3f2fd;color:#0d47a1;border-color:#90caf9}
     .status-select[data-val="rejected"] {background:#fce4ec;color:#b71c1c;border-color:#ef9a9a}
     .badge-responded{background:#fff3e0;color:#e65100;padding:2px 7px;border-radius:10px;font-weight:700}
+    .badge-failed{background:#fce4ec;color:#b71c1c;padding:2px 7px;border-radius:10px;font-weight:700}
+    .apply-error-banner{background:#fce4ec;border-left:3px solid #e53935;border-radius:0 4px 4px 0;
+                        padding:7px 10px;margin-top:8px;font-size:11.5px;color:#b71c1c;line-height:1.5;word-break:break-word}
     .badge-product{background:#e3f2fd;color:#0d47a1;padding:2px 7px;border-radius:10px;font-weight:600;font-size:11px}
     .badge-service{background:#f3e5f5;color:#6a1b9a;padding:2px 7px;border-radius:10px;font-weight:600;font-size:11px}
     .badge-greenhouse{background:#e8f5e9;color:#1b5e20;padding:2px 7px;border-radius:10px}
@@ -362,9 +365,10 @@
   <!-- Status filter -->
   <div class="filter-group">
     <span class="filter-label">Status</span>
-    <button class="filter-btn active" data-filter="status" data-val="all"       onclick="applyFilters(this,'status')">All ({{ jobs|rejectattr('applied_at')|list|length }})</button>
+    <button class="filter-btn active" data-filter="status" data-val="all"       onclick="applyFilters(this,'status')">All ({{ jobs|rejectattr('applied_at')|rejectattr('apply_status','eq','failed')|list|length }})</button>
     <button class="filter-btn"        data-filter="status" data-val="tailored"  onclick="applyFilters(this,'status')">Tailored ({{ jobs|selectattr('tailor_result')|rejectattr('applied_at')|list|length }})</button>
-    <button class="filter-btn"        data-filter="status" data-val="applied"   onclick="applyFilters(this,'status')">Applied ({{ jobs|selectattr('applied_at')|rejectattr('job_status','eq','interview')|rejectattr('job_status','eq','rejected')|list|length }})</button>
+    <button class="filter-btn"        data-filter="status" data-val="applied"   onclick="applyFilters(this,'status')">✅ Applied ({{ jobs|selectattr('applied_at')|rejectattr('job_status','eq','interview')|rejectattr('job_status','eq','rejected')|list|length }})</button>
+    <button class="filter-btn"        data-filter="status" data-val="failed"    onclick="applyFilters(this,'status')" style="border-color:#ef9a9a">❌ Failed ({{ jobs|selectattr('apply_status','eq','failed')|list|length }})</button>
     <button class="filter-btn"        data-filter="status" data-val="interview" onclick="applyFilters(this,'status')">🟢 Interview ({{ jobs|selectattr('job_status','eq','interview')|list|length }})</button>
     <button class="filter-btn"        data-filter="status" data-val="rejected"  onclick="applyFilters(this,'status')">🔴 Rejected ({{ jobs|selectattr('job_status','eq','rejected')|list|length }})</button>
     <button class="filter-btn"        data-filter="status" data-val="responded" onclick="applyFilters(this,'status')">Responded ({{ jobs|selectattr('email_responses')|list|length }})</button>
@@ -394,6 +398,8 @@
        data-tailored="{{ 'yes' if tr else 'no' }}"
        data-applied="{{ 'yes' if job.applied_at else 'no' }}"
        data-jobstatus="{{ job.job_status or '' }}"
+       data-applystatus="{{ job.apply_status or '' }}"
+       data-applyerror="{{ job.apply_error or '' }}"
        data-responded="{{ 'yes' if job.email_responses else 'no' }}"
        data-loc="{{ job.location|lower }}"
        data-expmin="{{ job.experience|expmin }}"
@@ -416,6 +422,7 @@
         {% if job.tier %}<span class="badge-tier{{ job.tier }}" title="Tier {{ job.tier }} company">T{{ job.tier }}</span>{% endif %}
         {% if job.is_remote %}<span class="badge-remote">Remote</span>{% endif %}
         {% if job.applied_at %}<span class="badge-applied">✓ Applied</span>{% endif %}
+        {% if job.apply_status == 'failed' %}<span class="badge-failed">❌ Auto-Apply Failed</span>{% endif %}
         {% if job.job_status == 'rejected' %}<span class="badge-rejected">🔴 Rejected</span>{% endif %}
         {% if job.job_status == 'interview' %}<span class="badge-interview">🟢 Interview</span>{% endif %}
         {% if job.email_responses %}<span class="badge-responded" style="cursor:pointer" onclick="showResponses(event,'{{ job.id }}')">📬 {{ job.email_responses|length }} Response{{ 's' if job.email_responses|length > 1 else '' }}</span>{% endif %}
@@ -510,6 +517,9 @@
         </div>
         {% endif %}
         <div style="font-size:12px;color:#999;margin-top:8px">Resume not tailored yet</div>
+      {% endif %}
+      {% if job.apply_error %}
+      <div class="apply-error-banner">⚠️ <strong>Auto-apply failed:</strong> {{ job.apply_error }}</div>
       {% endif %}
     </div>
 
@@ -925,9 +935,11 @@ function applyFilters(btn, group){
     if(show && activeFilters.tier !== 'all' && c.dataset.tier !== activeFilters.tier) show=false;
     // Status
     const js = c.dataset.jobstatus || '';
-    if(activeFilters.status === 'all'      && c.dataset.applied === 'yes') show=false;
+    const as = c.dataset.applystatus || '';
+    if(activeFilters.status === 'all'      && (c.dataset.applied === 'yes' || as === 'failed')) show=false;
     if(show && activeFilters.status === 'tailored'  && (c.dataset.tailored !== 'yes' || c.dataset.applied === 'yes')) show=false;
     if(show && activeFilters.status === 'applied'   && (c.dataset.applied !== 'yes' || js === 'interview' || js === 'rejected')) show=false;
+    if(show && activeFilters.status === 'failed'    && as !== 'failed') show=false;
     if(show && activeFilters.status === 'interview' && js !== 'interview') show=false;
     if(show && activeFilters.status === 'rejected'  && js !== 'rejected')  show=false;
     if(show && activeFilters.status === 'responded'  && (c.dataset.responded !== 'yes' || js === 'rejected')) show=false;
