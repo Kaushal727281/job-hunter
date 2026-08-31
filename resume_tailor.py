@@ -402,6 +402,142 @@ def _detect_domain(job: dict) -> tuple[str, str]:
     )
 
 
+def _review_draft(draft: dict, job: dict) -> dict:
+    """
+    Reviewer pass: second LLM call that audits the draft for writing quality.
+
+    Checks:
+    - Clichés ("results-driven", "passionate", "team player", etc.)
+    - Em-dashes / en-dashes used where hyphens should be
+    - "Interview backtrack" claims (specific metrics or projects that are vague
+      and can't be defended in an interview)
+    - Generic summary that could apply to any job
+    - Passive-voice bullets ("was responsible for")
+
+    Returns a dict with:
+      {
+        "edits": [{"field":"summary|cover_letter|bullet_text","original":"...","replacement":"..."}],
+        "style_issues": ["issue1", "issue2"],
+        "reviewer_score": 1-10,
+        "approved": bool   (True if reviewer_score >= 7)
+      }
+    Falls back gracefully if LLM call fails.
+    """
+    from llm_client import chat_complete
+
+    # Build a compact view of the draft for the reviewer
+    bullets_preview = []
+    for role in (draft.get("jobs") or []):
+        for b in (role.get("bullets") or []):
+            bullets_preview.append(f"  • [{role.get('title','')}] {b}")
+
+    draft_text = f"""SUMMARY: {draft.get("summary", "")}
+
+BULLETS:
+{chr(10).join(bullets_preview[:20])}
+
+COVER LETTER (first 400 chars): {(draft.get("cover_letter") or "")[:400]}"""
+
+    prompt = f"""You are a senior technical recruiter reviewing a tailored resume draft for quality.
+Job: {job.get("title","?")} at {job.get("company","?")}
+
+DRAFT:
+{draft_text}
+
+Review for these CRITICAL issues:
+
+1. CLICHÉS — flag any of: "results-driven", "passionate", "team player", "hard worker",
+   "go-getter", "dynamic", "synergy", "leverage" (as verb), "proactively", "innovative",
+   "detail-oriented" used generically, "self-starter", "motivated individual"
+
+2. EM-DASHES — flag any bullet or sentence using — (em-dash) instead of a hyphen or comma
+
+3. INTERVIEW BACKTRACK TEST — flag any bullet that makes a claim the candidate might
+   struggle to elaborate on in 2 minutes. E.g. "reduced latency by 40%" with no context
+   of what was reduced, how, or what baseline. Vague metric claims are red flags.
+
+4. GENERIC SUMMARY — flag if the summary could apply to ANY Java/backend job rather than
+   THIS specific job. Must mention at least one thing specific to {job.get("company","?")}
+   or this exact JD.
+
+5. PASSIVE VOICE — flag bullets starting with "was responsible for", "assisted with",
+   "helped to", "worked on" — these are weak; must use strong action verbs.
+
+For each issue found, provide a specific replacement text.
+Return ONLY valid JSON — no markdown:
+{{
+  "edits": [
+    {{"field": "summary|cover_letter|<exact bullet text first 40 chars>",
+      "original": "<exact problematic phrase>",
+      "replacement": "<corrected text>"}}
+  ],
+  "style_issues": ["<issue description>"],
+  "reviewer_score": <1-10 overall quality>,
+  "approved": <true if score>=7>
+}}
+
+If no issues found, return {{"edits":[],"style_issues":[],"reviewer_score":9,"approved":true}}"""
+
+    try:
+        raw, _ = chat_complete(prompt, max_tokens=800, temperature=0.3)
+        if raw.startswith("```"):
+            raw = raw.split("```", 2)[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+            raw = raw.rsplit("```", 1)[0].strip()
+        review = json.loads(raw)
+        review.setdefault("edits", [])
+        review.setdefault("style_issues", [])
+        review.setdefault("reviewer_score", 7)
+        review.setdefault("approved", True)
+        logger.info(
+            f"  Reviewer: score={review['reviewer_score']}/10, "
+            f"edits={len(review['edits'])}, issues={len(review['style_issues'])}"
+        )
+        return review
+    except Exception as e:
+        logger.warning(f"  Reviewer pass failed: {e}")
+        return {"edits": [], "style_issues": [], "reviewer_score": 7, "approved": True}
+
+
+def _apply_reviewer_edits(result: dict, review: dict) -> dict:
+    """Apply reviewer's text edits back into the draft result dict."""
+    edits = review.get("edits") or []
+    if not edits:
+        return result
+
+    for edit in edits:
+        field    = (edit.get("field") or "").lower()
+        original = edit.get("original") or ""
+        replacement = edit.get("replacement") or ""
+        if not original or not replacement or original == replacement:
+            continue
+
+        if field == "summary":
+            s = result.get("summary", "")
+            if original in s:
+                result["summary"] = s.replace(original, replacement, 1)
+
+        elif field == "cover_letter":
+            cl = result.get("cover_letter", "")
+            if original in cl:
+                result["cover_letter"] = cl.replace(original, replacement, 1)
+
+        else:
+            # Try to match against bullet text
+            for role in (result.get("jobs") or []):
+                bullets = role.get("bullets") or []
+                for idx, b in enumerate(bullets):
+                    if original in b:
+                        bullets[idx] = b.replace(original, replacement, 1)
+                        break
+
+    # Record reviewer metadata in result
+    result["reviewer_score"]  = review.get("reviewer_score", 7)
+    result["reviewer_issues"] = review.get("style_issues", [])
+    return result
+
+
 def tailor_resume(job: dict, prev_tips: list[str] | None = None, custom_instructions: str | None = None) -> dict:
     """
     Tailors the base resume for the given job.
@@ -443,7 +579,31 @@ def tailor_resume(job: dict, prev_tips: list[str] | None = None, custom_instruct
     domain_label, domain_hint = _detect_domain(job)
     logger.info(f"  Detected domain: {domain_label}")
 
+    # Fetch company research (cached 30 days)
+    try:
+        from company_research import get_company_research
+        co_research = get_company_research(job)
+    except Exception:
+        co_research = {}
+
+    company_context = ""
+    if co_research:
+        parts = []
+        if co_research.get("mission"):
+            parts.append(f"Mission: {co_research['mission']}")
+        if co_research.get("product"):
+            parts.append(f"Product: {co_research['product']}")
+        if co_research.get("tech_stack"):
+            parts.append(f"Known tech stack: {', '.join(co_research['tech_stack'][:6])}")
+        if co_research.get("culture"):
+            parts.append(f"Culture: {co_research['culture']}")
+        if co_research.get("why_join"):
+            parts.append(f"Why join (use in cover letter para 2): {co_research['why_join']}")
+        if parts:
+            company_context = "\n## Company Research\n" + "\n".join(parts) + "\n"
+
     prompt = f"""You are an expert ATS resume optimizer helping {candidate_name} tailor their resume for a specific job. Your TWO goals:
+{company_context}
 1. Maximize ATS keyword match score by weaving JD keywords naturally into the resume.
 2. Keep every claim 100% truthful — never fabricate roles, companies, or technologies not present.
 
@@ -588,6 +748,15 @@ Return ONLY valid JSON, no markdown fences, no extra text."""
     for key in ("summary", "jobs", "match_score", "key_matches"):
         if key not in result:
             raise ValueError(f"Groq response missing key: {key}")
+
+    # ── Drafter-Reviewer pass ──────────────────────────────────────────────
+    # Second LLM call audits the draft for clichés, em-dashes, vague metrics,
+    # generic summary, and passive-voice bullets. Applies fixes to the draft.
+    try:
+        review = _review_draft(result, job)
+        result = _apply_reviewer_edits(result, review)
+    except Exception as _rev_err:
+        logger.warning(f"  Reviewer pass skipped: {_rev_err}")
     # Normalise any fields that llama may return as lists instead of strings
     for _f in ("summary", "cover_letter", "cover_note"):
         if isinstance(result.get(_f), list):

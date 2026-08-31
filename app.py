@@ -322,6 +322,21 @@ def _bg_tailor(job_id: str, profile: str, prev_result: dict = None, prev_pdf: st
         pdf_path = save_and_convert(result["resume_html"], job_dir, "resume")
         (job_dir / "cover_note.txt").write_text(result.get("cover_note", ""), encoding="utf-8")
 
+        # ATS PDF text-layer verification (MadsLorentzen approach)
+        try:
+            from verify_pdf import verify_pdf_coverage
+            pdf_verify = verify_pdf_coverage(
+                pdf_path,
+                result.get("bold_keywords", []),
+                job.get("description", ""),
+            )
+            result["pdf_verify"] = pdf_verify
+            logger.info(
+                f"  PDF verify: {pdf_verify['coverage_pct']}% keyword coverage → {pdf_verify['verdict']}"
+            )
+        except Exception as _pve:
+            logger.warning(f"  PDF verify skipped: {_pve}")
+
         job_store.update_job(job_id,
             tailor_result=result,
             pdf_path=str(pdf_path),
